@@ -1,0 +1,14 @@
+{
+  "id": "finance",
+  "name": "Финансы",
+  "version": "1.0.0",
+  "description": "Расходы, доходы, бюджет и статистика по категориям",
+  "icon": "💰",
+  "author": "lifehub",
+  "type": "app",
+  "sdk": "^1",
+  "entry": "src/index.tsx",
+  "deps": {},
+  "permissions": [],
+  "exports": { "collections": ["transactions"] }
+}

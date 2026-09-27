@@ -1,0 +1,14 @@
+{
+  "id": "notes",
+  "name": "Заметки",
+  "version": "1.0.0",
+  "description": "Заметки в markdown с тегами и поиском",
+  "icon": "📝",
+  "author": "lifehub",
+  "type": "app",
+  "sdk": "^1",
+  "entry": "src/index.tsx",
+  "deps": { "marked": "^16" },
+  "permissions": [],
+  "exports": { "collections": ["notes"] }
+}

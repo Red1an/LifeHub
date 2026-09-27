@@ -1,0 +1,11 @@
+{
+  "id": "__ID__",
+  "name": "__NAME__",
+  "version": "1.0.0",
+  "description": "__DESCRIPTION__",
+  "icon": "__ICON__",
+  "type": "library",
+  "sdk": "^1",
+  "entry": "src/index.ts",
+  "deps": {}
+}

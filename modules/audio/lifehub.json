@@ -1,0 +1,13 @@
+{
+  "id": "audio",
+  "name": "Аудио",
+  "version": "1.0.0",
+  "description": "Общий аудиодвижок: микрофон, высота тона, метроном, ритм",
+  "icon": "🎚️",
+  "author": "lifehub",
+  "type": "library",
+  "sdk": "^1",
+  "entry": "src/index.ts",
+  "deps": {},
+  "permissions": ["mic"]
+}

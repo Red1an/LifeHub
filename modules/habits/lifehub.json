@@ -1,0 +1,13 @@
+{
+  "id": "habits",
+  "name": "Привычки",
+  "version": "1.0.0",
+  "description": "Ежедневные привычки, серии и календарь активности",
+  "icon": "🔥",
+  "author": "lifehub",
+  "type": "app",
+  "sdk": "^1",
+  "entry": "src/index.tsx",
+  "deps": {},
+  "permissions": []
+}

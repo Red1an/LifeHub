@@ -1,0 +1,14 @@
+{
+  "id": "guitar",
+  "name": "GuitarHub",
+  "version": "1.0.0",
+  "description": "Аккорды и табы, тренажёры слуха, ритма и вокала, прогресс",
+  "icon": "🎸",
+  "author": "lifehub",
+  "type": "app",
+  "sdk": "^1",
+  "entry": "src/index.tsx",
+  "deps": {},
+  "uses": { "audio": "^1" },
+  "permissions": ["mic", "files"]
+}

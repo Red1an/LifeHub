@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+/* Тёмная тема включается атрибутом data-theme="dark" (на <html> или на обёртке модуля). */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/*
+ * Токены темы. Оболочка хаба нарочно нейтральная — это рамка, а не стиль:
+ * модули могут пользоваться токенами (bg-surface, text-muted, border-line, bg-accent…),
+ * а могут полностью рисовать свой интерфейс.
+ */
+@theme inline {
+  --color-bg: var(--lh-bg);
+  --color-surface: var(--lh-surface);
+  --color-surface-2: var(--lh-surface-2);
+  --color-line: var(--lh-line);
+  --color-fg: var(--lh-fg);
+  --color-muted: var(--lh-muted);
+  --color-accent: var(--lh-accent);
+  --color-accent-fg: var(--lh-accent-fg);
+  --color-accent-soft: var(--lh-accent-soft);
+  --color-success: var(--lh-success);
+  --color-warning: var(--lh-warning);
+  --color-danger: var(--lh-danger);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+}
+
+:root,
+[data-theme="light"] {
+  --lh-bg: #f7f7f5;
+  --lh-surface: #ffffff;
+  --lh-surface-2: #f0f0ee;
+  --lh-line: #e4e4e0;
+  --lh-fg: #1a1a18;
+  --lh-muted: #74746e;
+  --lh-success: #2f7d4f;
+  --lh-warning: #a8660f;
+  --lh-danger: #c2352b;
+  --lh-ink: #1a1a18;
+  --lh-ink-fg: #ffffff;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --lh-bg: #121211;
+  --lh-surface: #1a1a19;
+  --lh-surface-2: #232321;
+  --lh-line: #2e2e2b;
+  --lh-fg: #e9e9e4;
+  --lh-muted: #8d8d86;
+  --lh-success: #5fb37f;
+  --lh-warning: #d69a45;
+  --lh-danger: #e0675d;
+  --lh-ink: #e9e9e4;
+  --lh-ink-fg: #121211;
+  color-scheme: dark;
+}
+
+/* Акцент: по умолчанию «чернила» — цвет текста, без навязанного цвета. */
+:root { --lh-accent: var(--lh-ink); --lh-accent-fg: var(--lh-ink-fg); }
+[data-accent="blue"] { --lh-accent: #2f6fd6; --lh-accent-fg: #fff; }
+[data-accent="green"] { --lh-accent: #2f7d4f; --lh-accent-fg: #fff; }
+[data-accent="orange"] { --lh-accent: #d0661c; --lh-accent-fg: #fff; }
+[data-accent="red"] { --lh-accent: #c2352b; --lh-accent-fg: #fff; }
+[data-accent="violet"] { --lh-accent: #6b4fd8; --lh-accent-fg: #fff; }
+
+:root { --lh-accent-soft: color-mix(in oklab, var(--lh-accent) 10%, transparent); }
+
+html,
+body {
+  background: var(--lh-bg);
+  color: var(--lh-fg);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+
+/* Обёртка модуля с собственной темой получает свой фон и цвет текста. */
+.lh-module[data-theme] {
+  background: var(--lh-bg);
+  color: var(--lh-fg);
+}
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+@keyframes lh-fade { from { opacity: 0; } }
+@keyframes lh-sheet { from { transform: translateY(16px); opacity: 0; } }
+@keyframes lh-toast { from { transform: translateY(8px); opacity: 0; } }
+.lh-fade { animation: lh-fade 0.12s ease-out; }
+.lh-sheet { animation: lh-sheet 0.18s cubic-bezier(0.2, 0.9, 0.3, 1); }
+.lh-toast { animation: lh-toast 0.16s ease-out; }
+
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pt-safe { padding-top: env(safe-area-inset-top); }
