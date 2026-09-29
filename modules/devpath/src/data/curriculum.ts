@@ -1,0 +1,1045 @@
+/*
+ * Учебная программа: треки → темы. Темы идут в рекомендуемом порядке.
+ * level: 1 — база (junior+), 2 — middle, 3 — senior.
+ * points — что нужно знать по теме; по ним нейронка строит уроки, квизы и задачи.
+ * id темы — `<трек>-<слаг>`, менять нельзя: к нему привязан прогресс.
+ */
+
+export interface Topic {
+  id: string;
+  title: string;
+  level: 1 | 2 | 3;
+  summary: string;
+  points: string[];
+}
+
+export interface Resource {
+  title: string;
+  url: string;
+}
+
+export interface Track {
+  id: string;
+  title: string;
+  icon: string;
+  color: string;
+  description: string;
+  resources: Resource[];
+  topics: Topic[];
+}
+
+const t = (id: string, title: string, level: 1 | 2 | 3, summary: string, points: string[]): Topic => ({ id, title, level, summary, points });
+
+export const TRACKS: Track[] = [
+  {
+    id: "csharp",
+    title: "C# и CLR",
+    icon: "🟣",
+    color: "#a78bfa",
+    description: "Язык на уровне «знаю, как это работает внутри»: память, GC, async, generics, производительность.",
+    resources: [
+      { title: "Документация C#", url: "https://learn.microsoft.com/ru-ru/dotnet/csharp/" },
+      { title: "CLR via C# (Рихтер) — классика про рантайм", url: "https://www.oreilly.com/library/view/clr-via-c/9780735668737/" },
+      { title: "SharpLab — смотреть IL и JIT-asm", url: "https://sharplab.io/" },
+      { title: "Блог .NET — Performance Improvements", url: "https://devblogs.microsoft.com/dotnet/category/performance/" },
+    ],
+    topics: [
+      t("csharp-types", "Типы значений и ссылочные типы", 1, "Где живут данные, боксинг, семантика копирования.", [
+        "struct vs class: копирование, стек/куча как деталь реализации",
+        "boxing/unboxing и где он прячется (интерфейсы, object, params)",
+        "readonly struct, ref struct, record struct",
+        "Nullable<T> и nullable reference types",
+        "равенство: Equals, GetHashCode, ==, IEquatable<T>",
+      ]),
+      t("csharp-oop", "ООП в C# глубже", 1, "Наследование, интерфейсы, полиморфизм и их цена.", [
+        "virtual/override/new, sealed, abstract",
+        "интерфейсы: default interface methods, static abstract members",
+        "композиция вместо наследования",
+        "records: value equality, with-выражения",
+        "модификаторы доступа, init, required",
+      ]),
+      t("csharp-exceptions", "Исключения и обработка ошибок", 1, "Как бросать, ловить и не терять ошибки.", [
+        "try/catch/finally, when-фильтры, throw vs throw ex",
+        "иерархия исключений, свои исключения",
+        "исключения vs Result-паттерн",
+        "стоимость исключений",
+        "AggregateException, исключения в Task",
+      ]),
+      t("csharp-generics", "Generics и вариантность", 2, "Как устроены обобщения в CLR и зачем in/out.", [
+        "ограничения where (class, struct, new(), unmanaged, notnull)",
+        "ковариантность и контравариантность (IEnumerable<out T>, Action<in T>)",
+        "reified generics: код для value types и reference types",
+        "generic math и static abstract в интерфейсах",
+        "статические поля в generic-типах",
+      ]),
+      t("csharp-delegates", "Делегаты, события, лямбды", 1, "Замыкания и их ловушки.", [
+        "Func/Action/Predicate, multicast-делегаты",
+        "события и отписка, утечки памяти через события",
+        "замыкания: захват переменных, аллокации",
+        "static лямбды, локальные функции",
+        "expression trees vs delegates",
+      ]),
+      t("csharp-linq", "LINQ изнутри", 1, "Отложенное выполнение, итераторы, IQueryable.", [
+        "yield return и машина состояний итератора",
+        "deferred vs immediate execution, многократное перечисление",
+        "IEnumerable vs IQueryable",
+        "стоимость LINQ: аллокации, когда писать цикл",
+        "GroupBy, Join, SelectMany, Aggregate",
+      ]),
+      t("csharp-collections", "Коллекции и их сложность", 1, "Что выбрать и почему.", [
+        "List, Dictionary, HashSet: устройство и O-сложность",
+        "resize, capacity, коллизии хэша",
+        "Immutable и Frozen коллекции",
+        "Concurrent-коллекции: ConcurrentDictionary, Channel",
+        "Span-friendly API, CollectionsMarshal",
+      ]),
+      t("csharp-strings", "Строки и текст", 1, "Неизменяемость, кодировки, форматирование.", [
+        "неизменяемость string, интернирование",
+        "StringBuilder, интерполяция и interpolated string handlers",
+        "кодировки: UTF-8, UTF-16, BOM",
+        "сравнение строк: Ordinal vs культура",
+        "Regex: компиляция, source generator, таймауты",
+      ]),
+      t("csharp-memory", "Память и сборщик мусора", 2, "Поколения, LOH, финализация, утечки.", [
+        "поколения 0/1/2, LOH/POH, compacting",
+        "workstation vs server GC, concurrent/background GC",
+        "IDisposable, using, финализаторы, SafeHandle",
+        "WeakReference, утечки в управляемом коде",
+        "как смотреть: dotnet-counters, dotnet-gcdump",
+      ]),
+      t("csharp-span", "Span, Memory и высокопроизводительный код", 3, "Работа без аллокаций.", [
+        "Span<T>, ReadOnlySpan<T>, Memory<T>: где что можно",
+        "stackalloc, ArrayPool, MemoryPool",
+        "ref returns, ref locals, scoped",
+        "string vs ReadOnlySpan<char>, string.Create",
+        "System.IO.Pipelines",
+      ]),
+      t("csharp-async", "async/await изнутри", 2, "Машина состояний, контекст синхронизации, ошибки.", [
+        "как компилятор разворачивает async-метод",
+        "Task vs ValueTask, когда что",
+        "SynchronizationContext, ConfigureAwait(false)",
+        "deadlock из .Result/.Wait()",
+        "исключения в async, async void, CancellationToken",
+        "IAsyncEnumerable, await foreach",
+      ]),
+      t("csharp-threading", "Многопоточность и синхронизация", 2, "Потоки, пул, примитивы, модель памяти.", [
+        "ThreadPool, Task.Run, долгие задачи",
+        "lock/Monitor, SemaphoreSlim, ReaderWriterLockSlim",
+        "Interlocked, volatile, модель памяти .NET",
+        "гонки, дедлоки, livelock",
+        "Parallel, PLINQ, Channels (producer/consumer)",
+      ]),
+      t("csharp-reflection", "Рефлексия, атрибуты, Source Generators", 3, "Метапрограммирование и AOT.", [
+        "Reflection и её стоимость",
+        "атрибуты и их чтение",
+        "Source Generators (incremental)",
+        "Native AOT и trimming: что ломается",
+        "Emit/Expression.Compile — где применяется",
+      ]),
+      t("csharp-modern", "Современный C# (10–14)", 1, "Фичи последних версий, которые спрашивают.", [
+        "pattern matching: property, list, relational patterns",
+        "primary constructors, collection expressions",
+        "file-scoped types, global usings",
+        "required members, raw string literals",
+        "field keyword, extension members",
+      ]),
+      t("csharp-runtime", "JIT, IL и устройство рантайма", 3, "Что происходит между кодом и процессором.", [
+        "IL, JIT, tiered compilation, PGO",
+        "ReadyToRun vs Native AOT",
+        "inlining, devirtualization, bounds check elimination",
+        "method table, заголовок объекта",
+        "как читать asm в SharpLab",
+      ]),
+      t("csharp-benchmark", "Профилирование и BenchmarkDotNet", 2, "Измерять, а не гадать.", [
+        "BenchmarkDotNet: MemoryDiagnoser, baseline, параметры",
+        "почему Stopwatch в цикле врёт",
+        "dotnet-trace, dotnet-counters, PerfView",
+        "поиск горячих мест и аллокаций",
+      ]),
+    ],
+  },
+  {
+    id: "dotnet",
+    title: "ASP.NET Core и экосистема",
+    icon: "🌐",
+    color: "#60a5fa",
+    description: "Веб-сервисы на .NET: хостинг, DI, middleware, API, аутентификация, тесты, фоновые задачи.",
+    resources: [
+      { title: "Документация ASP.NET Core", url: "https://learn.microsoft.com/ru-ru/aspnet/core/" },
+      { title: ".NET Aspire", url: "https://learn.microsoft.com/ru-ru/dotnet/aspire/" },
+      { title: "eShop — эталонное приложение Microsoft", url: "https://github.com/dotnet/eShop" },
+    ],
+    topics: [
+      t("dotnet-host", "Generic Host, конфигурация, логирование", 1, "Как стартует приложение.", [
+        "WebApplication builder, Generic Host",
+        "IConfiguration: источники и порядок, Options pattern (IOptions/Snapshot/Monitor)",
+        "ILogger, структурное логирование, Serilog",
+        "окружения, секреты (user-secrets)",
+      ]),
+      t("dotnet-di", "Внедрение зависимостей", 1, "Контейнер .NET и времена жизни.", [
+        "Singleton/Scoped/Transient и captive dependency",
+        "keyed services, фабрики, декораторы",
+        "IServiceScopeFactory в фоновых задачах",
+        "почему Service Locator — антипаттерн",
+      ]),
+      t("dotnet-middleware", "Pipeline и middleware", 1, "Путь запроса через приложение.", [
+        "порядок middleware и почему он важен",
+        "свой middleware, Use/Map/Run",
+        "фильтры MVC vs middleware",
+        "обработка ошибок, ProblemDetails",
+      ]),
+      t("dotnet-api", "Web API: Minimal API и контроллеры", 1, "Проектирование HTTP API.", [
+        "Minimal API: группы, фильтры, TypedResults",
+        "model binding и валидация",
+        "версионирование API, OpenAPI",
+        "REST: ресурсы, коды ответа, идемпотентность методов",
+        "пагинация, фильтрация",
+      ]),
+      t("dotnet-mediatr", "CQRS в приложении: MediatR и пайплайны", 2, "Команды, запросы и сквозная логика.", [
+        "команды и запросы, обработчики",
+        "pipeline behaviors: валидация, логирование, транзакции",
+        "FluentValidation",
+        "когда MediatR лишний",
+      ]),
+      t("dotnet-auth", "Аутентификация и авторизация", 2, "JWT, OAuth2/OIDC, политики.", [
+        "cookie vs JWT bearer",
+        "OAuth 2.0 и OpenID Connect: потоки (authorization code + PKCE, client credentials)",
+        "политики, claims, requirement handlers",
+        "refresh tokens, хранение секретов",
+        "Identity, Keycloak/Duende",
+      ]),
+      t("dotnet-grpc", "gRPC, SignalR и реальное время", 2, "Не только REST.", [
+        "gRPC: protobuf, стриминг, дедлайны",
+        "SignalR: хабы, масштабирование через backplane",
+        "WebSockets, SSE",
+        "когда что выбрать",
+      ]),
+      t("dotnet-background", "Фоновые задачи", 2, "Работа вне запроса.", [
+        "BackgroundService, IHostedService",
+        "Hangfire, Quartz",
+        "Channels как внутренняя очередь",
+        "graceful shutdown",
+      ]),
+      t("dotnet-testing", "Тестирование", 1, "Пирамида тестов на практике.", [
+        "xUnit/NUnit, AAA, теории",
+        "моки: Moq/NSubstitute, когда не мокать",
+        "WebApplicationFactory — интеграционные тесты",
+        "Testcontainers для БД и брокеров",
+        "покрытие, мутационное тестирование (Stryker)",
+      ]),
+      t("dotnet-resilience", "Отказоустойчивость HTTP-клиентов", 2, "HttpClient и Polly.", [
+        "IHttpClientFactory и проблема сокетов",
+        "retry с backoff и jitter, timeout, circuit breaker",
+        "Microsoft.Extensions.Resilience",
+        "идемпотентность при повторах",
+      ]),
+      t("dotnet-caching", "Кэширование", 2, "In-memory, распределённый, HybridCache.", [
+        "IMemoryCache, IDistributedCache, HybridCache",
+        "Redis: структуры, TTL, eviction",
+        "стратегии: cache-aside, write-through",
+        "инвалидация, stampede, output caching",
+      ]),
+      t("dotnet-observability", "Наблюдаемость в .NET", 2, "Логи, метрики, трейсы.", [
+        "OpenTelemetry в .NET: Activity, Meter",
+        "корреляция запросов, trace context",
+        "health checks",
+        "Aspire dashboard",
+      ]),
+      t("dotnet-aspire", ".NET Aspire и облачная разработка", 3, "Оркестрация распределённого приложения локально.", [
+        "AppHost, ресурсы, service discovery",
+        "интеграции (Postgres, Redis, RabbitMQ)",
+        "деплой: манифест, контейнеры",
+      ]),
+      t("dotnet-performance", "Производительность ASP.NET Core", 3, "Выжать максимум из сервиса.", [
+        "response compression, output caching",
+        "rate limiting middleware",
+        "пулы объектов, аллокации на запрос",
+        "нагрузочное тестирование: k6, NBomber",
+      ]),
+      t("dotnet-deploy", "Деплой и хостинг .NET", 2, "Как .NET-приложение живёт в проде.", [
+        "Kestrel, IIS, reverse proxy",
+        "self-contained, framework-dependent, single-file",
+        "systemd-сервис на Linux, Windows Service",
+        "контейнеры: dotnet publish /t:PublishContainer",
+        "health checks и graceful shutdown при деплое",
+      ]),
+    ],
+  },
+  {
+    id: "data",
+    title: "Базы данных и EF Core",
+    icon: "🗄️",
+    color: "#34d399",
+    description: "SQL на уровне планов запросов, транзакции и изоляция, EF Core без боли, NoSQL.",
+    resources: [
+      { title: "Use The Index, Luke — индексы", url: "https://use-the-index-luke.com/" },
+      { title: "Документация EF Core", url: "https://learn.microsoft.com/ru-ru/ef/core/" },
+      { title: "PostgreSQL: документация", url: "https://www.postgresql.org/docs/current/" },
+    ],
+    topics: [
+      t("data-sql", "SQL глубже", 1, "Джойны, оконные функции, CTE.", [
+        "виды JOIN, NULL-семантика",
+        "GROUP BY/HAVING, оконные функции",
+        "CTE, рекурсивные CTE",
+        "подзапросы vs джойны",
+      ]),
+      t("data-indexes", "Индексы и планы запросов", 2, "Почему запрос медленный.", [
+        "B-tree, hash, GIN/GiST",
+        "составные индексы и порядок колонок, covering index",
+        "EXPLAIN ANALYZE, seq scan vs index scan",
+        "селективность, статистика",
+      ]),
+      t("data-transactions", "Транзакции и уровни изоляции", 2, "ACID и аномалии.", [
+        "ACID",
+        "аномалии: dirty read, non-repeatable read, phantom, lost update, write skew",
+        "уровни изоляции и MVCC",
+        "блокировки, дедлоки, SELECT FOR UPDATE",
+        "оптимистичная конкуренция (rowversion)",
+      ]),
+      t("data-postgres", "PostgreSQL на практике", 2, "Особенности главной open-source СУБД.", [
+        "MVCC и VACUUM, bloat",
+        "JSONB и индексы по нему",
+        "расширения: pg_stat_statements, pg_trgm, PostGIS",
+        "Npgsql в .NET",
+      ]),
+      t("data-modeling", "Моделирование данных", 1, "Нормализация и когда её нарушать.", [
+        "нормальные формы",
+        "денормализация ради чтения",
+        "ключи: суррогатные, естественные, UUID v7",
+        "soft delete, аудит, временные таблицы",
+      ]),
+      t("data-efcore", "EF Core: основы и ловушки", 1, "ORM, который надо понимать.", [
+        "DbContext, change tracking, AsNoTracking",
+        "N+1, Include, split queries",
+        "миграции и их деплой",
+        "проекции Select вместо загрузки сущностей",
+      ]),
+      t("data-efcore-adv", "EF Core продвинутый", 3, "Производительность и тонкая настройка.", [
+        "compiled queries, ExecuteUpdate/ExecuteDelete",
+        "owned types, value converters, JSON-колонки",
+        "интерсепторы, конкуренция",
+        "Dapper рядом с EF",
+      ]),
+      t("data-nosql", "NoSQL", 2, "Документные, key-value, колоночные.", [
+        "MongoDB: документы, индексы, агрегации",
+        "Redis как БД",
+        "Cassandra: wide-column, партиционирование",
+        "когда NoSQL, а когда Postgres с JSONB",
+      ]),
+      t("data-redis", "Redis глубже", 2, "Больше, чем кэш.", [
+        "структуры: string, hash, list, set, sorted set, stream",
+        "персистентность: RDB, AOF",
+        "Pub/Sub и Streams",
+        "распределённые блокировки и их подводные камни",
+        "кластер и Sentinel",
+      ]),
+      t("data-scaling", "Масштабирование БД", 3, "Реплики, шардинг, партиционирование.", [
+        "репликация: синхронная/асинхронная, лаг",
+        "read replicas и read-your-writes",
+        "партиционирование таблиц",
+        "шардинг: ключ, решардинг",
+        "connection pooling (PgBouncer)",
+      ]),
+      t("data-search", "Полнотекстовый поиск и аналитика", 3, "Elasticsearch и OLAP.", [
+        "инвертированный индекс",
+        "Elasticsearch/OpenSearch: маппинг, анализаторы",
+        "OLTP vs OLAP, ClickHouse",
+        "CDC (Debezium) для синхронизации",
+      ]),
+    ],
+  },
+  {
+    id: "arch",
+    title: "Архитектура и проектирование",
+    icon: "🏛️",
+    color: "#f59e0b",
+    description: "От чистого кода до архитектуры систем: принципы, паттерны, DDD, стили.",
+    resources: [
+      { title: "refactoring.guru — паттерны", url: "https://refactoring.guru/ru/design-patterns" },
+      { title: "Martin Fowler — статьи по архитектуре", url: "https://martinfowler.com/architecture/" },
+      { title: "Microsoft: архитектура .NET-приложений", url: "https://learn.microsoft.com/ru-ru/dotnet/architecture/" },
+    ],
+    topics: [
+      t("arch-solid", "SOLID, DRY, KISS, YAGNI", 1, "Принципы, и где они перегибают.", [
+        "каждый принцип SOLID с примером нарушения",
+        "связность и зацепление (cohesion/coupling)",
+        "закон Деметры",
+        "когда принципы вредят",
+      ]),
+      t("arch-patterns", "Паттерны проектирования GoF", 1, "Которые реально используются в .NET.", [
+        "Strategy, Decorator, Adapter, Facade",
+        "Factory, Builder",
+        "Observer, Mediator, Chain of Responsibility",
+        "паттерны внутри самого .NET (middleware, IOptions, Stream)",
+      ]),
+      t("arch-refactoring", "Рефакторинг и чистый код", 1, "Как улучшать код безопасно.", [
+        "запахи кода",
+        "приёмы рефакторинга",
+        "тесты как страховка",
+        "работа с легаси (Feathers)",
+      ]),
+      t("arch-layers", "Слоистая, чистая и гексагональная архитектура", 2, "Где проходят границы.", [
+        "N-tier и его проблемы",
+        "Clean Architecture, Onion, Ports & Adapters",
+        "направление зависимостей",
+        "vertical slice architecture",
+      ]),
+      t("arch-ddd", "Domain-Driven Design", 2, "Стратегический и тактический DDD.", [
+        "ubiquitous language, bounded context, context map",
+        "entity, value object, aggregate и его границы",
+        "доменные события",
+        "anti-corruption layer",
+        "event storming",
+      ]),
+      t("arch-testing", "Тестируемая архитектура", 2, "Код, который легко проверять.", [
+        "пирамида и «трофей» тестов",
+        "тестовые двойники: stub, mock, fake",
+        "тестирование через публичный API, а не детали",
+        "архитектурные тесты (NetArchTest)",
+      ]),
+      t("arch-cqrs", "CQRS и Event Sourcing", 3, "Разделение чтения и записи.", [
+        "CQRS без и с разными хранилищами",
+        "event sourcing: события как источник правды, снапшоты",
+        "проекции, eventual consistency",
+        "когда это оверкилл",
+      ]),
+      t("arch-monolith", "Модульный монолит vs микросервисы", 2, "Выбор стиля.", [
+        "модульный монолит: модули, границы, контракты",
+        "микросервисы: плюсы, цена, распределённый монолит",
+        "декомпозиция по бизнес-возможностям",
+        "strangler fig — миграция",
+      ]),
+      t("arch-microservices", "Паттерны микросервисов", 3, "Как микросервисы общаются и не падают.", [
+        "API gateway, BFF",
+        "database per service",
+        "saga (оркестрация/хореография)",
+        "transactional outbox/inbox",
+        "service mesh",
+      ]),
+      t("arch-api", "Проектирование API и контрактов", 2, "API, которые не больно менять.", [
+        "REST vs gRPC vs GraphQL",
+        "обратная совместимость, версионирование",
+        "contract testing (Pact)",
+        "идемпотентные ключи",
+      ]),
+      t("arch-quality", "Атрибуты качества и решения", 3, "Работа архитектора.", [
+        "нефункциональные требования: латентность, доступность, масштабируемость",
+        "ADR — записи архитектурных решений",
+        "C4-модель для схем",
+        "фитнес-функции архитектуры",
+        "trade-off анализ",
+      ]),
+      t("arch-integration", "Интеграционные паттерны", 3, "Как системы разговаривают друг с другом.", [
+        "Enterprise Integration Patterns: канал, маршрутизатор, транслятор",
+        "синхронная vs асинхронная интеграция",
+        "webhooks, polling, CDC",
+        "схемы сообщений и их эволюция",
+      ]),
+    ],
+  },
+  {
+    id: "distributed",
+    title: "Распределённые системы",
+    icon: "🕸️",
+    color: "#f472b6",
+    description: "Согласованность, консенсус, очереди, отказы — то, что отличает senior от middle.",
+    resources: [
+      { title: "Designing Data-Intensive Applications (Клеппман)", url: "https://dataintensive.net/" },
+      { title: "Jepsen — анализы БД", url: "https://jepsen.io/analyses" },
+      { title: "The Raft Consensus Algorithm", url: "https://raft.github.io/" },
+    ],
+    topics: [
+      t("distributed-basics", "Заблуждения и модели отказов", 1, "Почему распределённое — это сложно.", [
+        "8 заблуждений о распределённых вычислениях",
+        "частичные отказы, таймауты",
+        "модели отказов: crash, omission, byzantine",
+        "синхронная vs асинхронная модель",
+      ]),
+      t("distributed-time", "Время и порядок событий", 2, "Часы врут.", [
+        "физические часы, NTP, дрейф",
+        "логические часы Лэмпорта",
+        "векторные часы",
+        "hybrid logical clocks",
+        "happens-before",
+      ]),
+      t("distributed-cap", "CAP, PACELC и модели согласованности", 2, "Чем платим за доступность.", [
+        "CAP и частые неверные трактовки",
+        "PACELC",
+        "линеаризуемость, последовательная, причинная, eventual consistency",
+        "read-your-writes, monotonic reads",
+      ]),
+      t("distributed-replication", "Репликация", 2, "Лидер, мульти-лидер, без лидера.", [
+        "single-leader, multi-leader, leaderless",
+        "кворумы (R + W > N)",
+        "конфликты: LWW, CRDT",
+        "anti-entropy, read repair",
+      ]),
+      t("distributed-partitioning", "Партиционирование", 2, "Как делить данные.", [
+        "по диапазону vs по хэшу",
+        "consistent hashing, виртуальные узлы",
+        "горячие ключи",
+        "ребалансировка",
+      ]),
+      t("distributed-consensus", "Консенсус: Raft и Paxos", 3, "Как узлы договариваются.", [
+        "задача консенсуса, FLP",
+        "Raft: выборы лидера, репликация лога, term",
+        "Paxos в общих чертах",
+        "etcd/ZooKeeper, распределённые блокировки и fencing tokens",
+      ]),
+      t("distributed-idempotency", "Идемпотентность и дедупликация", 2, "Повтор не должен ломать данные.", [
+        "идемпотентные операции и ключи",
+        "inbox-паттерн, таблица обработанных сообщений",
+        "дедупликация по окну",
+        "естественная идемпотентность через upsert",
+      ]),
+      t("distributed-transactions", "Распределённые транзакции", 3, "2PC, саги, outbox.", [
+        "two-phase commit и его проблемы",
+        "саги и компенсации",
+        "transactional outbox",
+        "exactly-once как иллюзия, идемпотентность",
+      ]),
+      t("distributed-messaging", "Очереди и брокеры сообщений", 2, "RabbitMQ, Kafka.", [
+        "очередь vs лог",
+        "RabbitMQ: exchanges, routing, ack, DLQ",
+        "Kafka: партиции, consumer groups, offsets, ретеншн",
+        "гарантии доставки: at-most/at-least/effectively-once",
+        "MassTransit в .NET",
+      ]),
+      t("distributed-streaming", "Потоковая обработка", 3, "События в реальном времени.", [
+        "event time vs processing time, окна",
+        "watermarks",
+        "Kafka Streams, Flink — идеи",
+        "event-driven архитектура",
+      ]),
+      t("distributed-resilience", "Отказоустойчивость", 2, "Не упасть всем вместе.", [
+        "таймауты, ретраи, backoff+jitter",
+        "circuit breaker, bulkhead",
+        "rate limiting: token bucket, leaky bucket",
+        "backpressure, load shedding",
+        "каскадные отказы",
+      ]),
+      t("distributed-orleans", "Акторы и Orleans", 3, "Модель акторов в .NET.", [
+        "модель акторов",
+        "Orleans: grains, silos, virtual actors",
+        "Akka.NET",
+        "когда акторы подходят",
+      ]),
+    ],
+  },
+  {
+    id: "devops",
+    title: "DevOps и инфраструктура",
+    icon: "⚙️",
+    color: "#22d3ee",
+    description: "Linux, контейнеры, Kubernetes, CI/CD, IaC, наблюдаемость, SRE.",
+    resources: [
+      { title: "roadmap.sh/devops", url: "https://roadmap.sh/devops" },
+      { title: "Документация Kubernetes", url: "https://kubernetes.io/ru/docs/home/" },
+      { title: "Google SRE Book (бесплатно)", url: "https://sre.google/sre-book/table-of-contents/" },
+      { title: "Killercoda — интерактивные лабы", url: "https://killercoda.com/" },
+    ],
+    topics: [
+      t("devops-linux", "Linux для разработчика", 1, "Уверенно в терминале.", [
+        "процессы, сигналы, systemd",
+        "файловая система, права, пользователи",
+        "bash: пайпы, grep/sed/awk, скрипты",
+        "диагностика: top/htop, ss, lsof, journalctl, strace",
+      ]),
+      t("devops-bash", "Автоматизация: bash и PowerShell", 1, "Скрипты вместо ручной работы.", [
+        "переменные, условия, циклы, функции",
+        "коды возврата, set -euo pipefail",
+        "PowerShell: объекты в конвейере",
+        "cron и планировщик задач",
+      ]),
+      t("devops-git", "Git продвинутый и процессы", 1, "Ветвление и история.", [
+        "rebase vs merge, interactive rebase",
+        "trunk-based vs gitflow",
+        "bisect, reflog, cherry-pick",
+        "conventional commits, semver",
+      ]),
+      t("devops-docker", "Docker", 1, "Контейнеры изнутри и снаружи.", [
+        "образы, слои, кэш сборки",
+        "multi-stage Dockerfile для .NET, chiseled-образы",
+        "namespaces и cgroups",
+        "сети и тома, docker compose",
+        "безопасность: non-root, сканирование",
+      ]),
+      t("devops-cicd", "CI/CD", 1, "Конвейер от коммита до прода.", [
+        "GitHub Actions / GitLab CI: джобы, кэш, артефакты",
+        "сборка, тесты, публикация образов",
+        "стратегии деплоя: rolling, blue-green, canary",
+        "feature flags",
+      ]),
+      t("devops-k8s", "Kubernetes: основы", 2, "Главные объекты.", [
+        "архитектура: control plane, kubelet, etcd",
+        "Pod, Deployment, ReplicaSet, Service, Ingress",
+        "ConfigMap, Secret",
+        "probes: liveness, readiness, startup",
+        "requests/limits, QoS",
+      ]),
+      t("devops-networking", "Сети в Docker и Kubernetes", 2, "Как контейнеры находят друг друга.", [
+        "bridge, host, overlay сети Docker",
+        "Service: ClusterIP, NodePort, LoadBalancer",
+        "DNS в кластере, kube-proxy",
+        "Ingress-контроллеры, Gateway API",
+      ]),
+      t("devops-k8s-adv", "Kubernetes продвинутый", 3, "Эксплуатация кластера.", [
+        "StatefulSet, DaemonSet, Job/CronJob",
+        "HPA, VPA, cluster autoscaler",
+        "RBAC, NetworkPolicy",
+        "операторы и CRD",
+        "Helm, Kustomize",
+      ]),
+      t("devops-iac", "Infrastructure as Code", 2, "Инфраструктура в git.", [
+        "Terraform: провайдеры, state, модули, plan/apply",
+        "Ansible — конфигурация серверов",
+        "GitOps: Argo CD / Flux",
+        "дрейф конфигурации",
+      ]),
+      t("devops-cloud", "Облака", 2, "Azure/AWS/Yandex Cloud: базовые сервисы.", [
+        "вычисления: VM, контейнеры, serverless",
+        "хранилища: объектное, блочное, managed БД",
+        "сети: VPC, подсети, балансировщики",
+        "IAM и принцип наименьших привилегий",
+        "стоимость (FinOps)",
+      ]),
+      t("devops-observability", "Мониторинг и наблюдаемость", 2, "Метрики, логи, трейсы.", [
+        "Prometheus: модель данных, PromQL",
+        "Grafana: дашборды и алерты",
+        "логи: Loki / ELK",
+        "трейсинг: OpenTelemetry, Jaeger/Tempo",
+        "RED и USE методы",
+      ]),
+      t("devops-sre", "SRE-практики", 3, "Надёжность как инженерная задача.", [
+        "SLI, SLO, SLA, error budget",
+        "инцидент-менеджмент, постмортемы без обвинений",
+        "capacity planning",
+        "chaos engineering",
+        "toil и его автоматизация",
+      ]),
+      t("devops-security", "DevSecOps", 3, "Безопасность в конвейере.", [
+        "секреты: Vault, sealed secrets",
+        "SAST/DAST, сканирование зависимостей и образов",
+        "supply chain: SBOM, подпись образов",
+        "политики: OPA/Kyverno",
+      ]),
+      t("devops-nginx", "Веб-серверы и прокси", 2, "Nginx, балансировка, TLS.", [
+        "reverse proxy, балансировка L4/L7",
+        "TLS-терминация, сертификаты, Let's Encrypt",
+        "Kestrel за прокси, forwarded headers",
+        "YARP в .NET",
+      ]),
+    ],
+  },
+  {
+    id: "cs",
+    title: "Алгоритмы и основы CS",
+    icon: "🧮",
+    color: "#94a3b8",
+    description: "Структуры данных, алгоритмы, ОС — фундамент и секции собеседований.",
+    resources: [
+      { title: "NeetCode — задачи по паттернам", url: "https://neetcode.io/roadmap" },
+      { title: "LeetCode", url: "https://leetcode.com/problemset/" },
+      { title: "Visualgo — визуализации", url: "https://visualgo.net/" },
+    ],
+    topics: [
+      t("cs-complexity", "Сложность алгоритмов", 1, "O-нотация и амортизация.", [
+        "O, Θ, Ω",
+        "амортизированная сложность",
+        "сложность по памяти",
+        "оценка по ограничениям задачи",
+      ]),
+      t("cs-arrays", "Массивы, строки, хэш-таблицы", 1, "Самые частые задачи.", [
+        "два указателя, скользящее окно",
+        "префиксные суммы",
+        "хэш-таблицы для подсчёта",
+        "сортировки и их свойства",
+      ]),
+      t("cs-structures", "Стек, очередь, куча, связные списки", 1, "Базовые структуры.", [
+        "монотонный стек",
+        "очередь с приоритетом (PriorityQueue в .NET)",
+        "связные списки: разворот, цикл",
+        "LRU-кэш",
+      ]),
+      t("cs-trees", "Деревья и графы", 2, "Обходы и поиск путей.", [
+        "BST, сбалансированные деревья, trie",
+        "DFS, BFS, топологическая сортировка",
+        "Дейкстра, union-find",
+        "обходы деревьев",
+      ]),
+      t("cs-dp", "Динамическое программирование", 2, "Подзадачи и мемоизация.", [
+        "мемоизация vs табуляция",
+        "рюкзак, LIS, LCS",
+        "DP на строках и сетках",
+        "как выделить состояние",
+      ]),
+      t("cs-search", "Бинарный поиск и жадные алгоритмы", 1, "Поиск по ответу.", [
+        "бинарный поиск и его границы",
+        "поиск по ответу",
+        "жадные алгоритмы и доказательство",
+        "интервалы",
+      ]),
+      t("cs-os", "Операционные системы", 2, "Процессы, память, I/O.", [
+        "процессы и потоки, переключение контекста",
+        "виртуальная память, страницы",
+        "планировщик",
+        "I/O модели: блокирующий, epoll/IOCP",
+      ]),
+      t("cs-hardware", "Железо для программиста", 3, "Кэши, конвейер, SIMD.", [
+        "иерархия памяти, cache lines, false sharing",
+        "branch prediction",
+        "SIMD и Vector<T> в .NET",
+        "числа, которые должен знать каждый (латентности)",
+      ]),
+      t("cs-patterns", "Паттерны задач с собеседований", 2, "Узнавать тип задачи за минуту.", [
+        "два указателя, скользящее окно, быстрый и медленный указатель",
+        "BFS/DFS, топологическая сортировка, union-find",
+        "бинарный поиск по ответу, куча топ-K",
+        "backtracking, DP",
+        "как рассуждать вслух на интервью",
+      ]),
+    ],
+  },
+  {
+    id: "net",
+    title: "Сети и безопасность",
+    icon: "🔐",
+    color: "#fb7185",
+    description: "Как ходят байты и как не дать их украсть.",
+    resources: [
+      { title: "OWASP Top 10", url: "https://owasp.org/www-project-top-ten/" },
+      { title: "High Performance Browser Networking (бесплатно)", url: "https://hpbn.co/" },
+    ],
+    topics: [
+      t("net-tcpip", "TCP/IP", 1, "Модель и транспорт.", [
+        "модели OSI и TCP/IP",
+        "TCP: рукопожатие, окна, retransmission, TIME_WAIT",
+        "UDP и когда он лучше",
+        "IP, подсети, NAT",
+      ]),
+      t("net-http", "HTTP/1.1, HTTP/2, HTTP/3", 1, "Эволюция протокола.", [
+        "методы, заголовки, кэширование (ETag, Cache-Control)",
+        "keep-alive, мультиплексирование, head-of-line blocking",
+        "QUIC",
+        "CORS",
+      ]),
+      t("net-dns-tls", "DNS и TLS", 2, "Имена и шифрование.", [
+        "DNS: записи, резолвинг, TTL",
+        "TLS 1.3 рукопожатие",
+        "сертификаты, цепочка доверия, mTLS",
+        "HSTS",
+      ]),
+      t("net-owasp", "Безопасность веб-приложений", 2, "OWASP Top 10 на .NET.", [
+        "инъекции (SQL, команды), параметризация",
+        "XSS, CSRF, SSRF",
+        "broken access control, IDOR",
+        "хранение паролей: хэши, соль, Argon2/PBKDF2",
+        "защита данных (Data Protection API)",
+      ]),
+      t("net-api-security", "Безопасность API", 2, "Защитить сервис, открытый в интернет.", [
+        "аутентификация сервис-сервис, mTLS, API-ключи",
+        "валидация JWT: подпись, aud, exp",
+        "rate limiting, защита от перебора",
+        "секреты: не в коде и не в логах",
+      ]),
+      t("net-crypto", "Криптография для разработчика", 3, "Что использовать и как не ошибиться.", [
+        "симметричное и асимметричное шифрование",
+        "хэши, HMAC, подписи",
+        "AES-GCM, ключи и IV",
+        "никогда не писать свою криптографию",
+      ]),
+      t("net-loadbalancing", "Балансировка и CDN", 2, "Доставка трафика.", [
+        "L4 vs L7",
+        "алгоритмы балансировки",
+        "sticky sessions",
+        "CDN и edge-кэширование",
+      ]),
+    ],
+  },
+  {
+    id: "ai",
+    title: "Нейросети и ИИ",
+    icon: "🤖",
+    color: "#c084fc",
+    description: "От основ ML до LLM-приложений на .NET: RAG, агенты, эмбеддинги.",
+    resources: [
+      { title: "3Blue1Brown — нейросети (видео)", url: "https://www.3blue1brown.com/topics/neural-networks" },
+      { title: "fast.ai — практический курс", url: "https://course.fast.ai/" },
+      { title: "Andrej Karpathy — Zero to Hero", url: "https://karpathy.ai/zero-to-hero.html" },
+      { title: "Semantic Kernel / Microsoft.Extensions.AI", url: "https://learn.microsoft.com/ru-ru/dotnet/ai/" },
+    ],
+    topics: [
+      t("ai-math", "Математика для ML", 1, "Минимум, без которого не понять.", [
+        "векторы, матрицы, умножение",
+        "производные, градиент, chain rule",
+        "вероятности, распределения",
+        "функции потерь",
+      ]),
+      t("ai-python", "Python для ML-инженера", 1, "Язык экосистемы ИИ глазами C#-разработчика.", [
+        "синтаксис и отличия от C#",
+        "виртуальные окружения, pip/uv",
+        "NumPy, pandas",
+        "Jupyter-ноутбуки",
+      ]),
+      t("ai-ml", "Классическое машинное обучение", 1, "Модели до нейросетей.", [
+        "обучение с учителем и без",
+        "линейная/логистическая регрессия, деревья, бустинг",
+        "переобучение, регуляризация, кросс-валидация",
+        "метрики: accuracy, precision/recall, F1, ROC-AUC",
+        "ML.NET",
+      ]),
+      t("ai-nn", "Нейронные сети", 2, "Как учатся сети.", [
+        "перцептрон, слои, функции активации",
+        "backpropagation",
+        "оптимизаторы: SGD, Adam",
+        "batch, epoch, learning rate",
+        "PyTorch на базовом уровне",
+      ]),
+      t("ai-arch", "Архитектуры: CNN, RNN, трансформеры", 2, "Что внутри современных моделей.", [
+        "свёрточные сети",
+        "RNN/LSTM и их проблемы",
+        "attention и трансформер",
+        "токенизация",
+      ]),
+      t("ai-llm", "Большие языковые модели", 2, "Как работают LLM.", [
+        "предобучение, fine-tuning, RLHF",
+        "контекстное окно, температура, top-p",
+        "галлюцинации и их причины",
+        "open-source модели, квантование, Ollama",
+      ]),
+      t("ai-prompting", "Промпт-инжиниринг", 1, "Как получать надёжный результат.", [
+        "системные промпты, few-shot",
+        "chain-of-thought, структурированный вывод (JSON)",
+        "оценка качества промптов (evals)",
+        "prompt injection",
+      ]),
+      t("ai-embeddings", "Эмбеддинги и векторный поиск", 2, "Смысловой поиск.", [
+        "эмбеддинги и косинусная близость",
+        "векторные БД: pgvector, Qdrant",
+        "ANN-индексы (HNSW)",
+        "гибридный поиск",
+      ]),
+      t("ai-rag", "RAG", 2, "LLM + ваши данные.", [
+        "chunking, retrieval, reranking",
+        "оценка RAG-систем",
+        "цитирование источников",
+        "типичные провалы",
+      ]),
+      t("ai-agents", "Агенты и tool use", 3, "LLM, которые действуют.", [
+        "function calling / tool use",
+        "MCP (Model Context Protocol)",
+        "планирование, циклы агента, память",
+        "безопасность и ограничения агентов",
+      ]),
+      t("ai-dotnet", "ИИ в .NET", 2, "Встраиваем модели в приложения.", [
+        "Microsoft.Extensions.AI: IChatClient, IEmbeddingGenerator",
+        "Semantic Kernel",
+        "ONNX Runtime для локального инференса",
+        "стоимость, кэширование, ограничения API",
+      ]),
+      t("ai-evals", "Оценка LLM-приложений", 3, "Как понять, что стало лучше.", [
+        "наборы тестов (evals), золотые ответы",
+        "LLM-as-a-judge и его ограничения",
+        "метрики RAG: faithfulness, relevance",
+        "регрессии при смене модели или промпта",
+      ]),
+      t("ai-mlops", "MLOps", 3, "Модели в продакшене.", [
+        "версионирование данных и моделей",
+        "мониторинг дрейфа",
+        "сервинг моделей",
+        "A/B тесты моделей",
+      ]),
+    ],
+  },
+  {
+    id: "sysdesign",
+    title: "System Design",
+    icon: "📐",
+    color: "#facc15",
+    description: "Проектирование систем как на собеседовании в сильную компанию: от требований до масштабирования.",
+    resources: [
+      { title: "System Design Primer", url: "https://github.com/donnemartin/system-design-primer" },
+      { title: "ByteByteGo", url: "https://bytebytego.com/" },
+      { title: "High Scalability — разборы архитектур", url: "http://highscalability.com/" },
+    ],
+    topics: [
+      t("sysdesign-method", "Методика проектирования", 1, "Как проходить секцию system design.", [
+        "сбор требований: функциональные и нефункциональные",
+        "оценки нагрузки (back-of-the-envelope): RPS, хранилище, трафик",
+        "API и модель данных",
+        "высокоуровневая схема → узкие места → масштабирование",
+      ]),
+      t("sysdesign-shortener", "Сокращатель ссылок", 1, "Классическая первая задача.", [
+        "генерация коротких id (base62, счётчики, хэши)",
+        "кэширование горячих ссылок",
+        "аналитика переходов",
+        "масштабирование чтения",
+      ]),
+      t("sysdesign-ratelimiter", "Rate limiter", 2, "Ограничение запросов в распределённой системе.", [
+        "алгоритмы: token bucket, sliding window",
+        "распределённое состояние в Redis",
+        "где ставить: gateway, сервис",
+        "ответы 429, заголовки",
+      ]),
+      t("sysdesign-chat", "Мессенджер", 2, "Реальное время и доставка.", [
+        "WebSocket-соединения и их масштабирование",
+        "хранение истории сообщений",
+        "статусы доставки и онлайн",
+        "групповые чаты, пуш-уведомления",
+      ]),
+      t("sysdesign-feed", "Лента новостей", 2, "Fan-out и ранжирование.", [
+        "fan-out on write vs on read",
+        "знаменитости и горячие аккаунты",
+        "кэш ленты",
+        "ранжирование",
+      ]),
+      t("sysdesign-notifications", "Сервис уведомлений", 2, "Push, email, SMS с гарантиями.", [
+        "очереди и приоритеты",
+        "шаблоны, предпочтения пользователя",
+        "ретраи, дедупликация, rate limits провайдеров",
+        "трекинг доставки",
+      ]),
+      t("sysdesign-booking", "Бронирование билетов", 3, "Конкурентный доступ к ограниченному ресурсу.", [
+        "двойное бронирование и блокировки",
+        "временная резервация с TTL",
+        "очередь ожидания при пиковых продажах",
+        "согласованность и оплата",
+      ]),
+      t("sysdesign-payments", "Платёжная система", 3, "Деньги не прощают ошибок.", [
+        "идемпотентность и двойные списания",
+        "двойная запись (double-entry ledger)",
+        "сверка (reconciliation)",
+        "саги с внешними провайдерами",
+      ]),
+      t("sysdesign-storage", "Файловое хранилище / Dropbox", 3, "Большие файлы и синхронизация.", [
+        "разбиение на чанки, дедупликация",
+        "метаданные vs блоки",
+        "синхронизация и конфликты",
+        "CDN и загрузка напрямую в object storage",
+      ]),
+      t("sysdesign-search", "Поиск и автодополнение", 3, "Typeahead и поисковый индекс.", [
+        "trie и топ-k подсказок",
+        "обновление подсказок",
+        "поисковый индекс, шардинг",
+        "ранжирование",
+      ]),
+    ],
+  },
+  {
+    id: "onec",
+    title: "1С:Предприятие",
+    icon: "🟡",
+    color: "#fde047",
+    description: "Понемногу: платформа, встроенный язык, запросы, интеграция 1С с .NET.",
+    resources: [
+      { title: "ИТС — документация 1С", url: "https://its.1c.ru/" },
+      { title: "Учебная версия платформы", url: "https://online.1c.ru/catalog/free/learning.php" },
+      { title: "Стандарты разработки 1С", url: "https://its.1c.ru/db/v8std" },
+    ],
+    topics: [
+      t("onec-platform", "Платформа и объекты конфигурации", 1, "Из чего состоит конфигурация.", [
+        "справочники, документы, перечисления",
+        "регистры сведений, накопления, бухгалтерии",
+        "клиент-серверная архитектура, файловый и серверный режим",
+        "конфигуратор и EDT",
+      ]),
+      t("onec-language", "Встроенный язык", 1, "Синтаксис и контексты исполнения.", [
+        "типы, коллекции (Массив, Структура, Соответствие, ТаблицаЗначений)",
+        "директивы &НаКлиенте/&НаСервере, контекстные вызовы",
+        "общие модули и их флаги",
+        "обработчики событий объектов",
+      ]),
+      t("onec-queries", "Язык запросов 1С", 1, "Запросы и виртуальные таблицы.", [
+        "синтаксис запросов, соединения",
+        "виртуальные таблицы регистров (остатки, обороты)",
+        "временные таблицы, пакетные запросы",
+        "запросы в цикле — главный антипаттерн",
+      ]),
+      t("onec-registers", "Проведение и регистры", 2, "Учётная логика.", [
+        "движения документов",
+        "контроль остатков, блокировки",
+        "периодические регистры сведений",
+      ]),
+      t("onec-bsp", "БСП и типовые конфигурации", 2, "Не изобретать то, что уже есть.", [
+        "Библиотека стандартных подсистем",
+        "доработка типовых: расширения конфигурации",
+        "обновление доработанных конфигураций",
+      ]),
+      t("onec-forms", "Управляемые формы", 1, "Интерфейс 1С.", [
+        "реквизиты и элементы формы",
+        "клиент-серверное взаимодействие формы",
+        "СКД — отчёты",
+      ]),
+      t("onec-integration", "Интеграция 1С с внешними системами", 2, "Мост между 1С и .NET.", [
+        "HTTP-сервисы и веб-сервисы 1С",
+        "OData-интерфейс",
+        "обмен через очереди и файлы",
+        "вызов .NET-сервисов из 1С и наоборот",
+      ]),
+      t("onec-performance", "Производительность 1С", 3, "Почему тормозит и как найти.", [
+        "управляемые блокировки",
+        "технологический журнал, замер производительности",
+        "оптимизация запросов, индексы",
+        "ЦУП/APDEX",
+      ]),
+    ],
+  },
+  {
+    id: "craft",
+    title: "Инженерная культура",
+    icon: "🛠️",
+    color: "#a3e635",
+    description: "То, что делает специалиста высококлассным помимо технологий.",
+    resources: [
+      { title: "Staff Engineer (Уилл Ларсон)", url: "https://staffeng.com/" },
+      { title: "Google Engineering Practices — code review", url: "https://google.github.io/eng-practices/" },
+    ],
+    topics: [
+      t("craft-learning", "Как учиться эффективно", 1, "Наука обучения, на которой построен DevPath.", [
+        "активное вспоминание (retrieval practice)",
+        "интервальное повторение и кривая забывания",
+        "чередование тем (interleaving)",
+        "метод Фейнмана, осознанная практика",
+      ]),
+      t("craft-review", "Код-ревью", 1, "Давать и получать ревью.", [
+        "что смотреть в ревью",
+        "как писать комментарии",
+        "маленькие PR",
+      ]),
+      t("craft-debugging", "Отладка и расследование проблем", 2, "Системный подход к багам.", [
+        "научный метод в отладке",
+        "дампы памяти, dotnet-dump",
+        "отладка в проде: логи, трейсы, фичефлаги",
+      ]),
+      t("craft-estimation", "Оценки и планирование", 2, "Сроки без самообмана.", [
+        "декомпозиция задач",
+        "оценка неопределённости",
+        "технический долг и его учёт",
+      ]),
+      t("craft-docs", "Техническое письмо", 2, "Design docs и RFC.", [
+        "design doc: контекст, варианты, решение",
+        "ADR",
+        "документация, которую читают",
+      ]),
+      t("craft-leadership", "Техническое лидерство", 3, "Влияние без должности.", [
+        "менторство",
+        "принятие решений в команде",
+        "работа с бизнесом",
+        "роли senior, lead, staff, architect",
+      ]),
+      t("craft-career", "Карьера и собеседования", 2, "Как расти и продавать свои навыки.", [
+        "грейды и ожидания от них",
+        "резюме и истории по STAR",
+        "подготовка к техническому и системному интервью",
+        "переговоры об оффере",
+      ]),
+    ],
+  },
+];
+
+export const ALL_TOPICS: (Topic & { trackId: string })[] = TRACKS.flatMap((tr) => tr.topics.map((tp) => ({ ...tp, trackId: tr.id })));
+
+export const topicById = (id: string) => ALL_TOPICS.find((x) => x.id === id);
+export const trackById = (id: string) => TRACKS.find((x) => x.id === id);
+
+export const LEVEL_NAMES: Record<1 | 2 | 3, string> = { 1: "база", 2: "middle", 3: "senior" };

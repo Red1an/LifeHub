@@ -1,0 +1,13 @@
+{
+  "id": "devpath",
+  "name": "DevPath",
+  "version": "0.2.0",
+  "description": "Система самообучения инженера: C#/.NET, DevOps, архитектура, распределённые системы, ИИ, 1С. Задания дня, карточки, уроки и наставник-нейронка",
+  "icon": "🧠",
+  "author": "Red1an",
+  "type": "app",
+  "sdk": "^1",
+  "entry": "src/index.tsx",
+  "deps": { "marked": "^16", "highlight.js": "^11" },
+  "permissions": ["ai"]
+}
