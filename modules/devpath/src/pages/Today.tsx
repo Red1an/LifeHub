@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { dayKey, Link, Loading, plural, useCollection, cn } from "@lifehub/sdk";
-import { useDev } from "../lib/store.ts";
+import { useDev, type Dev } from "../lib/store.ts";
 import { buildPlan } from "../lib/daily.ts";
 import type { DayPlan } from "../lib/types.ts";
 import { Screen, Panel, Bar, Ring, Pill, Tile, Btn } from "../components/kit.tsx";
@@ -75,6 +75,8 @@ export function Today() {
         </div>
       </Panel>
 
+      <GoalCard dev={dev} />
+
       {newbie && (
         <Panel className="mb-5 border-[var(--dp-violet)]/50">
           <div className="text-lg font-bold">Добро пожаловать! 🚀</div>
@@ -148,5 +150,35 @@ export function Today() {
         <Link to="/profile"><Btn tone="ghost" className="!min-h-9 !px-3 text-sm">Прогресс</Btn></Link>
       </Panel>
     </Screen>
+  );
+}
+
+/** Карточка цели: прогресс против графика. Без цели — предложение её поставить. */
+function GoalCard({ dev }: { dev: Dev }) {
+  const r = dev.roadmap;
+  if (!dev.goal || !r) {
+    return (
+      <Link to="/goal" className="dp-panel mb-5 flex items-center gap-3 p-4 transition hover:-translate-y-0.5">
+        <div className="text-3xl">🧭</div>
+        <div className="min-w-0 flex-1">
+          <div className="font-bold">Поставь цель</div>
+          <div className="text-sm text-[var(--dp-muted)]">«Senior .NET за 6 месяцев» — план по неделям и контроль отставания</div>
+        </div>
+        <span className="text-[var(--dp-muted)]">→</span>
+      </Link>
+    );
+  }
+  const color = r.done >= r.total || r.lag <= 0 ? "#34d399" : r.lag <= r.perWeek ? "#fbbf24" : "#f87171";
+  return (
+    <Link to="/goal" className="dp-panel mb-5 block p-4 transition hover:-translate-y-0.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 truncate font-bold">🧭 {dev.goal.title}</div>
+        <Pill color={color}>{r.done >= r.total ? "готово" : r.lag > 0 ? `отстаёшь на ${r.lag}` : r.lag < 0 ? `впереди на ${-r.lag}` : "по графику"}</Pill>
+      </div>
+      <Bar value={r.total ? r.done / r.total : 0} className="mt-2" color={color} />
+      <div className="mt-1 text-xs text-[var(--dp-muted)]">
+        {r.done}/{r.total} тем · неделя {r.currentWeek + 1} из {r.weeks.length} · осталось {r.daysLeft} {plural(r.daysLeft, ["день", "дня", "дней"])}
+      </div>
+    </Link>
   );
 }

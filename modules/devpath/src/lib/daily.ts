@@ -4,6 +4,7 @@ import { VIDEOS } from "../data/videos.ts";
 import { nextTopicOf, type Dev } from "./store.ts";
 import { contentFor, hasContent } from "./content.ts";
 import type { Quest } from "./types.ts";
+import { nextGoalTopic } from "./roadmap.ts";
 
 /** Детерминированный «случай» на день, чтобы план не прыгал при перерисовке. */
 function rng(seed: string) {
@@ -36,7 +37,7 @@ export function buildPlan(dev: Dev, date = dayKey()): Quest[] {
   }
 
   // 2. Новый урок — треки фокуса по кругу
-  let lessonTopic: string | undefined;
+  let lessonTopic: string | undefined = dev.roadmap ? nextGoalTopic(dev.roadmap)?.id : undefined;
   for (let k = 0; k < focus.length && !lessonTopic; k++) {
     const tr = focus[(dayNum + k) % focus.length];
     const t = nextTopicOf(tr, dev.topicMap, s.level);
@@ -47,7 +48,7 @@ export function buildPlan(dev: Dev, date = dayKey()): Quest[] {
     const tr = trackById(t.trackId)!;
     quests.push({
       id: "lesson", kind: "lesson", icon: tr.icon, title: t.title,
-      subtitle: `${tr.title} · ${hasContent(t.id) ? "интерактивный урок" : "урок от нейронки"}`,
+      subtitle: `${dev.roadmap ? "по плану цели · " : ""}${tr.title} · ${hasContent(t.id) ? "интерактивный урок" : "урок от нейронки"}`,
       xp: 60, to: `/topic/${t.id}/lesson`, topicId: t.id,
     });
     // 3. Видео к уроку

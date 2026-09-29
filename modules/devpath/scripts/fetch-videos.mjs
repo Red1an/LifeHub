@@ -123,6 +123,30 @@ const QUERIES = {
   "ai-dotnet": ["нейросети в C# .NET ИИ", "Microsoft.Extensions.AI Semantic Kernel .NET"],
   "ai-evals": ["оценка LLM evals", "LLM evals evaluation"],
   "ai-mlops": ["MLOps", "MLOps explained"],
+  "sec-mindset": ["моделирование угроз STRIDE безопасность приложений", "threat modeling STRIDE explained"],
+  "sec-injection": ["SQL инъекция как защититься", "injection attacks explained SQL command injection"],
+  "sec-xss": ["XSS атака Content Security Policy", "XSS cross site scripting explained CSP"],
+  "sec-authn": ["двухфакторная аутентификация passkeys как работает", "passkeys WebAuthn explained"],
+  "sec-authz": ["авторизация RBAC ABAC контроль доступа", "RBAC vs ABAC authorization explained"],
+  "sec-secrets": ["хранение секретов HashiCorp Vault", "secrets management HashiCorp Vault explained"],
+  "sec-data": ["шифрование данных персональные данные защита", "data encryption at rest in transit explained"],
+  "sec-files": ["SSRF уязвимость", "SSRF server side request forgery explained"],
+  "sec-supply": ["атака на цепочку поставок программного обеспечения", "software supply chain attacks explained"],
+  "sec-logging": ["мониторинг безопасности SIEM реагирование на инциденты", "security logging and monitoring incident response"],
+  "sec-aspnet": ["безопасность ASP.NET Core", "ASP.NET Core security best practices"],
+  "sec-pentest": ["пентест с нуля Burp Suite", "Burp Suite tutorial web application pentesting"],
+  "aidev-landscape": ["Claude Code Cursor ИИ агенты для программирования", "AI coding agents Claude Code Cursor comparison"],
+  "aidev-tasking": ["как писать промпты для программирования с ИИ", "how to prompt AI coding assistants effectively"],
+  "aidev-context": ["CLAUDE.md контекст Claude Code", "context engineering AI coding agents"],
+  "aidev-agentic": ["Claude Code агентное программирование", "Claude Code agentic coding workflow"],
+  "aidev-verify": ["TDD с нейросетью ИИ тесты", "test driven development with AI coding agents"],
+  "aidev-spec": ["spec driven development ИИ", "spec driven development GitHub Spec Kit"],
+  "aidev-architecture": ["архитектура программного обеспечения с помощью ИИ", "software architecture with AI LLM"],
+  "aidev-review": ["код ревью кода от нейросети ошибки", "reviewing AI generated code"],
+  "aidev-mcp": ["MCP Model Context Protocol что это", "Model Context Protocol MCP explained"],
+  "aidev-security": ["безопасность ИИ агентов prompt injection", "AI coding agents security prompt injection"],
+  "aidev-legacy": ["рефакторинг легаси кода с ИИ", "refactoring legacy code with AI"],
+  "aidev-growth": ["программист и ИИ будущее профессии навыки", "software engineers AI future skills"],
   "sysdesign-method": ["system design интервью как проходить", "system design interview framework"],
   "sysdesign-shortener": ["system design сокращатель ссылок", "system design URL shortener"],
   "sysdesign-ratelimiter": ["system design rate limiter", "system design rate limiter"],
@@ -172,7 +196,7 @@ const EN_CHANNELS = [
 ];
 const PINNED = {};
 // Нерелевантные ролики, которые поиск ставит высоко.
-const BANNED = new Set(["aToq1UEKSuM", "8Slzd1G7f9Q"]);
+const BANNED = new Set(["XXDiW6m8Go0", "yFvl2x8_9gI", "aToq1UEKSuM", "8Slzd1G7f9Q"]);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const parseViews = (s = "") => Number(s.replace(/[^\d]/g, "")) || 0;

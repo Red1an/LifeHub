@@ -12,6 +12,7 @@ import { MentorPage, ChatPage } from "./pages/Mentor.tsx";
 import { ProfilePage, useSound } from "./pages/Profile.tsx";
 import { TestPage, MistakesPage, MixedPage, PlacementPage } from "./pages/Training.tsx";
 import { ProjectsPage, ProjectPage } from "./pages/Projects.tsx";
+import { GoalPage } from "./pages/Goal.tsx";
 import { useDev } from "./lib/store.ts";
 
 function Layout({ children }: { children: ReactNode }) {
@@ -72,6 +73,7 @@ export default defineModule({
     "/placement/:id": PlacementPage,
     "/projects": ProjectsPage,
     "/project/:id": ProjectPage,
+    "/goal": GoalPage,
     "*": Today,
   },
   nav: [

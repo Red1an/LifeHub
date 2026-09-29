@@ -5,6 +5,7 @@ import { SEED_CARDS } from "../data/cards.ts";
 import { newCard, isDue, isLearned } from "./srs.ts";
 import { rankFor, streak, xpByDay } from "./game.ts";
 import { contentFor } from "./content.ts";
+import { computeRoadmap, type Goal } from "./roadmap.ts";
 import {
   DEFAULT_SETTINGS, type ActivityKind, type Card, type DayPlan, type LogEntry, type Mistake, type ProjectState, type Settings, type Step,
   type TopicState, type Watched,
@@ -54,6 +55,7 @@ export function useDev() {
   const log = useCollection<LogEntry>("log");
   const mistakes = useCollection<Mistake>("mistakes");
   const [settings] = useSettings();
+  const [goal, , goalMeta] = useStore<Goal | null>("roadmap", null);
 
   return useMemo(() => {
     const topicMap = new Map(topics.items.map((x) => [x.id, x]));
@@ -69,6 +71,8 @@ export function useDev() {
       log,
       mistakes,
       openMistakes: mistakes.items.filter((m) => !m.resolved),
+      goal,
+      roadmap: goal ? computeRoadmap(goal, topicMap) : null,
       settings,
       topicMap,
       state: (id: string) => topicMap.get(id),
@@ -80,9 +84,9 @@ export function useDev() {
       due,
       fresh,
       learned: cards.items.filter(isLearned).length,
-      loading: topics.loading || cards.loading || log.loading || mistakes.loading,
+      loading: topics.loading || cards.loading || log.loading || mistakes.loading || goalMeta.loading,
     };
-  }, [topics, cards, log, mistakes, settings]);
+  }, [topics, cards, log, mistakes, settings, goal, goalMeta.loading]);
 }
 
 export type Dev = ReturnType<typeof useDev>;

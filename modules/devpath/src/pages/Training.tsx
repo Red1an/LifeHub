@@ -38,7 +38,7 @@ export function TestPage() {
   const [run, setRun] = useState(0);
   const [done, setDone] = useState<{ r: PlayerResult; xp: number } | null>(null);
   const steps = useMemo<Step[]>(
-    () => [...shuffle(c?.quiz ?? []), ...(c?.recall ?? []).map((x) => ({ kind: "recall" as const, question: x.q, answer: x.a }))],
+    () => [...shuffle([...(c?.quiz ?? []), ...(c?.deepQuiz ?? [])]), ...(c?.recall ?? []).map((x) => ({ kind: "recall" as const, question: x.q, answer: x.a }))],
     [id, run],
   );
   if (!t) return <Screen><Header title="Тема не найдена" back="/map" /></Screen>;
@@ -205,7 +205,7 @@ export function PlacementPage() {
   const [phase, setPhase] = useState<"intro" | "play" | "result">("intro");
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const items = useMemo(
-    () => (tr ? tr.topics.flatMap((t) => shuffle(contentFor(t.id)?.quiz ?? []).slice(0, 2).map((step) => ({ id: t.id, step }))) : []),
+    () => (tr ? tr.topics.flatMap((t) => shuffle([...(contentFor(t.id)?.quiz ?? []), ...(contentFor(t.id)?.deepQuiz ?? [])]).slice(0, 2).map((step) => ({ id: t.id, step }))) : []),
     [id],
   );
   if (!tr) return <Screen><Header title="Трек не найден" back="/map" /></Screen>;

@@ -17,11 +17,13 @@ const BOSSES: Record<string, { name: string; icon: string }> = {
   distributed: { name: "Византийский Генерал", icon: "⚔️" },
   devops: { name: "CrashLoopBackOff", icon: "💥" },
   cs: { name: "Экспоненциальный Змей", icon: "🐉" },
-  net: { name: "SQL-Инъектор", icon: "🕷️" },
+  net: { name: "Потерянный Пакет", icon: "📦" },
   ai: { name: "Галлюцинирующая Модель", icon: "🌀" },
   sysdesign: { name: "Единая Точка Отказа", icon: "🎯" },
   onec: { name: "Запрос-в-Цикле", icon: "🔄" },
   craft: { name: "Легаси без Тестов", icon: "🦖" },
+  sec: { name: "Нулевой День", icon: "🕷️" },
+  aidev: { name: "Галлюцинирующий Автопилот", icon: "🤖" },
 };
 
 /** Случайная тема для игр: из начатых, иначе из фокуса. */

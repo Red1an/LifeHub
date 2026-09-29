@@ -12,6 +12,12 @@ export interface TopicContent {
   quiz: Step[];
   recall: { q: string; a: string }[];
   task?: { title: string; md: string; check: string[] };
+  /** Слой «Глубже» (уровень senior) из файлов deep-*.md. */
+  deep: Section[];
+  /** Вопросы слоя «Глубже»: идут в тест и тренировки, но не в короткий урок. */
+  deepQuiz: Step[];
+  /** «Что почитать»: пункты списка в Markdown. */
+  reading: string[];
 }
 
 function parseQuestion(block: string[]): Step | null {
@@ -58,8 +64,8 @@ export function parseTrack(text: string): Record<string, TopicContent> {
   for (const chunk of topics) {
     const [idLine, ...rest] = chunk.split("\n");
     const id = idLine.trim();
-    const c: TopicContent = { sections: [], quiz: [], recall: [] };
-    let mode = "theory" as "theory" | "quiz" | "recall" | "task";
+    const c: TopicContent = { sections: [], quiz: [], recall: [], deep: [], deepQuiz: [], reading: [] };
+    let mode = "theory" as "theory" | "quiz" | "recall" | "task" | "read";
     let buf: string[] = [];
     let title = "";
     const flush = () => {
@@ -73,6 +79,7 @@ export function parseTrack(text: string): Record<string, TopicContent> {
         const m = body.match(/^Q:\s*([\s\S]*?)\nA:\s*([\s\S]*)$/);
         if (m) c.recall.push({ q: m[1].trim(), a: m[2].trim() });
       }
+      if (mode === "read") c.reading.push(...buf.filter((l) => l.startsWith("- ")).map((l) => l.slice(2).trim()));
       if (mode === "task" && c.task) {
         c.task.check = buf.filter((l) => l.startsWith("- [ ] ")).map((l) => l.slice(6));
         c.task.md = buf.filter((l) => !l.startsWith("- [ ] ")).join("\n").trim();
@@ -83,7 +90,7 @@ export function parseTrack(text: string): Record<string, TopicContent> {
     for (const line of rest) {
       if (line.startsWith("```")) inFence = !inFence;
       if (!inFence) {
-        const sw = line.match(/^---(quiz|recall|task)\s*(.*)$/);
+        const sw = line.match(/^---(quiz|recall|task|read)\s*(.*)$/);
         if (sw) {
           flush();
           mode = sw[1] as typeof mode;

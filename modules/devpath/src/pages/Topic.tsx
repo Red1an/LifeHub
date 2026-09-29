@@ -3,7 +3,7 @@ import { Link, Loading, useNavigate, useParams, useCollection, useSearchParams, 
 import { topicById, trackById, LEVEL_NAMES, ALL_TOPICS } from "../data/curriculum.ts";
 import { useDev, startTopic, topicsDb, cardsDb, award } from "../lib/store.ts";
 import { generateCards } from "../lib/ai.ts";
-import { builtinLesson, contentFor } from "../lib/content.ts";
+import { builtinLesson, contentFor, SIMPLE_TITLE } from "../lib/content.ts";
 import { newCard } from "../lib/srs.ts";
 import { XP } from "../lib/game.ts";
 import type { Chat, Lesson } from "../lib/types.ts";
@@ -215,10 +215,11 @@ function TheoryTab({ id, openChat }: { id: string; openChat: () => void }) {
   }
   return (
     <div className="space-y-4">
+      <div className="text-xs text-[var(--dp-muted)]">💡 Подчёркнутые термины можно нажать — покажется определение.</div>
       {content.sections.map((s, k) => (
-        <Panel key={k}>
-          <h2 className="mb-2 text-lg font-extrabold">{s.title}</h2>
-          <Md text={s.md} className="text-[15px]" />
+        <Panel key={k} className={s.title === SIMPLE_TITLE ? "border-[var(--dp-cyan)]/40 bg-[var(--dp-cyan)]/5" : undefined}>
+          <h2 className="mb-2 text-lg font-extrabold">{s.title === SIMPLE_TITLE ? "💡 " : ""}{s.title}</h2>
+          <Md text={s.md} className="text-[15px]" terms />
           <button
             className="mt-3 text-sm text-[var(--dp-cyan)] hover:underline"
             onClick={() => {
@@ -238,6 +239,28 @@ function TheoryTab({ id, openChat }: { id: string; openChat: () => void }) {
           )}
         </Panel>
       ))}
+      {content.deep.length > 0 && (
+        <details className="dp-panel group border-[#f472b6]/40 p-4 sm:p-5">
+          <summary className="cursor-pointer list-none">
+            <div className="flex items-center gap-2 text-lg font-extrabold">
+              🦅 Глубже — уровень senior <span className="ml-auto text-sm font-normal text-[var(--dp-muted)] group-open:hidden">раскрыть</span>
+            </div>
+            <div className="mt-1 text-sm text-[var(--dp-muted)]">Внутреннее устройство, крайние случаи, производительность — то, что спрашивают на сильных собеседованиях.</div>
+          </summary>
+          {content.deep.map((s, k) => (
+            <div key={k} className="mt-4">
+              <h3 className="mb-2 text-base font-extrabold">{capitalize(s.title.replace(/^Глубже:\s*/, ""))}</h3>
+              <Md text={s.md} className="text-[15px]" terms />
+            </div>
+          ))}
+        </details>
+      )}
+      {content.reading.length > 0 && (
+        <Panel>
+          <div className="mb-2 text-lg font-extrabold">📚 Что почитать</div>
+          <Md text={content.reading.map((r) => "- " + r).join("\n")} className="text-[15px]" />
+        </Panel>
+      )}
       <div className="flex flex-wrap gap-2">
         <Link to={`/quiz/${id}`} className="dp-btn dp-btn-primary">✅ Проверить себя</Link>
         <Btn tone="ghost" onClick={openChat}>💬 Задать вопрос</Btn>
@@ -319,3 +342,5 @@ function RegenMenu({ id }: { id: string }) {
     </div>
   );
 }
+
+const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);

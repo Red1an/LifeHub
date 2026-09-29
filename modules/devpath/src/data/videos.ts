@@ -6254,5 +6254,1121 @@ export const VIDEOS: Record<string, { ru: Video[]; en: Video[] }> = {
     "v": 40385
    }
   ]
+ },
+ "sec-mindset": {
+  "ru": [
+   {
+    "id": "IcmApKZwmc4",
+    "t": "МОДЕЛЬ УГРОЗ И МОДЕЛЬ НАРУШИТЕЛЯ",
+    "c": "3D HOST",
+    "d": "7:43",
+    "v": 10168
+   },
+   {
+    "id": "Rq_eAWbCqUc",
+    "t": "Безопасность интернет-приложений #5 / Моделирование угроз. SDLC [Технострим]",
+    "c": "VK Team",
+    "d": "28:07",
+    "v": 1660
+   },
+   {
+    "id": "qSZlg36777M",
+    "t": "МОДЕЛИ БЕЗОПАСНОСТИ ИНФОРМАЦИИ | СТАНДАРТНАЯ, ПАРКЕРА, 5A, STRIDE",
+    "c": "3D HOST",
+    "d": "6:59",
+    "v": 5343
+   }
+  ],
+  "en": [
+   {
+    "id": "rEnJYNkUde0",
+    "t": "STRIDE Threat Modeling for Beginners - In 20 Minutes",
+    "c": "Netsec Explained",
+    "d": "21:49",
+    "v": 120485
+   },
+   {
+    "id": "h_BC6QMWDbA",
+    "t": "What is Threat Modeling and Why Is It Important?",
+    "c": "CBT Nuggets",
+    "d": "6:06",
+    "v": 137212
+   },
+   {
+    "id": "lnvYlg4HOX4",
+    "t": "Use STRIDE To Do A Quick Threat Modeling On A Simple Web Application (Step by Step Guide)",
+    "c": "NetSec",
+    "d": "19:21",
+    "v": 39705
+   }
+  ]
+ },
+ "sec-injection": {
+  "ru": [
+   {
+    "id": "827vVw41IE0",
+    "t": "КАК ВЗЛАМЫВАЮТ САЙТЫ? Гайд с нуля - XSS и SQL инъекция",
+    "c": "Yugo",
+    "d": "9:56",
+    "v": 256900
+   },
+   {
+    "id": "jJXnjzQmAkQ",
+    "t": "Как взламывают сайты? XSS уязвимость, SQL-injection, CSRF, Code Injection",
+    "c": "Иван Гончаров",
+    "d": "33:04",
+    "v": 135408
+   },
+   {
+    "id": "pv0WFWD-s8Y",
+    "t": "ТАК ЛИ ОПАСНА SQL-ИНЪЕКЦИЯ? КАК ЗАЩИТИТЬСЯ?",
+    "c": "CYBERDEN 2.0",
+    "d": "7:38",
+    "v": 16110
+   }
+  ],
+  "en": [
+   {
+    "id": "ciNHn38EyRc",
+    "t": "Running an SQL Injection Attack - Computerphile",
+    "c": "Computerphile",
+    "d": "17:11",
+    "v": 4602471
+   },
+   {
+    "id": "jrHRe9lSqqA",
+    "t": "What Is a Prompt Injection Attack?",
+    "c": "IBM Technology",
+    "d": "10:57",
+    "v": 297762
+   },
+   {
+    "id": "2OPVViV-GQk",
+    "t": "SQL Injections are scary!! (hacking tutorial for beginners)",
+    "c": "NetworkChuck",
+    "d": "10:14",
+    "v": 2085219
+   }
+  ]
+ },
+ "sec-xss": {
+  "ru": [
+   {
+    "id": "4sFXSPFp26s",
+    "t": "Что такое XSS уязвимость. Тестируем безопасность",
+    "c": "LearnQA: Онлайн обучение тестировщиков",
+    "d": "5:19",
+    "v": 47148
+   },
+   {
+    "id": "ZFzn2AQPwRA",
+    "t": "ВСЁ Что нужно знать о БЕЗОПАСНОСТИ Фронтенд разработчику (XSS, CSRF)",
+    "c": "Владилен Минин",
+    "d": "17:23",
+    "v": 19799
+   },
+   {
+    "id": "AlRufzbkJoI",
+    "t": "Кибербезопасность с нуля / Урок #3 – XSS, CSRF и уязвимости во Front-end",
+    "c": "Школа itProger / Программирование",
+    "d": "6:12",
+    "v": 19234
+   }
+  ],
+  "en": [
+   {
+    "id": "z4LhLJnmoZ0",
+    "t": "Cross-Site Scripting: A 25-Year Threat That Is Still Going Strong",
+    "c": "IBM Technology",
+    "d": "9:33",
+    "v": 114872
+   },
+   {
+    "id": "pD6C1-zSxIM",
+    "t": "Cross-Site Scripting Explained with Examples and How to Prevent XSS with Content Security Policy",
+    "c": "Hussein Nasser",
+    "d": "18:32",
+    "v": 62991
+   },
+   {
+    "id": "L5l9lSnNMxg",
+    "t": "Cracking Websites with Cross Site Scripting - Computerphile",
+    "c": "Computerphile",
+    "d": "8:34",
+    "v": 1586398
+   }
+  ]
+ },
+ "sec-authn": {
+  "ru": [
+   {
+    "id": "e_ckgvl0Mxg",
+    "t": "Пароли Умирают: Что Такое Passkey и Почему Это Будущее | Passkeys: The Future of Passwords",
+    "c": "Alex WysiWyg",
+    "d": "8:29",
+    "v": 57701
+   },
+   {
+    "id": "zrnfvytnylE",
+    "t": "Как работает двухфакторная аутентификация? | РАЗБОР",
+    "c": "Droider",
+    "d": "8:39",
+    "v": 133134
+   },
+   {
+    "id": "49vEAjag6p8",
+    "t": "Passkey: авторизация без пароля по местоположению",
+    "c": "Теплица социальных технологий",
+    "d": "5:23",
+    "v": 21006
+   }
+  ],
+  "en": [
+   {
+    "id": "xYfiOnufBSk",
+    "t": "How Passkeys Work - Computerphile",
+    "c": "Computerphile",
+    "d": "19:07",
+    "v": 502198
+   },
+   {
+    "id": "1nnOvYHwweE",
+    "t": "Passkeys Explained: Are They Actually Better Than Passwords?",
+    "c": "Addie LaMarr",
+    "d": "12:37",
+    "v": 272065
+   },
+   {
+    "id": "V-7zMIgGO1U",
+    "t": "\"Webauthn, Passkeys, and You - The Future of Authentication\" - William Brown (Everything Open 2023)",
+    "c": "Everything Open",
+    "d": "40:58",
+    "v": 20385
+   }
+  ]
+ },
+ "sec-authz": {
+  "ru": [
+   {
+    "id": "pLZvp4ury7U",
+    "t": "ABAC | АТРИБУТНОЕ УПРАВЛЕНИЕ ДОСТУПОМ",
+    "c": "3D HOST",
+    "d": "7:23",
+    "v": 2699
+   },
+   {
+    "id": "8H-r2iV0jAc",
+    "t": "RBAC | РОЛЕВОЕ УПРАВЛЕНИЕ ДОСТУПОМ",
+    "c": "3D HOST",
+    "d": "8:47",
+    "v": 3722
+   },
+   {
+    "id": "ngYGv79hBTw",
+    "t": "Как работают авторизация и аутентификация | OAuth, JWT, webauthn, RBAC, ABAC | Podlodka Podcast #388",
+    "c": "Podlodka",
+    "d": "2:23:13",
+    "v": 14379
+   }
+  ],
+  "en": [
+   {
+    "id": "rvZ35YW4t5k",
+    "t": "Role-based access control (RBAC) vs. Attribute-based access control (ABAC)",
+    "c": "IBM Technology",
+    "d": "7:39",
+    "v": 176036
+   },
+   {
+    "id": "5GG-VUvruzE",
+    "t": "How To Handle Permissions Like A Senior Dev",
+    "c": "Web Dev Simplified",
+    "d": "36:39",
+    "v": 662109
+   },
+   {
+    "id": "DT6Zy1X3ytM",
+    "t": "Authorization Explained: When to Use RBAC, ABAC, ACL & More",
+    "c": "Hayk Simonyan",
+    "d": "11:03",
+    "v": 72090
+   }
+  ]
+ },
+ "sec-secrets": {
+  "ru": [
+   {
+    "id": "zsnAkQvDyiY",
+    "t": "Vault - где хранить, как шифровать и зачем всё это? - Максим Киселёв - Михаил Кажемский",
+    "c": "FIDELINA",
+    "d": "2:02:41",
+    "v": 38292
+   },
+   {
+    "id": "mELQB4WWZuM",
+    "t": "Это должен знать каждый DevOps! HashiCorp Vault — универсальное решение?",
+    "c": "Cloud․ru",
+    "d": "1:15:05",
+    "v": 2520
+   },
+   {
+    "id": "lWa_LSbj0lI",
+    "t": "Vault HashiCorp подходы к хранению секретов",
+    "c": "Лев Следопыт",
+    "d": "47:22",
+    "v": 1991
+   }
+  ],
+  "en": [
+   {
+    "id": "klyAhaklGNU",
+    "t": "HashiCorp Vault Tutorial for Beginners - What, Why and How",
+    "c": "TechWorld with Nana",
+    "d": "29:10",
+    "v": 173436
+   },
+   {
+    "id": "FQE_gyEwu0Q",
+    "t": "HashiCorp Vault + Terraform: The Ultimate Secrets Management Guide",
+    "c": "KodeKloud",
+    "d": "18:45",
+    "v": 17165
+   },
+   {
+    "id": "eA_9WwYwXp0",
+    "t": "Introduction to Vault",
+    "c": "HashiCorp, an IBM Company",
+    "d": "25:40",
+    "v": 17014
+   }
+  ]
+ },
+ "sec-data": {
+  "ru": [
+   {
+    "id": "qgofSZFTuVc",
+    "t": "КАК РАБОТАЕТ ШИФРОВАНИЕ? С НУЛЯ ЗА ЧАС",
+    "c": "Alek OS",
+    "d": "57:04",
+    "v": 423577
+   },
+   {
+    "id": "prJ3XNOsoOs",
+    "t": "Надежное шифрование данных средствами Windows. EFS. Зеленые имена файлов",
+    "c": "DesignerMix",
+    "d": "8:48",
+    "v": 29670
+   },
+   {
+    "id": "G9iQH7UIzjQ",
+    "t": "КАК ЗАЩИТИТЬ ДАННЫЕ | Руководство по основам безопасности",
+    "c": "Первый отдел",
+    "d": "18:47",
+    "v": 190429
+   }
+  ],
+  "en": [
+   {
+    "id": "Hi9z45-CPs4",
+    "t": "Encrypting Data at Rest and Transit - How to Protect Your Data",
+    "c": "Learning and Technology with Frank",
+    "d": "14:35",
+    "v": 16920
+   }
+  ]
+ },
+ "sec-files": {
+  "ru": [
+   {
+    "id": "DC7gR7n2wG4",
+    "t": "Начинаем в багбаунти: как найти первую SSRF",
+    "c": "Standoff 365",
+    "d": "1:19:58",
+    "v": 8764
+   },
+   {
+    "id": "CXRa5kG5SQ4",
+    "t": "Кибербезопасность с нуля / Урок #7 – Инъекции в код: command injection, RCE, SSRF",
+    "c": "Школа itProger / Программирование",
+    "d": "4:10",
+    "v": 5881
+   },
+   {
+    "id": "CTR2wnnxSEo",
+    "t": "Почему SSRF становится такой популярной уязвимостью",
+    "c": "Полосатый ИНФОБЕЗ",
+    "d": "14:43",
+    "v": 2200
+   }
+  ],
+  "en": [
+   {
+    "id": "Zyt7lUO3mY8",
+    "t": "Server-Side Request Forgery (SSRF) Explained And Demonstrated",
+    "c": "Loi Liang Yang",
+    "d": "6:13",
+    "v": 118206
+   },
+   {
+    "id": "a7OMdTuYaGc",
+    "t": "Cross Site Request Forgery vs Server Side Request Forgery Explained",
+    "c": "Hussein Nasser",
+    "d": "12:23",
+    "v": 45826
+   },
+   {
+    "id": "eVI0Ny5cZ2c",
+    "t": "Find and Exploit Server-Side Request Forgery (SSRF)",
+    "c": "The Cyber Mentors",
+    "d": "8:56",
+    "v": 69670
+   }
+  ]
+ },
+ "sec-supply": {
+  "ru": [
+   {
+    "id": "4jkeaQe6ILM",
+    "t": "Атаки на цепочку поставок: риски, сценарии и защита на практике",
+    "c": "AM Live",
+    "d": "2:21:42",
+    "v": 18071
+   },
+   {
+    "id": "qVkVn1PK9Do",
+    "t": "#SecuritySmallTalk О безопасности цепочки поставки",
+    "c": "Инфосистемы Джет",
+    "d": "7:33",
+    "v": 2064
+   },
+   {
+    "id": "8s9jZKZvUWo",
+    "t": "Как защитить цепочку поставок ПО? Показываем CICADA8 Dependency Firewall в работе",
+    "c": "AM Live",
+    "d": "25:48",
+    "v": 4341
+   }
+  ],
+  "en": [
+   {
+    "id": "QVqIx-Y8s-s",
+    "t": "The largest supply-chain attack ever…",
+    "c": "Fireship",
+    "d": "4:00",
+    "v": 699779
+   },
+   {
+    "id": "njm1nZlrR68",
+    "t": "Supply Chain Security - The Ultimate Guide to Software Composition Analysis (SCA) Tools",
+    "c": "Aikido Security",
+    "d": "13:44",
+    "v": 31021
+   },
+   {
+    "id": "Eq6ATHhBezw",
+    "t": "The Biggest Hack in US History: SolarWinds Hack",
+    "c": "Cybernews and Cybernews Kernel",
+    "d": "27:21",
+    "v": 905693
+   }
+  ]
+ },
+ "sec-logging": {
+  "ru": [
+   {
+    "id": "4uMHT3DtkHg",
+    "t": "Как расследовать инциденты с помощью MaxPatrol SIEM быстро, эффективно, качественно",
+    "c": "PT Product Update",
+    "d": "37:44",
+    "v": 11351
+   },
+   {
+    "id": "rUQ5YvvDjX0",
+    "t": "Как техническому специалисту реагировать на инциденты ИБ",
+    "c": "PT Product Update",
+    "d": "1:57:14",
+    "v": 5420
+   },
+   {
+    "id": "hpF-IZGUJCk",
+    "t": "SIEM. Основные функции. Схемы применения. Примеры. Картинки (Хомич Аркадий)",
+    "c": "Михаил Рыбков",
+    "d": "5:03",
+    "v": 8374
+   }
+  ],
+  "en": [
+   {
+    "id": "MsGl6lX-YaI",
+    "t": "Cybersecurity IDR: Incident Detection & Response | Google Cybersecurity Certificate",
+    "c": "Grow with Google",
+    "d": "1:43:03",
+    "v": 244827
+   },
+   {
+    "id": "Eb-D0hTf5GQ",
+    "t": "Incident Response: Azure Log Analysis",
+    "c": "John Hammond",
+    "d": "19:15",
+    "v": 71963
+   },
+   {
+    "id": "TlB-vGW-xLQ",
+    "t": "how to CORRECTLY read logs as a Cybersecurity SOC Analyst",
+    "c": "Tech with Jono",
+    "d": "8:30",
+    "v": 129037
+   }
+  ]
+ },
+ "sec-aspnet": {
+  "ru": [
+   {
+    "id": "HRQDrJany-A",
+    "t": "ASP.NET Core - чистая, луковая АРХИТЕКТУРА для новичков | Структура проекта",
+    "c": "Kirill Sachkov Development",
+    "d": "16:12",
+    "v": 36073
+   },
+   {
+    "id": "NgHeCdDv5Fc",
+    "t": "Безопасность .NET веб-приложений: частые ошибки и методы борьбы с ними",
+    "c": "ITVDN",
+    "d": "50:30",
+    "v": 2947
+   },
+   {
+    "id": "PkFuKQo6Iss",
+    "t": "Михаил Щербаков — Что и как нужно защищать в .NET-приложении",
+    "c": "DotNext — конференция для .NET‑разработчиков",
+    "d": "45:09",
+    "v": 4388
+   }
+  ],
+  "en": [
+   {
+    "id": "6WZ6S-qmtqY",
+    "t": "Top 12 Tips For API Security",
+    "c": "ByteByteGo",
+    "d": "9:47",
+    "v": 245979
+   },
+   {
+    "id": "bV8v8DzgAtg",
+    "t": "Asp.Net Core Web API Security Checklist. TOP 3 Vulnerabilities And How To Fix Them",
+    "c": "Codewrinkles",
+    "d": "15:16",
+    "v": 13961
+   },
+   {
+    "id": "V_LFLjnFnis",
+    "t": "ASP.NET Security Best Practices",
+    "c": "DevExpress",
+    "d": "57:16",
+    "v": 17641
+   }
+  ]
+ },
+ "sec-pentest": {
+  "ru": [
+   {
+    "id": "b1j69Zw6TfY",
+    "t": "ПОЛНЫЙ гайд по Burp Suite для начинающих!",
+    "c": "CyberYozh",
+    "d": "16:24",
+    "v": 40808
+   },
+   {
+    "id": "aP_CsSV57Nk",
+    "t": "Знакомство с Burp Suite, часть 1: Proxy, Scanner, Repeater",
+    "c": "CTF в Петербурге",
+    "d": "52:47",
+    "v": 50041
+   },
+   {
+    "id": "PBwuawb_Oic",
+    "t": "Основы Burp Suite. Что это и как им пользоваться",
+    "c": "Pulse",
+    "d": "7:26",
+    "v": 78365
+   }
+  ],
+  "en": [
+   {
+    "id": "QiNLNDSLuJY",
+    "t": "Master Burp Suite Like A Pro In Just 1 Hour",
+    "c": "Netsec Explained",
+    "d": "51:29",
+    "v": 382575
+   },
+   {
+    "id": "iKkeMdkRk7M",
+    "t": "How Hackers Use Burp Suite to Get Into Websites",
+    "c": "Neurix",
+    "d": "15:16",
+    "v": 326105
+   },
+   {
+    "id": "r46b9L6UQDo",
+    "t": "Mastering Burp Suite: The Ultimate Web Application Hacking Tool",
+    "c": "David Bombal Clips",
+    "d": "6:09",
+    "v": 53560
+   }
+  ]
+ },
+ "aidev-landscape": {
+  "ru": [
+   {
+    "id": "6NK4Pona2fY",
+    "t": "Claude Code: полный гайд по AI-кодингу (хаки, техники и секреты)",
+    "c": "Олег Стефанов",
+    "d": "29:06",
+    "v": 319054
+   },
+   {
+    "id": "i0q_Ztq8S7A",
+    "t": "Вайбкодинг БЕСПЛАТНО: Забудь про Cursor AI! Гайд по Claude Code и OpenCode",
+    "c": "Дейл про AI",
+    "d": "6:21",
+    "v": 42053
+   },
+   {
+    "id": "PwtfglP241c",
+    "t": "Claude Code: ПОЛНЫЙ гайд по разработке с ИИ агентом",
+    "c": "PurpleSchool | Anton Larichev",
+    "d": "35:26",
+    "v": 91526
+   }
+  ],
+  "en": [
+   {
+    "id": "JSuS-zXMVwE",
+    "t": "Cursor ditches VS Code, but not everyone is happy...",
+    "c": "Fireship",
+    "d": "5:03",
+    "v": 915684
+   },
+   {
+    "id": "OSBo9qcpRfw",
+    "t": "Cursor vs Claude Code | The Ultimate Comparison Guide",
+    "c": "Codevolution",
+    "d": "11:55",
+    "v": 153326
+   },
+   {
+    "id": "JMYspR42HFM",
+    "t": "Claude Code vs Codex vs Cursor (an honest comparison)",
+    "c": "Theo - t3․gg",
+    "d": "37:57",
+    "v": 171799
+   }
+  ]
+ },
+ "aidev-tasking": {
+  "ru": [
+   {
+    "id": "wm0dHy5Tx6E",
+    "t": "Овладей Формулой Идеального Промпта для ChatGPT (всего за 8 минут)!",
+    "c": "INVOKA | Карточки и инфографика для маркетплейсов",
+    "d": "8:59",
+    "v": 108425
+   },
+   {
+    "id": "iZXi1si4sjo",
+    "t": "Как писать промпты в Codex и Claude Code: промпт-инжиниринг в AI агентах",
+    "c": "Олег Стефанов",
+    "d": "20:44",
+    "v": 32342
+   },
+   {
+    "id": "38AKndMnwYE",
+    "t": "16 методов Промпт Инжиниринга с нуля до PRO",
+    "c": "Cg_Stas | Нейросети с Головой",
+    "d": "20:39",
+    "v": 46312
+   }
+  ],
+  "en": [
+   {
+    "id": "5fhcklZe-qE",
+    "t": "Everything You Need to Know About Coding with AI // NOT vibe coding",
+    "c": "ForrestKnight",
+    "d": "13:15",
+    "v": 282905
+   },
+   {
+    "id": "91B_v-wOaws",
+    "t": "I Have Spent 500+ Hours Programming With AI. This Is what I learned",
+    "c": "The Coding Sloth",
+    "d": "13:38",
+    "v": 754830
+   },
+   {
+    "id": "H3M95i4iS5c",
+    "t": "Essential AI prompts for developers",
+    "c": "Visual Studio Code",
+    "d": "8:31",
+    "v": 378469
+   }
+  ]
+ },
+ "aidev-context": {
+  "ru": [
+   {
+    "id": "6eBSHbLKuN0",
+    "t": "Освоение Claude Code за 30 минут",
+    "c": "Anthropic",
+    "d": "28:07",
+    "v": 1628234
+   },
+   {
+    "id": "lJNjDoJi6hQ",
+    "t": "Прекратите записывать некорректные файлы CLAUDE.md",
+    "c": "camelCase",
+    "d": "14:53",
+    "v": 32741
+   },
+   {
+    "id": "Da2Z_zvG8as",
+    "t": "Создатель Claude Code: УДАЛИТЕ СВОЙ CLAUDE.md",
+    "c": "Несерьезный айтишник",
+    "d": "14:38",
+    "v": 11896
+   }
+  ],
+  "en": [
+   {
+    "id": "vD0E3EUb8-8",
+    "t": "Context Engineering vs. Prompt Engineering: Smarter AI with RAG & Agents",
+    "c": "IBM Technology",
+    "d": "7:52",
+    "v": 252405
+   },
+   {
+    "id": "Qx0fCqpkBus",
+    "t": "What Is Context Engineering? Why It Matters for AI Agents",
+    "c": "IBM Technology",
+    "d": "9:57",
+    "v": 37001
+   },
+   {
+    "id": "-BnIfH2J50I",
+    "t": "How Context Engineering Improves AI Coding Agents",
+    "c": "IBM Developer and IBM Technology",
+    "d": "9:20",
+    "v": 20357
+   }
+  ]
+ },
+ "aidev-agentic": {
+  "ru": [
+   {
+    "id": "EHrqzvKmszo",
+    "t": "ПОЛНЫЙ гайд по AI-Агентам в Claude Code за 36 минут: MCP, Skills и своя архитектура",
+    "c": "Даниил Шишко x Pixel Perfect | Ai в Дизайне",
+    "d": "39:15",
+    "v": 140740
+   },
+   {
+    "id": "6NK4Pona2fY",
+    "t": "Claude Code: полный гайд по AI-кодингу (хаки, техники и секреты)",
+    "c": "Олег Стефанов",
+    "d": "29:06",
+    "v": 319054
+   },
+   {
+    "id": "PwtfglP241c",
+    "t": "Claude Code: ПОЛНЫЙ гайд по разработке с ИИ агентом",
+    "c": "PurpleSchool | Anton Larichev",
+    "d": "35:26",
+    "v": 91526
+   }
+  ],
+  "en": [
+   {
+    "id": "bcM9dP_uXJU",
+    "t": "How to Build an AI Agent with Claude Code (Claude AI Agent Tutorial)",
+    "c": "AI Master",
+    "d": "22:08",
+    "v": 536458
+   },
+   {
+    "id": "S-sYlFiGFv8",
+    "t": "How the Claude Code team uses Claude Code",
+    "c": "Claude",
+    "d": "22:23",
+    "v": 308948
+   },
+   {
+    "id": "C2GpeepcmYs",
+    "t": "Claude Code Crash Course For Developers",
+    "c": "Traversy Media",
+    "d": "1:03:23",
+    "v": 260247
+   }
+  ]
+ },
+ "aidev-verify": {
+  "ru": [],
+  "en": [
+   {
+    "id": "-QFHIoCo-Ko",
+    "t": "Full Walkthrough: Workflow for AI Coding — Matt Pocock",
+    "c": "AI Engineer and Matt Pocock",
+    "d": "1:36:30",
+    "v": 1677977
+   },
+   {
+    "id": "hy8UstR2NEg",
+    "t": "Full Course: Spec-Driven Development with Coding Agents",
+    "c": "DeepLearningAI and JetBrains",
+    "d": "1:01:34",
+    "v": 194289
+   },
+   {
+    "id": "nQwJVHCtDDY",
+    "t": "Matt Pocock’s Agentic Engineering Workflow (just copy him)",
+    "c": "David Ondrej and Matt Pocock",
+    "d": "1:02:25",
+    "v": 443807
+   }
+  ]
+ },
+ "aidev-spec": {
+  "ru": [
+   {
+    "id": "CVJ01XSmHEY",
+    "t": "Лайвкодинг с Claude Code: Spec-Driven Development на реальном TypeScript-проекте",
+    "c": "Организованное программирование | Кирилл Мокевнин",
+    "d": "1:20:40",
+    "v": 42225
+   },
+   {
+    "id": "EBPGiG9ddKQ",
+    "t": "Spec-Driven Development: теория, инструменты, практика — Александр Шаповалов",
+    "c": "AvitoTech",
+    "d": "43:31",
+    "v": 22000
+   },
+   {
+    "id": "EZwcBSX_Rbs",
+    "t": "Spec Driven Development через все роли команды  как мы внедрили единый процесс в монолит с 10 летне",
+    "c": "HighLoad Channel",
+    "d": "44:51",
+    "v": 23167
+   }
+  ],
+  "en": [
+   {
+    "id": "VfBLlAN5zdQ",
+    "t": "Plan, Specify, and Implement with Spec Kit",
+    "c": "Microsoft Developer and GitHub",
+    "d": "35:53",
+    "v": 66716
+   },
+   {
+    "id": "rCdqRETmYFw",
+    "t": "The ONLY GitHub Spec Kit guide you NEED",
+    "c": "Vibecoder School",
+    "d": "22:12",
+    "v": 29974
+   },
+   {
+    "id": "hy8UstR2NEg",
+    "t": "Full Course: Spec-Driven Development with Coding Agents",
+    "c": "DeepLearningAI and JetBrains",
+    "d": "1:01:34",
+    "v": 194289
+   }
+  ]
+ },
+ "aidev-architecture": {
+  "ru": [
+   {
+    "id": "YoHuVfr_rjk",
+    "t": "ВСЯ БАЗА для работы с ИИ за 10 минут (Агенты, LLM, RAG, Токены)",
+    "c": "Dmitry Slepov",
+    "d": "11:51",
+    "v": 108483
+   },
+   {
+    "id": "Bca7s7Yvhzk",
+    "t": "🏛️ Проектирование архитектуры при помощи AI — Вводный курс",
+    "c": "Timur Shemsedinov",
+    "d": "20:03",
+    "v": 37311
+   },
+   {
+    "id": "DvSwvJVens8",
+    "t": "AI PC — личный ИИ у вас дома! Объясняем",
+    "c": "Droider",
+    "d": "24:17",
+    "v": 342529
+   }
+  ],
+  "en": [
+   {
+    "id": "mViFYTwWvcM",
+    "t": "Spec-Driven Development: AI Assisted Coding Explained",
+    "c": "IBM Technology",
+    "d": "9:00",
+    "v": 473505
+   },
+   {
+    "id": "w4rG5GY9IlA",
+    "t": "Learning Software Engineering During the Era of AI | Raymond Fu | TEDxCSTU",
+    "c": "TEDx Talks",
+    "d": "12:27",
+    "v": 935067
+   },
+   {
+    "id": "RRKwmeyIc24",
+    "t": "What Is an AI Stack? LLMs, RAG, & AI Hardware",
+    "c": "IBM Technology",
+    "d": "9:06",
+    "v": 352852
+   }
+  ]
+ },
+ "aidev-review": {
+  "ru": [
+   {
+    "id": "YhmhmVThjNc",
+    "t": "👁️ Ревью AI кода и создание плана для агентов — npm i -g reslop — помогает держать код под контролем",
+    "c": "Timur Shemsedinov",
+    "d": "30:39",
+    "v": 14217
+   },
+   {
+    "id": "7__ZzWA-71U",
+    "t": "Что такое код-ревью?",
+    "c": "Merion Academy",
+    "d": "8:57",
+    "v": 16885
+   },
+   {
+    "id": "-iWJpHz8qnY",
+    "t": "Код ревью (code review): лучшие практики, как проводить.",
+    "c": "Андрей Шестаков",
+    "d": "8:40",
+    "v": 4679
+   }
+  ],
+  "en": [
+   {
+    "id": "c57vAe-mMLo",
+    "t": "How AI Is Changing Code Reviews & Software Development",
+    "c": "IBM Technology and IBM Developer",
+    "d": "14:09",
+    "v": 65585
+   },
+   {
+    "id": "b2QkhmQ0sT0",
+    "t": "How I Review AI Code - (Meta Senior Staff Engineer)",
+    "c": "John Kim",
+    "d": "20:32",
+    "v": 125791
+   },
+   {
+    "id": "fFIjrtH6qjc",
+    "t": "AI Killed Code Review (Here's the Proof)",
+    "c": "The Serious CTO",
+    "d": "13:46",
+    "v": 29545
+   }
+  ]
+ },
+ "aidev-mcp": {
+  "ru": [
+   {
+    "id": "sI6DF8i5gVI",
+    "t": "MCP за 5 минут",
+    "c": "suchkov tech",
+    "d": "5:02",
+    "v": 30161
+   },
+   {
+    "id": "KnN3u1vugfA",
+    "t": "MCP-серверы в Cursor AI/Claude: полный гайд для x10 эффективности",
+    "c": "Олег Стефанов",
+    "d": "10:49",
+    "v": 186874
+   },
+   {
+    "id": "yRzA1ofypMA",
+    "t": "MCP - ТЕХНОЛОГИЯ БУДУЩЕГО | САМОЕ ПОНЯТНОЕ ОБЪЯСНЕНИЕ + НАСТРОЙКА СЕРВЕРОВ В CURSOR!",
+    "c": "AI RANEZ",
+    "d": "23:17",
+    "v": 31815
+   }
+  ],
+  "en": [
+   {
+    "id": "E2DEHOEbzks",
+    "t": "Model Context Protocol (MCP) Explained for Beginners: AI Flight Booking Demo!",
+    "c": "KodeKloud",
+    "d": "24:10",
+    "v": 1324832
+   },
+   {
+    "id": "oblaHqULUHk",
+    "t": "MCP Explained Simply — What It Is and Why It Exists",
+    "c": "TechWorld with Nana",
+    "d": "30:06",
+    "v": 469967
+   },
+   {
+    "id": "HyzlYwjoXOQ",
+    "t": "Claude's Model Context Protocol is here... Let's test it",
+    "c": "Fireship",
+    "d": "8:08",
+    "v": 1406838
+   }
+  ]
+ },
+ "aidev-security": {
+  "ru": [
+   {
+    "id": "tXPtoJF6fRI",
+    "t": "ИИ-агенты — кошмар для безопасности? Разбираемся с OpenClaw",
+    "c": "Первый отдел",
+    "d": "23:25",
+    "v": 54608
+   },
+   {
+    "id": "bUeM87mvKdo",
+    "t": "Защищаем GPTs ботов от Prompt Injection Attacks",
+    "c": "Singularity is Coming",
+    "d": "12:15",
+    "v": 1722
+   },
+   {
+    "id": "kUNn6-ONJG8",
+    "t": "Я СОЗДАЛ АРМИЮ ИИ агентов и они работают за меня [ШАБЛОН для N8N]",
+    "c": "ИИздец",
+    "d": "38:11",
+    "v": 834399
+   }
+  ],
+  "en": [
+   {
+    "id": "5ZA1lTxTH3c",
+    "t": "Securing AI Agents: How to Prevent Hidden Prompt Injection Attacks",
+    "c": "IBM Technology",
+    "d": "10:08",
+    "v": 32418
+   },
+   {
+    "id": "jrHRe9lSqqA",
+    "t": "What Is a Prompt Injection Attack?",
+    "c": "IBM Technology",
+    "d": "10:57",
+    "v": 297762
+   },
+   {
+    "id": "oI4Ud6Jk3IM",
+    "t": "Ultimate Guide to Prompt Injection: Step by Step Tutorial",
+    "c": "Aikido Security",
+    "d": "18:50",
+    "v": 8515
+   }
+  ]
+ },
+ "aidev-legacy": {
+  "ru": [
+   {
+    "id": "GcXC8a8oL4I",
+    "t": "Как писать код с ИИ: советы от разработчика с 25-летним стажем",
+    "c": "Лёша Корепанов",
+    "d": "14:00",
+    "v": 50521
+   },
+   {
+    "id": "H4Mp2BSffSM",
+    "t": "Укрощая зверя: legacy-код, тесты и вы / Кирилл Борисов (Booking.com)",
+    "c": "Python Channel",
+    "d": "45:11",
+    "v": 3705
+   },
+   {
+    "id": "ejXxWxt3xOk",
+    "t": "КОД КАК У СЕНЬОРА. РЕФАКТОРИНГ",
+    "c": "ITentika Online",
+    "d": "22:59",
+    "v": 76131
+   }
+  ],
+  "en": [
+   {
+    "id": "CKC47S92wA4",
+    "t": "What Is Legacy Code? How AI Is Modernizing Legacy Systems",
+    "c": "IBM Technology and IBM Developer",
+    "d": "9:11",
+    "v": 42640
+   },
+   {
+    "id": "UqfxuQKuMo8",
+    "t": "AI coding agents are useless on large codebases. Unless you do THIS.",
+    "c": "Jo Van Eyck",
+    "d": "16:22",
+    "v": 49081
+   },
+   {
+    "id": "kY7ak0p4tZM",
+    "t": "How to use Generative AI for App Modernization",
+    "c": "IBM Technology",
+    "d": "7:51",
+    "v": 20944
+   }
+  ]
+ },
+ "aidev-growth": {
+  "ru": [
+   {
+    "id": "hvXOIjjkSHM",
+    "t": "Жуткое будущее ИИ | Варламов и Дороничев в AI-столице мира Кремниевой долине",
+    "c": "varlamov",
+    "d": "1:24:15",
+    "v": 1257022
+   },
+   {
+    "id": "f0MCwhF6Azk",
+    "t": "Что я думаю про будущее разработки в эпоху ИИ",
+    "c": "Лёша Корепанов",
+    "d": "14:10",
+    "v": 59763
+   },
+   {
+    "id": "zOHz_vAElGo",
+    "t": "9 AI-навыков, которые сделают тебя богатым в 2026 году",
+    "c": "Виктор Рязанов",
+    "d": "20:53",
+    "v": 201884
+   }
+  ],
+  "en": [
+   {
+    "id": "w4rG5GY9IlA",
+    "t": "Learning Software Engineering During the Era of AI | Raymond Fu | TEDxCSTU",
+    "c": "TEDx Talks",
+    "d": "12:27",
+    "v": 935067
+   },
+   {
+    "id": "l7JaE04t-ik",
+    "t": "AI Will Replace Software Engineers? Here’s What’s Actually Happening",
+    "c": "Chris Schwenk | Tech Jobber",
+    "d": "10:47",
+    "v": 138931
+   },
+   {
+    "id": "Ci7ZDQ3m8cc",
+    "t": "Stanford AI Expert: These 3 Jobs Will EXPLODE in the Next 5 Years!",
+    "c": "Sajjaad Khader",
+    "d": "12:43",
+    "v": 195914
+   }
+  ]
  }
 };

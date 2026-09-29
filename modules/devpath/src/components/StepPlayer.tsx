@@ -168,9 +168,11 @@ function StepView({ step, topicId, locked, onChecked, onNext }: { step: Step; to
     case "explain":
       return (
         <div>
-          <div className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--dp-cyan)]">Объяснение</div>
+          <div className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--dp-cyan)]">
+            {step.title === "Простыми словами" ? "💡 Суть на пальцах" : "Объяснение"}
+          </div>
           <h2 className="mb-3 text-2xl font-extrabold">{step.title}</h2>
-          <Md text={step.md} className="text-[15px]" />
+          <Md text={step.md} className="text-[15px]" terms />
           <Btn block className="mt-6" onClick={onNext}>
             Понятно →
           </Btn>
