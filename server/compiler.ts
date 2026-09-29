@@ -59,6 +59,8 @@ export async function compileModule(dir: string, manifest: Manifest, ctx: Compil
       build.onResolve({ filter: /^[^./]/ }, async (args) => {
         if (args.kind === "entry-point" || path.isAbsolute(args.path)) return;
         const spec = args.path;
+        // Внешние адреса в CSS (@import url("https://fonts…")) остаются как есть.
+        if (/^(https?:)?\/\//.test(spec) || spec.startsWith("data:")) return { path: spec, external: true };
 
         if (spec.startsWith("@modules/")) {
           const id = spec.slice("@modules/".length);

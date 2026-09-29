@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import zlib from "node:zlib";
 import { Hono, type Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import QRCode from "qrcode";
@@ -600,11 +601,24 @@ function manifestOf(id: string): Manifest | undefined {
 
 const rawDb = () => db.getRaw();
 
+/** Сжатые версии бандлов: модули с большими данными весят мегабайты, а с телефона грузятся по мобильной сети. */
+const gzipped = new Map<string, ArrayBuffer>();
+
 function js(c: Context, body: string, immutable: boolean) {
-  return c.body(body, 200, {
+  const headers: Record<string, string> = {
     "content-type": "text/javascript; charset=utf-8",
     "cache-control": immutable ? "public, max-age=31536000, immutable" : "no-cache",
-  });
+    vary: "accept-encoding",
+  };
+  if (body.length < 4096 || !/\bgzip\b/.test(c.req.header("accept-encoding") ?? "")) return c.body(body, 200, headers);
+  let gz = gzipped.get(body);
+  if (!gz) {
+    const buf = zlib.gzipSync(body);
+    gz = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    gzipped.set(body, gz);
+    if (gzipped.size > 64) gzipped.delete(gzipped.keys().next().value!);
+  }
+  return c.body(gz, 200, { ...headers, "content-encoding": "gzip" });
 }
 
 function addDir(files: Record<string, Uint8Array>, dir: string, prefix: string, filter: (p: string) => boolean = () => true) {
