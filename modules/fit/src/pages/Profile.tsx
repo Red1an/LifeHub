@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn, confirm, Loading, media, prompt, toast, uid } from "@lifehub/sdk";
 import { EQUIP, EX, LIMITS } from "../data/library.ts";
 import { useFit } from "../lib/store.ts";
+import { isNatural, onVoices, ruVoices, say, setVoice } from "../lib/sfx.ts";
 import type { Equip, Experience, Goal, Limitation, Place, Profile } from "../lib/types.ts";
 import { Btn, Chip, Header, Panel, Screen, Section } from "../components/kit.tsx";
 
@@ -172,6 +173,7 @@ export function ProfilePage() {
           <Chip on={p.sound} onClick={() => set({ sound: !p.sound })}>🔔 Сигналы таймера</Chip>
           <Chip on={p.voice} onClick={() => set({ voice: !p.voice })}>🗣️ Голосовые подсказки</Chip>
         </div>
+        {p.voice && <VoicePicker name={p.voiceName} rate={p.voiceRate ?? 1} onChange={(v) => set(v)} />}
       </Section>
 
       {fit.hidden.length > 0 && (
@@ -188,5 +190,39 @@ export function ProfilePage() {
         <Btn tone="ghost" onClick={() => set({ onboarded: false })}>Пройти знакомство ещё раз</Btn>
       </Section>
     </Screen>
+  );
+}
+
+/** Выбор голоса тренера: лучшие (нейросетевые) — первыми. */
+function VoicePicker({ name, rate, onChange }: { name?: string; rate: number; onChange: (v: Partial<Profile>) => void }) {
+  const [voices, setVoices] = useState(ruVoices);
+  useEffect(() => onVoices(() => setVoices(ruVoices())), []);
+  const current = voices.find((v) => v.name === name) ?? voices[0];
+  const test = (n = current?.name, r = rate) => {
+    setVoice({ name: n, rate: r });
+    say("Поднимаем руки через стороны вверх. Вдох. И на выдохе опускаем.", { force: true });
+  };
+  const natural = voices.some(isNatural);
+  return (
+    <Panel className="mt-3 !p-4">
+      <div className="text-xs font-extrabold uppercase tracking-widest text-[var(--ft-muted)]">Голос тренера</div>
+      {voices.length ? (
+        <>
+          <select className="ft-input mt-2" value={current?.name ?? ""} onChange={(e) => { onChange({ voiceName: e.target.value }); test(e.target.value); }}>
+            {voices.map((v) => <option key={v.name} value={v.name}>{isNatural(v) ? "✨ " : ""}{v.name}</option>)}
+          </select>
+          <div className="mt-3 flex items-center gap-2 text-sm">
+            <span className="text-[var(--ft-muted)]">Темп</span>
+            {[0.9, 1, 1.1, 1.2].map((r) => <Chip key={r} on={Math.abs(rate - r) < 0.01} onClick={() => { onChange({ voiceRate: r }); test(undefined, r); }}>{r}×</Chip>)}
+          </div>
+          <Btn tone="ghost" className="mt-3 !min-h-9 text-sm" onClick={() => test()}>▶ Послушать</Btn>
+        </>
+      ) : <div className="mt-2 text-sm">Браузер не нашёл русских голосов.</div>}
+      <div className="mt-3 text-xs leading-relaxed text-[var(--ft-muted)]">
+        {natural ? "✨ — нейросетевые голоса, звучат почти как живой человек. " : "Живых нейросетевых голосов в этом браузере нет. "}
+        Самые естественные — в Microsoft Edge (Светлана и Дмитрий, «Natural») и в Chrome («Google русский»).
+        На телефоне голос берётся из настроек синтеза речи системы.
+      </div>
+    </Panel>
   );
 }

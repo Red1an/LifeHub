@@ -3,7 +3,7 @@
 export type Muscle =
   | "chest" | "delts" | "triceps" | "biceps" | "forearms"
   | "lats" | "upperback" | "lowerback" | "abs" | "obliques"
-  | "glutes" | "quads" | "hams" | "calves" | "neck";
+  | "glutes" | "quads" | "hams" | "calves" | "neck" | "adductors";
 
 /** Двигательный паттерн — основа балансировки тренировок. */
 export type Pattern =
@@ -34,7 +34,13 @@ export type Equip =
   | "barbell"
   | "bench"
   | "rack"      // стойки для штанги
-  | "kettlebell";
+  | "kettlebell"
+  // Ниже — только для расширенного каталога (data/extra.ts):
+  | "machine"   // тренажёры
+  | "cable"     // блочный тренажёр, кроссовер
+  | "ball"      // фитбол, медбол
+  | "roller"    // ролик для МФР
+  | "other";    // особый инвентарь
 
 export type Limitation = "knees" | "back" | "shoulders" | "wrists";
 
@@ -68,6 +74,16 @@ export interface Exercise {
   tags?: Tag[];
   /** Короткий поисковый запрос для видео (иначе — название). */
   video?: string;
+  /** Что сказать голосом перед упражнением (иначе — первый шаг техники). */
+  say?: string;
+  /** Папка с картинками в free-exercise-db (lib/media.ts). */
+  photo?: string;
+  /** GIF-анимация из ExerciseDB (id). */
+  gif?: string;
+  /** Короткий ролик YouTube с техникой (id видео). */
+  yt?: string;
+  /** Из расширенного каталога: техника не встроена, подгружается и переводится (lib/media.ts). */
+  ext?: boolean;
 }
 
 export type Goal = "health" | "strength" | "muscle" | "endurance" | "fatloss";
@@ -100,6 +116,9 @@ export interface Profile {
   workTo: number;
   sound: boolean;
   voice: boolean;
+  /** Имя голоса speechSynthesis (пусто — лучший русский автоматически). */
+  voiceName?: string;
+  voiceRate?: number;
   bodyweight?: number;
 }
 

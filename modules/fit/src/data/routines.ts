@@ -11,7 +11,7 @@ export interface Routine {
   items: [string, number, number?][];
 }
 
-/** Готовые короткие комплексы: разминка у стола, зарядка, растяжка. */
+/** Готовые короткие комплексы: разминка у стола, зарядка (только стоя), растяжка. */
 export const ROUTINES: Routine[] = [
   /* ───── У стола (2–4 минуты) ───── */
   {
@@ -45,27 +45,28 @@ export const ROUTINES: Routine[] = [
     items: [["box-breath", 64], ["eyes-20", 30], ["desk-shrugs", 20, 5], ["neck-tilts", 30]],
   },
 
-  /* ───── Зарядка ───── */
+  /* ───── Зарядка: всё стоя, без пола ───── */
   {
-    id: "morning-soft", kind: "morning", title: "Мягкое пробуждение", icon: "🌅", color: "#fbbf24",
-    text: "5 минут, можно прямо в пижаме",
-    items: [["neck-tilts", 30], ["shoulder-rolls", 30], ["cat-cow", 45], ["thoracic-rotation", 60], ["glute-bridge", 40, 12], ["standing-side-bend", 40], ["march", 45]],
+    id: "morning-joints", kind: "morning", title: "Суставная гимнастика", icon: "🌅", color: "#fbbf24",
+    text: "10 минут сверху вниз: от шеи до стоп, без коврика",
+    items: [
+      ["neck-tilts", 30], ["neck-turns", 30], ["shoulder-rolls", 30], ["arm-circles", 30], ["elbow-circles", 30], ["wrist-circles", 30],
+      ["arm-scissors", 30], ["torso-twist", 30], ["standing-side-bend", 30], ["standing-cat", 30], ["hip-circles", 30], ["knee-circles", 30],
+      ["foot-circles", 15], ["squat-reach", 40, 10], ["march", 40], ["breath-arms", 40],
+    ],
   },
   {
     id: "morning-energy", kind: "morning", title: "Бодрая зарядка", icon: "☀️", color: "#ff7a2f",
-    text: "10 минут: мобильность + лёгкая сила",
+    text: "8 минут стоя: разогнать кровь и проснуться",
     items: [
-      ["jumping-jacks", 45], ["arm-circles", 30], ["hip-circles", 30], ["worlds-greatest", 60], ["air-squat", 40, 15],
-      ["pushup", 40, 10], ["reverse-lunge", 60, 8], ["bird-dog", 60, 8], ["plank", 40], ["shadow-boxing", 45], ["down-dog", 40],
+      ["jumping-jacks", 40], ["arm-swings", 30], ["torso-twist", 30], ["windmill", 40], ["air-squat", 40, 15], ["standing-knee-elbow", 40],
+      ["reverse-lunge", 30, 8], ["oblique-crunch-standing", 40], ["shadow-boxing", 45], ["butt-kicks", 30], ["reach-up", 30],
     ],
   },
   {
-    id: "morning-mobility", kind: "morning", title: "Суставы и спина", icon: "🐈", color: "#38d6f5",
-    text: "8 минут: подвижность без нагрузки",
-    items: [
-      ["neck-tilts", 30], ["shoulder-rolls", 30], ["wrist-circles", 30], ["cat-cow", 60], ["thoracic-rotation", 60],
-      ["hip-circles", 30], ["deep-squat-hold", 45], ["worlds-greatest", 60], ["dead-bug", 60, 10], ["lying-twist", 60],
-    ],
+    id: "morning-express", kind: "morning", title: "Экспресс", icon: "⚡", color: "#38d6f5",
+    text: "4 минуты, когда совсем некогда",
+    items: [["neck-turns", 20], ["arm-circles", 25], ["torso-twist", 25], ["hip-circles", 25], ["squat-reach", 30, 8], ["march", 30], ["reach-up", 25]],
   },
 
   /* ───── Растяжка ───── */

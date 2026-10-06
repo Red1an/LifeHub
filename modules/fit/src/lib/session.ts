@@ -30,7 +30,7 @@ export function buildSteps(w: Workout): Step[] {
       main.forEach((i, k) => {
         steps.push({ t: "work", i, s: r, auto: true, round: r });
         const lastInRound = k === main.length - 1;
-        if (!lastInRound) steps.push({ t: "rest", sec: rest, i, s: r });
+        if (!lastInRound) { if (rest > 0) steps.push({ t: "rest", sec: rest, i, s: r }); }
         else if (r < rounds - 1) steps.push({ t: "rest", sec: 60, i, s: r, round: true });
       });
     }

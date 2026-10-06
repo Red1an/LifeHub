@@ -11,8 +11,10 @@ import { ExercisePage } from "./pages/Exercise.tsx";
 import { ProgressPage } from "./pages/Progress.tsx";
 import { ProfilePage } from "./pages/Profile.tsx";
 import { CoachPage } from "./pages/Coach.tsx";
+import { CatalogPage } from "./pages/Catalog.tsx";
+import { MyRoutinePage } from "./pages/MyRoutine.tsx";
 import { useFit, type Fit } from "./lib/store.ts";
-import { setAudio } from "./lib/sfx.ts";
+import { setAudio, setVoice } from "./lib/sfx.ts";
 import { Ring } from "./components/kit.tsx";
 
 let lastReminder = Date.now();
@@ -39,6 +41,7 @@ function useBreakReminder(fit: Fit) {
 function Layout({ children }: { children: ReactNode }) {
   const fit = useFit();
   useEffect(() => setAudio({ sound: fit.profile.sound, voice: fit.profile.voice }), [fit.profile.sound, fit.profile.voice]);
+  useEffect(() => setVoice({ name: fit.profile.voiceName, rate: fit.profile.voiceRate }), [fit.profile.voiceName, fit.profile.voiceRate]);
   useBreakReminder(fit);
   return <div className="ft-root flex min-h-full flex-1 flex-col">{children}</div>;
 }
@@ -82,13 +85,15 @@ export default defineModule({
     "/progress": ProgressPage,
     "/profile": ProfilePage,
     "/coach": CoachPage,
+    "/catalog": CatalogPage,
+    "/my/:id": MyRoutinePage,
     "*": Today,
   },
   nav: [
     { to: "/", label: "Сегодня", icon: "🏠" },
     { to: "/build", label: "Тренировка", icon: "🏋️" },
     { to: "/breaks", label: "Разминки", icon: "🧘" },
-    { to: "/skills", label: "Навыки", icon: "🪜" },
+    { to: "/catalog", label: "Упражнения", icon: "📚" },
     { to: "/progress", label: "Прогресс", icon: "📈" },
   ],
   widgets: {

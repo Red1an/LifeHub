@@ -45,17 +45,57 @@ export const sfx = {
   tap: () => play(() => tone(520, 0, 0.05, "sine", 0.05)),
 };
 
-let ruVoice: SpeechSynthesisVoice | null | undefined;
+/* ───── Голос ─────
+ * speechSynthesis умеет и «живые» нейросетевые голоса: в Edge — Microsoft Svetlana/Dmitry Online (Natural),
+ * в Chrome — Google русский, на телефоне — голоса Google или Samsung. Выбираем лучший из доступных
+ * или тот, что выбран в настройках. */
+let voiceName = "";
+let rate = 1;
 
-export function say(text: string) {
-  if (!voice || !("speechSynthesis" in window)) return;
+export function setVoice(opts: { name?: string; rate?: number }) {
+  voiceName = opts.name ?? "";
+  rate = opts.rate ?? 1;
+}
+
+const score = (v: SpeechSynthesisVoice) =>
+  (/natural|neural|online/i.test(v.name) ? 40 : 0) + (/google/i.test(v.name) ? 20 : 0) + (/svetlana|dariya|dmitry|milena|yandex/i.test(v.name) ? 10 : 0) +
+  (v.localService ? 0 : 5) + (v.lang.toLowerCase() === "ru-ru" ? 2 : 0);
+
+/** Русские голоса, лучшие — первыми. */
+export function ruVoices(): SpeechSynthesisVoice[] {
+  if (!("speechSynthesis" in window)) return [];
+  return speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith("ru")).sort((a, b) => score(b) - score(a));
+}
+
+/** Список голосов приходит асинхронно — подписка для настроек. */
+export function onVoices(fn: () => void) {
+  if (!("speechSynthesis" in window)) return () => {};
+  speechSynthesis.addEventListener("voiceschanged", fn);
+  return () => speechSynthesis.removeEventListener("voiceschanged", fn);
+}
+
+export const isNatural = (v: SpeechSynthesisVoice) => score(v) >= 20;
+
+function pick() {
+  const list = ruVoices();
+  return list.find((v) => v.name === voiceName) ?? list[0] ?? null;
+}
+
+/** Сказать фразу. queue — не перебивать то, что уже говорится. */
+export function say(text: string, opts: { queue?: boolean; force?: boolean } = {}) {
+  if ((!voice && !opts.force) || !text || !("speechSynthesis" in window)) return;
   try {
-    ruVoice ??= speechSynthesis.getVoices().find((v) => v.lang.toLowerCase().startsWith("ru")) ?? null;
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "ru-RU";
-    if (ruVoice) u.voice = ruVoice;
-    u.rate = 1.05;
-    speechSynthesis.cancel();
+    const v = pick();
+    if (v) u.voice = v;
+    // Нейросетевые голоса и так звучат естественно, обычные чуть ускоряем.
+    u.rate = rate * (v && isNatural(v) ? 1 : 1.05);
+    if (!opts.queue) speechSynthesis.cancel();
     speechSynthesis.speak(u);
   } catch {}
+}
+
+export function hush() {
+  try { if ("speechSynthesis" in window) speechSynthesis.cancel(); } catch {}
 }

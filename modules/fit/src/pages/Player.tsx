@@ -3,10 +3,12 @@ import { cn, confirm, formatDuration, Link, Loading, plural, toast, useNavigate 
 import { EX, MUSCLES, neighbours, videoUrl } from "../data/library.ts";
 import { alternatives, makeItem } from "../lib/generator.ts";
 import { buildSteps, saveFinished, type Step } from "../lib/session.ts";
-import { say, sfx, unlockAudio } from "../lib/sfx.ts";
+import { hush, say, sfx, unlockAudio } from "../lib/sfx.ts";
+import { sayText, translateHowTo, useHowTo } from "../lib/media.ts";
 import { useFit, type Fit, type Active } from "../lib/store.ts";
 import type { Exercise, Workout, WorkoutItem } from "../lib/types.ts";
 import { Btn, Pill, Ring, Stepper } from "../components/kit.tsx";
+import { ExThumb, ExVisual } from "../components/Visual.tsx";
 
 function useNow(ms = 250) {
   const [now, setNow] = useState(Date.now());
@@ -73,6 +75,16 @@ function Player({ fit, active }: { fit: Fit; active: Active }) {
 
   const item = step ? w.items[step.i] : undefined;
   const ex = item ? EX.get(item.ex) : undefined;
+  const how = useHowTo(ex);
+  const voiceText = (e: Exercise | undefined) => (e ? `${e.name}. ${sayText(e, e.ext ? (how.english ? [] : how.steps) : e.steps)}` : "");
+
+  // Упражнения из каталога: заранее переводим технику всей тренировки.
+  useEffect(() => {
+    for (const id of new Set(w.items.map((it) => it.ex))) {
+      const e = EX.get(id);
+      if (e?.ext && e.photo) void translateHowTo(e).catch(() => {});
+    }
+  }, [w.items.length]);
 
   // Вход в новый шаг: запускаем нужный таймер.
   useEffect(() => {
@@ -90,10 +102,11 @@ function Player({ fit, active }: { fit: Fit; active: Active }) {
       const prep = prevRest ? 0 : 5;
       if (prep) setTimer({ phase: "prep", end: Date.now() + prep * 1000, total: prep });
       else setTimer({ phase: "run", end: Date.now() + workSec(ex, item) * 1000, total: workSec(ex, item) });
-      say(ex?.name ?? "");
+      // Во втором и следующих кругах — только название, объяснение уже было.
+      say(step.round ? ex?.name ?? "" : voiceText(ex));
     } else {
       setTimer(null);
-      if (step.s === 0) say(ex?.name ?? "");
+      if (step.s === 0) say(voiceText(ex));
     }
   }, [idx, steps.length]);
 
@@ -146,7 +159,7 @@ function Player({ fit, active }: { fit: Fit; active: Active }) {
       if (saved.ups?.length) fit.setLevels((l) => ({ ...l, ...Object.fromEntries(saved.ups!.map((u) => [u.chain, u.to])) }));
       fit.setActive(null);
       sfx.win();
-      say("Тренировка завершена. Отличная работа!");
+      say(w.kind === "morning" ? "Зарядка закончена. Отличного дня!" : w.kind === "workout" ? "Тренировка завершена. Отличная работа!" : "Готово. Отличная работа!");
       nav(`/done/${saved.id}`, { replace: true });
     } catch (e) {
       finishing.current = false;
@@ -156,6 +169,7 @@ function Player({ fit, active }: { fit: Fit; active: Active }) {
 
   const quit = async () => {
     if (!(await confirm("Выйти без сохранения? Сделанные подходы не запишутся.", { danger: true, confirmText: "Выйти" }))) return;
+    hush();
     fit.setActive(null);
     nav("/", { replace: true });
   };
@@ -234,24 +248,36 @@ function Player({ fit, active }: { fit: Fit; active: Active }) {
         ) : (
           <>
             <div key={idx} className="ft-slide">
-              <div className="flex items-start gap-3">
-                <div className="grid size-16 shrink-0 place-items-center rounded-3xl bg-[var(--ft-panel-2)] text-4xl">{ex.icon}</div>
-                <div className="min-w-0 flex-1">
-                  <h1 className="ft-display text-xl font-bold leading-tight sm:text-2xl">{ex.name}</h1>
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {ex.muscles.map((m) => <Pill key={m} color="#c8f031">{MUSCLES[m]}</Pill>)}
-                    {ex.sides && <Pill color="#38d6f5">на каждую сторону</Pill>}
+              <div className="relative">
+                <ExVisual ex={ex} paused={timer?.paused != null || timer?.phase === "prep"} className={cn("w-full", step.auto ? "h-52 sm:h-64" : "h-40 sm:h-52")} />
+                {step.auto && timer && (
+                  <div className="absolute bottom-2 right-2 rounded-full bg-[var(--ft-bg)]/85 backdrop-blur">
+                    <Ring value={left / timer.total} size={84} stroke={7} color={timer.phase === "prep" ? "var(--ft-orange)" : "var(--ft-lime)"}>
+                      <div className="ft-num text-2xl font-extrabold">{Math.ceil(left)}</div>
+                    </Ring>
                   </div>
-                </div>
+                )}
+                {timer?.phase === "prep" && (
+                  <div className="absolute left-2 top-2 rounded-full bg-[var(--ft-orange)] px-3 py-1 text-xs font-extrabold text-[#140700]">Приготовься</div>
+                )}
+              </div>
+              <h1 className="ft-display mt-3 text-xl font-bold leading-tight sm:text-2xl">{ex.name}</h1>
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {ex.muscles.map((m) => <Pill key={m} color="#c8f031">{MUSCLES[m]}</Pill>)}
+                {ex.sides && <Pill color="#38d6f5">на каждую сторону</Pill>}
               </div>
 
-              <button className="mt-3 w-full rounded-2xl bg-[var(--ft-panel)] px-4 py-3 text-left" onClick={() => setTech(!tech)}>
-                <div className="flex items-center justify-between text-sm font-bold">
-                  <span>🎓 {tech ? "Техника" : ex.cues[0]}</span>
-                  <span className="text-[var(--ft-muted)]">{tech ? "▴" : "▾"}</span>
-                </div>
-                {tech && <Technique ex={ex} />}
-              </button>
+              {step.auto ? (
+                <Steps steps={how.steps} english={how.english} className="mt-3" />
+              ) : (
+                <button className="mt-3 w-full rounded-2xl bg-[var(--ft-panel)] px-4 py-3 text-left" onClick={() => setTech(!tech)}>
+                  <div className="flex items-center justify-between gap-2 text-sm font-bold">
+                    <span>🎓 {tech ? "Техника" : ex.cues[0] ?? how.steps[0] ?? "Техника"}</span>
+                    <span className="text-[var(--ft-muted)]">{tech ? "▴" : "▾"}</span>
+                  </div>
+                  {tech && <Technique ex={ex} steps={how.steps} />}
+                </button>
+              )}
             </div>
 
             {step.auto ? (
@@ -316,18 +342,34 @@ function Player({ fit, active }: { fit: Fit; active: Active }) {
   );
 }
 
-function Technique({ ex }: { ex: Exercise }) {
+/** Шаги техники прямо на экране упражнения. */
+function Steps({ steps, english, className }: { steps: string[]; english?: boolean; className?: string }) {
+  if (!steps.length) return null;
+  return (
+    <ol className={cn("space-y-1.5 rounded-2xl bg-[var(--ft-panel)] px-4 py-3 text-sm leading-snug", className)}>
+      {steps.map((s, i) => (
+        <li key={i} className="flex gap-2.5">
+          <span className="ft-num mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-[var(--ft-lime)] text-[10px] font-bold text-[#0a0b0d]">{i + 1}</span>
+          <span>{s}</span>
+        </li>
+      ))}
+      {english && <li className="text-xs text-[var(--ft-muted)]">Перевод готовится — пока оригинал</li>}
+    </ol>
+  );
+}
+
+function Technique({ ex, steps }: { ex: Exercise; steps: string[] }) {
   return (
     <div className="mt-3 space-y-3 text-sm font-normal" onClick={(e) => e.stopPropagation()}>
-      <ol className="list-decimal space-y-1 pl-5">{ex.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
-      <div>
+      <ol className="list-decimal space-y-1 pl-5">{steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+      {ex.cues.length > 0 && <div>
         <div className="mb-1 text-xs font-bold uppercase tracking-wider text-[var(--ft-lime)]">Ключевое</div>
         <ul className="space-y-0.5">{ex.cues.map((c, i) => <li key={i}>✓ {c}</li>)}</ul>
-      </div>
-      <div>
+      </div>}
+      {ex.mistakes.length > 0 && <div>
         <div className="mb-1 text-xs font-bold uppercase tracking-wider text-[var(--ft-orange)]">Частые ошибки</div>
         <ul className="space-y-0.5">{ex.mistakes.map((c, i) => <li key={i}>✗ {c}</li>)}</ul>
-      </div>
+      </div>}
       {ex.breathe && <div className="text-[var(--ft-muted)]">🌬️ {ex.breathe}</div>}
       <a href={videoUrl(ex)} target="_blank" rel="noreferrer" className="inline-block text-[var(--ft-cyan)] underline underline-offset-2">▶ Видео с техникой на YouTube</a>
     </div>
@@ -413,15 +455,10 @@ function AutoView({ ex, item, timer, left, onPause, onSkip }: { ex: Exercise; it
   const prep = timer?.phase === "prep";
   const reps = item.plan.reps?.[0];
   return (
-    <div className="mt-6 flex flex-1 flex-col items-center">
-      <Ring value={timer ? left / timer.total : 0} size={220} stroke={14} color={prep ? "var(--ft-orange)" : "var(--ft-lime)"}>
-        <div>
-          <div className="ft-num text-6xl font-extrabold">{Math.ceil(left)}</div>
-          <div className="text-xs text-[var(--ft-muted)]">
-            {timer?.paused != null ? "пауза" : prep ? "приготовься" : reps ? `≈ ${reps} ${plural(reps, ["повтор", "повтора", "повторов"])}${ex.sides ? " на сторону" : ""}` : ex.sides ? (left > (timer?.total ?? 0) / 2 ? "первая сторона" : "вторая сторона") : "работаем"}
-          </div>
-        </div>
-      </Ring>
+    <div className="mt-3 flex flex-1 flex-col items-center">
+      <div className="text-center text-sm font-bold text-[var(--ft-muted)]">
+        {timer?.paused != null ? "⏸ пауза" : prep ? "приготовься…" : reps ? `≈ ${reps} ${plural(reps, ["повтор", "повтора", "повторов"])}${ex.sides ? " на сторону" : ""}` : ex.sides ? (left > (timer?.total ?? 0) / 2 ? "первая сторона" : "вторая сторона") : "работаем"}
+      </div>
       <div className="flex-1" />
       <div className="mt-6 grid w-full grid-cols-2 gap-2">
         <Btn tone="ghost" className="!min-h-14" onClick={onPause}>{timer?.paused != null ? "▶ Дальше" : "⏸ Пауза"}</Btn>
@@ -476,7 +513,7 @@ function RestView({ step, steps, idx, w, left, timer, onFeel, onAdd, onSkip, onP
       <div className="flex-1" />
       {nextEx && nextItem && nextStep?.t === "work" && (
         <div className="mt-6 flex w-full items-center gap-3 rounded-2xl bg-[var(--ft-panel)] p-3">
-          <div className="text-3xl">{nextEx.icon}</div>
+          <ExThumb ex={nextEx} className="size-14" />
           <div className="min-w-0 flex-1">
             <div className="text-xs text-[var(--ft-muted)]">Далее{w.circuit ? "" : ` · подход ${nextStep.s + 1} из ${nextItem.sets.length}`}</div>
             <div className="truncate font-bold">{nextEx.name}</div>

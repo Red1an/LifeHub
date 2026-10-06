@@ -9,6 +9,7 @@ import { unlockAudio } from "../lib/sfx.ts";
 import { BodyMap } from "../components/BodyMap.tsx";
 import { Bar, Btn, Pill, Ring, Screen, Section, Tile } from "../components/kit.tsx";
 import { useDraft } from "./Build.tsx";
+import { useMorning } from "./Breaks.tsx";
 import { Welcome } from "./Welcome.tsx";
 
 const greeting = () => {
@@ -33,8 +34,9 @@ export function Today() {
   const nav = useNavigate();
   const d = useDraft(fit);
   const rec = useMemo(() => recovery(fit.hist), [fit.hist]);
+  const m = useMorning();
 
-  if (fit.loading) return <Screen><Loading /></Screen>;
+  if (fit.loading || m.loading) return <Screen><Loading /></Screen>;
   if (!fit.profile.onboarded) return <Welcome />;
 
   const { rank, next, progress } = fit.rank;
@@ -42,7 +44,7 @@ export function Today() {
   const breaksP = fit.breaksToday / fit.profile.breaksPerDay;
   const morning = new Date().getHours() < 11;
   const breakR = pickRoutine(fit.hist, "break");
-  const morningR = pickRoutine(fit.hist, "morning");
+  const morningR = m.routine(fit.profile.limits);
   const stretchR = pickRoutine(fit.hist, "stretch");
   const sinceMove = fit.lastMoveAt ? Date.now() - fit.lastMoveAt : Infinity;
   const nextAch = achievements(fit.hist, fit.week.streak, fit.days, fit.levels).filter((a) => !a.done).sort((a, b) => (b.progress ?? 0) - (a.progress ?? 0))[0];
@@ -118,10 +120,10 @@ export function Today() {
         <div className="grid grid-cols-2 gap-3">
           <Tile onClick={() => go(breakR)} icon={breakR.icon} title={`У стола: ${breakR.title}`} text={`${Math.round(breakR.items.reduce((n, i) => n + i[1], 0) / 60)} мин · ${breakR.text}`} color={breakR.color} />
           {morning
-            ? <Tile onClick={() => go(morningR)} icon={morningR.icon} title={`Зарядка: ${morningR.title}`} text={morningR.text} color={morningR.color} />
+            ? <Tile onClick={() => go(morningR)} icon={morningR.icon} title="Зарядка дня" text={`${m.length} мин стоя, каждый день новая`} color={morningR.color} />
             : <Tile onClick={() => go(stretchR)} icon={stretchR.icon} title={stretchR.title} text={stretchR.text} color={stretchR.color} />}
           <Tile to="/coach" icon="🤖" title="Тренер" text="Опиши ситуацию — соберёт тренировку" color="#a78bfa" />
-          <Tile to="/skills" icon="🪜" title="Навыки" text="Лестницы: от нуля до пистолетика" color="#ff7a2f" />
+          <Tile to="/catalog" icon="📚" title="Упражнения" text="Сотни упражнений по мышцам — собери своё" color="#ff7a2f" />
         </div>
       </Section>
 
