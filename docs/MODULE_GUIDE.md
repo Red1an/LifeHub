@@ -38,7 +38,7 @@ node "{{HUB_DIR}}/bin/lifehub.mjs" check <id>
   "description": "Учёт расходов и доходов",
   "icon": "💰",                    // эмодзи
   "author": "имя",
-  "type": "app",                   // "app" или "library"
+  "type": "app",                   // "app", "library" или "service"
   "sdk": "^1",
   "entry": "src/index.tsx",
   "deps": { "date-fns": "^4" },    // npm-пакеты (общий кэш хаба)
@@ -215,6 +215,24 @@ await google.calendar("/calendars/primary/events", { method: "POST", body: { sum
 - Помечай свои события (`extendedProperties.private`), чтобы отличать их от событий пользователя, и не трогай чужие
   без явной просьбы. Перед массовыми изменениями показывай черновик.
 
+### Интернет (разрешение "network")
+
+Браузер не пускает модуль на чужие сайты без CORS. `net` забирает страницу через сервер хаба —
+работает с любым публичным сайтом и с телефона. Локальная сеть и сам компьютер с хабом недоступны.
+
+```tsx
+import { net, NetRequestError } from "@lifehub/sdk";
+
+const html = await net.text("https://example.com/search?q=…");   // ошибка, если статус не 2xx
+const data = await net.json<{ items: any[] }>("https://api.example.com/items");
+const r = await net.fetch(url, { method: "POST", body: JSON.stringify(x), headers: { "content-type": "application/json" } });
+// r: { status, ok, url, contentType, text } — ошибки HTTP не бросают исключение
+```
+
+- Разбирай HTML на клиенте (`new DOMParser().parseFromString(html, "text/html")` или регулярки по встроенному JSON).
+- Сайты меняют вёрстку: пиши разбор терпимым к отсутствию полей и показывай понятную ошибку.
+- Сохраняй загруженное в коллекцию, если оно понадобится снова, — не дёргай сайт на каждый рендер.
+
 ## Интерфейс и дизайн
 
 **У каждого модуля свой дизайн.** Хаб — нейтральная рамка: узкая полоса с иконками модулей на
@@ -272,6 +290,8 @@ await google.calendar("/calendars/primary/events", { method: "POST", body: { sum
 **Устройства:** `media.microphone()`, `media.camera()` (нужны разрешения `mic`/`camera` и HTTPS или localhost),
 `media.notify(title, body)` (разрешение `notifications`).
 
+**Интернет:** `net.text(url)`, `net.json(url)`, `net.fetch(url, opts)` (разрешение `network`, см. выше).
+
 **События между модулями на странице:** `emitEvent("finance:added", data)`, `useEvent("finance:added", fn)`.
 
 ### Правила интерфейса
@@ -293,6 +313,31 @@ await google.calendar("/calendars/primary/events", { method: "POST", body: { sum
 
 Экспортирует функции, хуки, компоненты. Её код загружается в браузер **один раз** на все модули,
 которые её используют. При несовместимых изменениях API повышай мажорную версию.
+
+## Модуль-сервис
+
+Готовое приложение со своим сервером (Node, Python…), которое нельзя переписать на SDK: парсинг сайтов,
+локальные программы. Делай обычный модуль, если можешь, — сервис не получает SDK, данные хаба, виджеты и
+историю версий.
+
+```json
+{
+  "id": "eda", "name": "Еда", "type": "service",
+  "service": {
+    "start": "npm start",            // команда запуска (в папке модуля)
+    "port": 4322,                    // порт, который слушает сервер на 127.0.0.1
+    "build": "{python} build.py",    // необязательно: сборка перед запуском, когда файлы изменились
+    "path": "/",                     // начальная страница
+    "health": "/api/health",         // необязательно: адрес проверки готовности
+    "env": { "EDA_PORT": "{port}", "EDA_DATA": "{data}" }
+  }
+}
+```
+
+В командах и `env` подставляются `{port}`, `{dir}` (папка модуля), `{data}` (папка данных сервиса вне модуля —
+храни данные там, а не в папке модуля), `{python}`, `{node}`. Есть `package.json` — хаб сам выполнит `npm install`.
+Хаб запускает сервис, перезапускает при сбое и показывает его во фрейме по адресу `/s/<id>/`. Запросы к
+корню (`fetch("/api/…")`) хаб переводит под этот адрес сам, но надёжнее относительные пути (`fetch("api/…")`).
 
 ## История версий, форки и обновления
 

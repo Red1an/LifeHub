@@ -13,19 +13,65 @@ export interface MicHandle {
   close: () => void;
 }
 
+/*
+ * Один поток микрофона на всю страницу. Упражнения берут его и отпускают;
+ * поток закрывается через несколько секунд после последнего — переход между
+ * упражнениями не запрашивает доступ заново и индикатор микрофона не мигает.
+ */
+let shared: { stream: MediaStream; users: number; closeTimer: number } | null = null;
+let opening: Promise<MediaStream> | null = null;
+const RELEASE_DELAY_MS = 4000;
+
+function liveStream(): MediaStream | null {
+  if (!shared) return null;
+  if (shared.stream.getAudioTracks().some((t) => t.readyState === "live")) return shared.stream;
+  shared = null;
+  return null;
+}
+
+async function acquireStream(): Promise<MediaStream> {
+  const live = liveStream();
+  if (live) return live;
+  opening ??= navigator.mediaDevices
+    .getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
+    .then((stream) => {
+      shared = { stream, users: 0, closeTimer: 0 };
+      return stream;
+    })
+    .finally(() => {
+      opening = null;
+    });
+  return opening;
+}
+
 export async function openMic(): Promise<MicHandle> {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-  });
+  const stream = await acquireStream();
+  if (shared) {
+    window.clearTimeout(shared.closeTimer);
+    shared.users++;
+  }
   const audio = getAudioContext();
   if (audio.state === "suspended") await audio.resume();
   const source = audio.createMediaStreamSource(stream);
+  let closed = false;
   return {
     source,
     stream,
     close: () => {
+      if (closed) return;
+      closed = true;
       source.disconnect();
-      stream.getTracks().forEach((track) => track.stop());
+      const s = shared;
+      if (!s || s.stream !== stream) return;
+      s.users = Math.max(0, s.users - 1);
+      if (s.users === 0) {
+        s.closeTimer = window.setTimeout(() => {
+          if (shared === s && s.users === 0) {
+            s.stream.getTracks().forEach((track) => track.stop());
+            shared = null;
+          }
+        }, RELEASE_DELAY_MS);
+      }
     },
   };
 }

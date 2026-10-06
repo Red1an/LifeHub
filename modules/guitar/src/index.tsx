@@ -1,82 +1,116 @@
-import { defineModule } from "@lifehub/sdk";
+import { useEffect, type ReactNode } from "react";
+import { defineModule, useNavigate, useParams } from "@lifehub/sdk";
+import "./styles.css";
 import { StorageGate } from "./lib/storage";
+import { migrateOldSongs, SEED } from "./lib/songs";
 import { PracticeWidget } from "./widget";
-import Page0 from "./app/page";
-import Page1 from "./app/practice/page";
-import Page2 from "./app/progress/page";
-import Page3 from "./app/songs/page";
-import Page4 from "./app/songs/[slug]/page";
-import Page5 from "./app/songs/new/page";
-import Page6 from "./app/train/page";
-import Page7 from "./app/train/bend/page";
-import Page8 from "./app/train/breath/page";
-import Page9 from "./app/train/caged/page";
-import Page10 from "./app/train/call-response/page";
-import Page11 from "./app/train/chord-changes/page";
-import Page12 from "./app/train/chord-check/page";
-import Page13 from "./app/train/chords/page";
-import Page14 from "./app/train/fingerstyle/page";
-import Page15 from "./app/train/fretboard/page";
-import Page16 from "./app/train/harmony/page";
-import Page17 from "./app/train/intervals/page";
-import Page18 from "./app/train/jam/page";
-import Page19 from "./app/train/key-finder/page";
-import Page20 from "./app/train/pitch-graph/page";
-import Page21 from "./app/train/pitch-match/page";
-import Page22 from "./app/train/progressions/page";
-import Page23 from "./app/train/rhythm/page";
-import Page24 from "./app/train/rhythm-mic/page";
-import Page25 from "./app/train/rhythm-reading/page";
-import Page26 from "./app/train/scales/page";
-import Page27 from "./app/train/sing-interval/page";
-import Page28 from "./app/train/speed/page";
-import Page29 from "./app/train/sustain/page";
-import Page30 from "./app/train/vocal-range/page";
-import Page31 from "./app/train/warmup/page";
+import { TodayPage } from "./pages/Today";
+import { SongsPage } from "./pages/Songs";
+import { SongPage } from "./pages/Song";
+import { ChordsPage } from "./pages/Chords";
+import { LearnPage, LearnPathPage } from "./pages/Learn";
+import { TrainPage } from "./pages/Train";
+import { ToolsPage } from "./pages/Tools";
+import { ProgressPage } from "./pages/Progress";
+import NewSongPage from "./pages/NewSong";
+import Bend from "./pages/train/bend";
+import Breath from "./pages/train/breath";
+import Caged from "./pages/train/caged";
+import CallResponse from "./pages/train/call-response";
+import ChordChanges from "./pages/train/chord-changes";
+import ChordCheck from "./pages/train/chord-check";
+import ChordsEar from "./pages/train/chords";
+import Fingerstyle from "./pages/train/fingerstyle";
+import Fretboard from "./pages/train/fretboard";
+import Harmony from "./pages/train/harmony";
+import Intervals from "./pages/train/intervals";
+import Jam from "./pages/train/jam";
+import KeyFinder from "./pages/train/key-finder";
+import PitchGraph from "./pages/train/pitch-graph";
+import PitchMatch from "./pages/train/pitch-match";
+import Progressions from "./pages/train/progressions";
+import Rhythm from "./pages/train/rhythm";
+import RhythmMic from "./pages/train/rhythm-mic";
+import RhythmReading from "./pages/train/rhythm-reading";
+import Scales from "./pages/train/scales";
+import SingInterval from "./pages/train/sing-interval";
+import Speed from "./pages/train/speed";
+import Sustain from "./pages/train/sustain";
+import VocalRange from "./pages/train/vocal-range";
+import Warmup from "./pages/train/warmup";
+
+function Layout({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    void migrateOldSongs();
+  }, []);
+  return (
+    <StorageGate>
+      <div className="gt-root flex min-h-full flex-1 flex-col">{children}</div>
+    </StorageGate>
+  );
+}
+
+/** Старые ссылки /songs/<slug> → /song/<id>. */
+function LegacySong() {
+  const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate(SEED.some((s) => s.id === `s-${slug}`) ? `/song/s-${slug}` : `/song/u-${slug}`, { replace: true });
+  }, [slug]);
+  return null;
+}
 
 export default defineModule({
   routes: {
-    "/": Page0,
-    "/practice": Page1,
-    "/progress": Page2,
-    "/songs": Page3,
-    "/songs/:slug": Page4,
-    "/songs/new": Page5,
-    "/train": Page6,
-    "/train/bend": Page7,
-    "/train/breath": Page8,
-    "/train/caged": Page9,
-    "/train/call-response": Page10,
-    "/train/chord-changes": Page11,
-    "/train/chord-check": Page12,
-    "/train/chords": Page13,
-    "/train/fingerstyle": Page14,
-    "/train/fretboard": Page15,
-    "/train/harmony": Page16,
-    "/train/intervals": Page17,
-    "/train/jam": Page18,
-    "/train/key-finder": Page19,
-    "/train/pitch-graph": Page20,
-    "/train/pitch-match": Page21,
-    "/train/progressions": Page22,
-    "/train/rhythm": Page23,
-    "/train/rhythm-mic": Page24,
-    "/train/rhythm-reading": Page25,
-    "/train/scales": Page26,
-    "/train/sing-interval": Page27,
-    "/train/speed": Page28,
-    "/train/sustain": Page29,
-    "/train/vocal-range": Page30,
-    "/train/warmup": Page31,
+    "/": TodayPage,
+    "/songs": SongsPage,
+    "/songs/new": NewSongPage,
+    "/songs/:slug": LegacySong,
+    "/song/:id": SongPage,
+    "/chords": ChordsPage,
+    "/learn": LearnPage,
+    "/learn/:id": LearnPathPage,
+    "/train": TrainPage,
+    "/tools": ToolsPage,
+    "/practice": ToolsPage,
+    "/progress": ProgressPage,
+    "/train/bend": Bend,
+    "/train/breath": Breath,
+    "/train/caged": Caged,
+    "/train/call-response": CallResponse,
+    "/train/chord-changes": ChordChanges,
+    "/train/chord-check": ChordCheck,
+    "/train/chords": ChordsEar,
+    "/train/fingerstyle": Fingerstyle,
+    "/train/fretboard": Fretboard,
+    "/train/harmony": Harmony,
+    "/train/intervals": Intervals,
+    "/train/jam": Jam,
+    "/train/key-finder": KeyFinder,
+    "/train/pitch-graph": PitchGraph,
+    "/train/pitch-match": PitchMatch,
+    "/train/progressions": Progressions,
+    "/train/rhythm": Rhythm,
+    "/train/rhythm-mic": RhythmMic,
+    "/train/rhythm-reading": RhythmReading,
+    "/train/scales": Scales,
+    "/train/sing-interval": SingInterval,
+    "/train/speed": Speed,
+    "/train/sustain": Sustain,
+    "/train/vocal-range": VocalRange,
+    "/train/warmup": Warmup,
+    "*": TodayPage,
   },
   nav: [
+    { to: "/", label: "Сегодня", icon: "🏠" },
     { to: "/songs", label: "Песни", icon: "🎵" },
+    { to: "/chords", label: "Аккорды", icon: "🎼" },
+    { to: "/learn", label: "Учёба", icon: "🧭" },
     { to: "/train", label: "Тренажёры", icon: "🎯" },
-    { to: "/practice", label: "Инструменты", icon: "🎛️" },
-    { to: "/progress", label: "Прогресс", icon: "📊" },
   ],
-  layout: StorageGate,
+  layout: Layout,
+  theme: "dark",
   widgets: {
-    practice: { title: "Гитара", component: PracticeWidget },
+    practice: { title: "Гитара", size: "sm", component: PracticeWidget },
   },
 });

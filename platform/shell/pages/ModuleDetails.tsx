@@ -68,7 +68,7 @@ export function ModuleDetailsPage({ id }: { id: string }) {
     >
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <Badge>v{m?.version}</Badge>
-        <Badge tone={isLib ? "accent" : "neutral"}>{isLib ? "библиотека" : "приложение"}</Badge>
+        <Badge tone={isLib ? "accent" : "neutral"}>{isLib ? "библиотека" : m?.type === "service" ? "сервис" : "приложение"}</Badge>
         <StatusBadge m={d} />
         {d.modified && d.source?.type !== "created" && <Badge tone="warning">изменён вами</Badge>}
         <span className="ml-auto">

@@ -53,6 +53,7 @@ async function start(args: string[]) {
     process.exit(1);
   }
   await Promise.all([reg.buildAll(), reg.rebuildCss()]);
+  reg.syncAllServices();
   reg.initHistory().catch((e) => console.error("[history]", e));
   reg.watchModules();
   reg.scheduleUpdateChecks();
@@ -152,6 +153,10 @@ async function check(args: string[]) {
     if (!all.some((m) => m.id === id)) {
       console.error(`✗ ${id}: модуль не найден в ${MODULES_DIR}`);
       failed = true;
+      continue;
+    }
+    if (reg.getEntry(id).manifest?.type === "service") {
+      console.log(`– ${id}: модуль-сервис, хаб его не собирает`);
       continue;
     }
     const b = await reg.getBuild(id);

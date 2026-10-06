@@ -27,6 +27,8 @@ export interface ModuleInfo {
   status: "ok" | "error" | "building" | "disabled";
   hash: string;
   hasCss: boolean;
+  /** Состояние процесса модуля-сервиса. */
+  service: { state: "stopped" | "installing" | "starting" | "running" | "error"; error?: string; log: string[] } | null;
   errors: string[];
   warnings: string[];
   libs: string[];

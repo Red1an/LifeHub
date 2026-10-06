@@ -13,6 +13,7 @@ import { buildCss } from "./css.ts";
 import { resolveLib, pkgDir, splitSpecifier } from "./libs.ts";
 import { getSettings, updateSettings } from "./settings.ts";
 import { emit } from "./events.ts";
+import { serviceStatus, syncServices, stopService, restartService } from "./services.ts";
 import { moduleStats, purgeModuleData } from "./db.ts";
 import { DatabaseSync } from "node:sqlite";
 import {
@@ -73,7 +74,8 @@ export function scan() {
     if (!fs.existsSync(path.join(dir, "lifehub.json"))) continue;
     seen.add(d.name);
     const prev = entries.get(d.name);
-    const e: Entry = { id: d.name, dir, build: prev?.build };
+    // Идущая сборка переходит в новую запись, иначе её результат потеряется и модуль навсегда останется «собирается».
+    const e: Entry = { id: d.name, dir, build: prev?.build, building: prev?.building };
     try {
       e.manifest = readManifest(dir);
       if (e.manifest.id !== d.name) {
@@ -83,7 +85,10 @@ export function scan() {
     } catch (err) {
       e.manifestError = (err as Error).message;
     }
-    if (prev?.manifest && e.manifest && JSON.stringify(prev.manifest) !== JSON.stringify(e.manifest)) e.build = undefined;
+    if (prev?.manifest && e.manifest && JSON.stringify(prev.manifest) !== JSON.stringify(e.manifest)) {
+      e.build = undefined;
+      e.building = undefined;
+    }
     entries.set(d.name, e);
   }
   for (const id of [...entries.keys()]) if (!seen.has(id)) entries.delete(id);
@@ -101,10 +106,22 @@ export async function getBuild(id: string, stack: string[] = []): Promise<BuildO
   }
   if (e.build) return e.build;
   if (e.building) return e.building;
+  if (e.manifest.type === "service") {
+    // Сервис хаб не собирает: его запускает services.ts, а интерфейс открывается через /s/<id>/.
+    const hash = crypto.createHash("sha1").update(JSON.stringify(e.manifest)).digest("hex").slice(0, 12);
+    e.build = { ok: true, hash, js: "", map: "", css: "", errors: [], warnings: [], libs: [], uses: [], inputs: [], builtAt: Date.now() };
+    return e.build;
+  }
   if (stack.includes(id)) return failed([`Циклическая зависимость модулей: ${[...stack, id].join(" → ")}`]);
 
   const manifest = e.manifest;
-  e.building = compileModule(e.dir, manifest, {
+  // Результат пишется в текущую запись модуля: scan() мог заменить её, пока шла сборка.
+  const settle = () => {
+    const cur = entries.get(id);
+    if (cur?.building === p) cur.building = undefined;
+    return cur;
+  };
+  const p: Promise<BuildOutput> = compileModule(e.dir, manifest, {
     libraryModule: async (libId) => {
       const lib = entries.get(libId);
       if (!lib?.manifest) return { error: `Модуль-библиотека "${libId}" не установлен` };
@@ -113,15 +130,31 @@ export async function getBuild(id: string, stack: string[] = []): Promise<BuildO
       if (!b.ok) return { error: `Модуль-библиотека "${libId}" не собирается:\n${b.errors.join("\n")}` };
       return { url: `/modules/${libId}/module.js?v=${b.hash}`, version: lib.manifest.version };
     },
-  })
-    .then((b) => {
-      if (entries.get(id) === e) e.build = b;
+  }).then(
+    (b) => {
+      const cur = entries.get(id);
+      if (cur?.building === p) cur.build = b;
+      settle();
       return b;
+    },
+    (err) => {
+      settle();
+      throw err;
+    },
+  );
+  e.building = p;
+  return p;
+}
+
+/** Страховка: включённый модуль без сборки собирается сам, а не висит «собирается». */
+function ensureBuilt(e: Entry) {
+  if (e.build || e.building || !e.manifest || !isEnabled(e.id)) return;
+  getBuild(e.id)
+    .then((b) => {
+      emit({ type: "module-built", id: e.id, hash: b.hash, ok: b.ok });
+      logBuild(e.id, b);
     })
-    .finally(() => {
-      e.building = undefined;
-    });
-  return e.building;
+    .catch((err) => console.error(`[build] ${e.id}`, err));
 }
 
 function failed(errors: string[]): BuildOutput {
@@ -166,7 +199,7 @@ export async function buildAll() {
 }
 
 export async function rebuildCss() {
-  const dirs = [...entries.values()].filter((e) => isEnabled(e.id)).map((e) => e.dir);
+  const dirs = [...entries.values()].filter((e) => isEnabled(e.id) && !isService(e)).map((e) => e.dir);
   const next = await buildCss(dirs);
   if (next.hash !== css.hash) {
     css = next;
@@ -188,6 +221,9 @@ export function watchModules() {
     const parts = filename.split(/[\\/]/);
     const id = parts[0];
     if (id.startsWith(".") || parts.some((p) => IGNORED.has(p)) || !MODULE_ID_RE.test(id)) return;
+    // Сервис живёт своей жизнью (пишет логи, кэши, сборку) — хаб следит только за его манифестом.
+    const known = entries.get(id);
+    if (known && isService(known) && parts.length > 1 && parts[1] !== "lifehub.json") return;
     clearTimeout(timers.get(id));
     timers.set(
       id,
@@ -196,8 +232,11 @@ export function watchModules() {
         const before = JSON.stringify(entries.get(id)?.manifest ?? null);
         scan();
         const after = JSON.stringify(entries.get(id)?.manifest ?? null);
-        if (before !== after || !entries.has(id)) emit({ type: "modules" });
-        if (entries.has(id)) {
+        if (before !== after || !entries.has(id)) {
+          emit({ type: "modules" });
+          syncAllServices();
+        }
+        if (entries.has(id) && !isService(entries.get(id)!)) {
           if (parts[1] === "lifehub.json") writeModuleTsconfig(entries.get(id)!).catch(() => {});
           await rebuild(id);
           if (entries.get(id)?.build?.ok) scheduleSnapshot(id);
@@ -235,6 +274,7 @@ export function listModules() {
   return [...entries.values()]
     .sort((a, b) => rank(a.id) - rank(b.id) || a.id.localeCompare(b.id))
     .map((e) => {
+      ensureBuilt(e);
       const enabled = isEnabled(e.id);
       const b = e.build;
       const status = !enabled ? "disabled" : e.manifestError ? "error" : e.building || !b ? "building" : b.ok ? "ok" : "error";
@@ -246,6 +286,7 @@ export function listModules() {
         status,
         hash: b?.hash ?? "",
         hasCss: !!b?.css,
+        service: isService(e) ? serviceStatus(e.id) : null,
         errors: e.manifestError ? [e.manifestError] : (b?.errors ?? []),
         warnings: b?.warnings ?? [],
         libs: b?.libs ?? [],
@@ -302,6 +343,7 @@ export async function writeWorkspaceFiles() {
     );
   }
   for (const e of entries.values()) {
+    if (isService(e)) continue;
     ensureModuleFiles(e.dir, e.manifest?.name ?? e.id);
     await writeModuleTsconfig(e).catch(() => {});
   }
@@ -332,7 +374,8 @@ const posix = (p: string) => p.replaceAll("\\", "/");
 
 /** tsconfig.json с путями к SDK хаба и к установленным библиотекам — для tsc и редактора. */
 export async function writeModuleTsconfig(e: Entry) {
-  if (!e.manifest) return;
+  // У сервиса свой tsconfig.json (если есть) — не трогаем.
+  if (!e.manifest || isService(e)) return;
   const nm = path.join(HUB_DIR, "node_modules");
   const paths: Record<string, string[]> = {
     "@lifehub/sdk": [posix(path.join(PLATFORM_DIR, "sdk", "index.ts"))],
@@ -547,7 +590,7 @@ export async function confirmInstall(stagingId: string, opts: { id?: string; rep
   let trashed: string | null = null;
   if (fs.existsSync(target)) {
     if (!opts.replace) throw new HubError(`Модуль "${id}" уже установлен`, 409);
-    trashed = moveToTrash(id);
+    trashed = await moveToTrash(id);
   }
   copyDir(meta.dir, target);
   // Заметки пользователя для нейронки (CLAUDE.md) переживают обновление, если у автора такого файла нет.
@@ -587,6 +630,7 @@ function patchSource(dir: string, patch: Partial<SourceInfo>) {
 
 async function afterChange(id?: string) {
   scan();
+  syncAllServices();
   await writeWorkspaceFiles();
   emit({ type: "modules" });
   if (id) await rebuild(id);
@@ -671,7 +715,8 @@ export async function forkModule(id: string, opts: { newId: string; name?: strin
   return opts.newId;
 }
 
-function moveToTrash(id: string) {
+async function moveToTrash(id: string) {
+  await stopService(id);
   const dir = path.join(MODULES_DIR, id);
   const dest = path.join(TRASH_DIR, `${id}-${Date.now()}`);
   fs.renameSync(dir, dest);
@@ -681,7 +726,7 @@ function moveToTrash(id: string) {
 /** Удаление: папка уходит в корзину (~/.lifehub/trash), данные — по желанию. */
 export async function removeModule(id: string, purgeData: boolean) {
   getEntry(id);
-  const dest = moveToTrash(id);
+  const dest = await moveToTrash(id);
   if (purgeData) purgeModuleData(id);
   const s = getSettings();
   updateSettings({
@@ -702,8 +747,29 @@ export async function setEnabled(id: string, enabled: boolean) {
   else disabled.add(id);
   updateSettings({ disabled: [...disabled] });
   emit({ type: "modules" });
+  syncAllServices();
   if (enabled) await rebuild(id);
   await rebuildCss();
+}
+
+/* ───────────────────────── модули-сервисы ───────────────────────── */
+
+const isService = (e: Entry) => e.manifest?.type === "service";
+
+/** Запустить включённые сервисы и остановить выключенные и удалённые. */
+export function syncAllServices() {
+  syncServices(
+    [...entries.values()]
+      .filter((e) => isService(e) && isEnabled(e.id))
+      .map((e) => ({ id: e.id, dir: e.dir, manifest: e.manifest! })),
+  );
+}
+
+export async function restartModuleService(id: string) {
+  const e = getEntry(id);
+  if (!e.manifest || !isService(e)) throw new HubError(`Модуль "${id}" — не сервис`);
+  if (!isEnabled(id)) throw new HubError("Модуль выключен");
+  await restartService(id, e.dir, e.manifest);
 }
 
 /* ───────────────────────── экспорт ───────────────────────── */
@@ -759,6 +825,7 @@ export async function initHistory() {
     return;
   }
   for (const e of [...entries.values()]) {
+    if (isService(e)) continue;
     try {
       const sha = await snapshot(e.id, e.dir, "start", "Состояние при запуске хаба");
       const src = readSource(e.dir);

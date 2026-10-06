@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link, plural } from "@lifehub/sdk";
+import { cn, Link, plural } from "@lifehub/sdk";
+import "./styles.css";
 import { loadHubStorage } from "./lib/storage";
 import { currentStreak, dayKey, loadDayLog } from "./lib/train-stats";
 
-/** Виджет на главной хаба: серия занятий и сколько упражнений сделано сегодня. */
+/** Виджет на главной хаба: серия занятий и сколько сделано сегодня. */
 export function PracticeWidget() {
   const [state, setState] = useState<{ streak: number; today: number } | null>(null);
   useEffect(() => {
@@ -14,17 +15,19 @@ export function PracticeWidget() {
   }, []);
   if (!state) return null;
   return (
-    <div>
-      <div className="flex items-baseline gap-2">
-        <span className="text-3xl font-semibold">{state.streak}</span>
-        <span className="text-sm text-muted">{plural(state.streak, ["день", "дня", "дней"])} подряд</span>
+    <Link to="/" className="gt-root -m-4 flex h-[calc(100%+2rem)] items-center gap-4 rounded-[inherit] p-4">
+      <div className="grid size-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#ffcf6e] to-[#ff8a4c] text-3xl">🎸</div>
+      <div className="min-w-0 flex-1">
+        <div className="gt-display text-lg font-bold uppercase">
+          Гитара <span className={cn(state.streak > 0 && "gt-flame")}>🔥</span>
+          {state.streak}
+        </div>
+        <div className="text-xs text-[var(--gt-muted)]">
+          {state.streak} {plural(state.streak, ["день", "дня", "дней"])} подряд · сегодня{" "}
+          {state.today ? `${state.today} ${plural(state.today, ["занятие", "занятия", "занятий"])}` : "ещё не играл"}
+        </div>
+        <div className="mt-1 text-xs font-bold text-[var(--gt-brass)]">▶ к занятиям</div>
       </div>
-      <div className="mt-1 text-sm text-muted">
-        Сегодня: {state.today ? `${state.today} ${plural(state.today, ["упражнение", "упражнения", "упражнений"])}` : "ещё не занимались"}
-      </div>
-      <Link to="/train" className="mt-3 inline-block text-sm font-medium text-accent">
-        К тренажёрам →
-      </Link>
-    </div>
+    </Link>
   );
 }

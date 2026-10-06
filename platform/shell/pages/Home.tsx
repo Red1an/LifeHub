@@ -26,7 +26,8 @@ export function HomePage() {
   const [defs, setDefs] = useState<Record<string, ModuleDefinition>>({});
   const [editing, setEditing] = useState(false);
   const apps = state ? appModules(state) : [];
-  const ready = apps.filter((m) => m.status === "ok");
+  // У сервисов нет виджетов: их интерфейс — отдельная страница во фрейме.
+  const ready = apps.filter((m) => m.status === "ok" && m.manifest?.type !== "service");
   const hashes = ready.map((m) => m.id + m.hash).join();
 
   useEffect(() => {

@@ -70,6 +70,7 @@ function Catalog({ onPreview }: { onPreview: (p: Preview) => void }) {
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{it.name}</span>
                     {it.type === "library" && <Badge tone="accent">библиотека</Badge>}
+                    {it.type === "service" && <Badge>сервис</Badge>}
                   </div>
                   <p className="mt-0.5 text-sm text-muted">{it.description}</p>
                   <div className="mt-3">

@@ -11,8 +11,11 @@ export interface Manifest {
   description?: string;
   icon?: string;
   author?: string;
-  /** "app" — приложение со страницами, "library" — общий код для других модулей. */
-  type: "app" | "library";
+  /**
+   * "app" — приложение со страницами, "library" — общий код для других модулей,
+   * "service" — отдельное приложение со своим сервером: хаб запускает его и показывает внутри себя.
+   */
+  type: "app" | "library" | "service";
   /** Совместимая версия SDK хаба (semver-диапазон). */
   sdk: string;
   entry: string;
@@ -25,6 +28,26 @@ export interface Manifest {
   /** Коллекции и ключи useStore, которые другие модули могут читать (с разрешением read:<id>). */
   exports: { collections: string[]; stores: string[] };
   forkedFrom?: string;
+  /** Только для type: "service". */
+  service?: ServiceConfig;
+}
+
+/**
+ * Как запустить модуль-сервис. В командах и env подставляются {port}, {dir} (папка модуля),
+ * {data} (папка данных сервиса вне модуля), {python}, {node}.
+ */
+export interface ServiceConfig {
+  /** Команда запуска сервера, например "npm start". */
+  start: string;
+  /** Порт, который слушает сервер (на 127.0.0.1). */
+  port: number;
+  /** Команда сборки: выполняется перед запуском, когда файлы модуля изменились. */
+  build?: string;
+  /** Начальная страница внутри сервиса. */
+  path: string;
+  /** Адрес проверки готовности (любой HTTP-ответ — сервер готов). */
+  health?: string;
+  env: Record<string, string>;
 }
 
 export class ManifestError extends Error {}
@@ -48,7 +71,27 @@ export function normalizeManifest(raw: any): Manifest {
     errors.push(`id должен соответствовать ${MODULE_ID_RE} (латиница в нижнем регистре, цифры, дефис)`);
   if (typeof raw.name !== "string" || !raw.name.trim()) errors.push("name обязателен");
   const type = raw.type ?? "app";
-  if (type !== "app" && type !== "library") errors.push('type: "app" или "library"');
+  if (type !== "app" && type !== "library" && type !== "service") errors.push('type: "app", "library" или "service"');
+  let service: ServiceConfig | undefined;
+  if (type === "service") {
+    const sv = raw.service;
+    if (typeof sv !== "object" || !sv) errors.push('service обязателен для type: "service"');
+    else {
+      if (typeof sv.start !== "string" || !sv.start.trim()) errors.push("service.start: команда запуска");
+      if (!Number.isInteger(sv.port) || sv.port < 1024 || sv.port > 65535) errors.push("service.port: число от 1024 до 65535");
+      const env = sv.env ?? {};
+      if (typeof env !== "object" || Array.isArray(env) || Object.values(env).some((v) => typeof v !== "string"))
+        errors.push("service.env: объект строк");
+      service = {
+        start: sv.start,
+        port: sv.port,
+        build: typeof sv.build === "string" && sv.build.trim() ? sv.build : undefined,
+        path: typeof sv.path === "string" && sv.path.startsWith("/") ? sv.path : "/",
+        health: typeof sv.health === "string" && sv.health.startsWith("/") ? sv.health : undefined,
+        env,
+      };
+    }
+  }
   const perms: string[] = Array.isArray(raw.permissions) ? raw.permissions : [];
   for (const p of perms) {
     if (!(KNOWN_PERMISSIONS as readonly string[]).includes(p) && !/^read:[a-z][a-z0-9-]+$/.test(p))
@@ -77,6 +120,7 @@ export function normalizeManifest(raw: any): Manifest {
       stores: Array.isArray(raw.exports?.stores) ? raw.exports.stores : [],
     },
     forkedFrom: raw.forkedFrom,
+    ...(service ? { service } : {}),
   };
 }
 

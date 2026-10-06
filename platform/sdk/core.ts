@@ -101,12 +101,14 @@ export interface ModuleManifest {
   description?: string;
   icon?: string;
   author?: string;
-  type: "app" | "library";
+  type: "app" | "library" | "service";
   permissions: string[];
   exports: { collections: string[]; stores: string[] };
   deps: Record<string, string>;
   uses: Record<string, string>;
   forkedFrom?: string;
+  /** Модуль-сервис: как хаб его запускает (только для type: "service"). */
+  service?: { start: string; port: number; build?: string; path: string; health?: string; env: Record<string, string> };
 }
 
 let host: HostServices = {

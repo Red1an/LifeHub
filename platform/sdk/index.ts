@@ -20,6 +20,8 @@ export type { AiOptions, ChatMessage } from "./ai.ts";
 export { AiRequestError, parseJson } from "./ai.ts";
 export type { GoogleStatus, GoogleFetchOptions } from "./google.ts";
 export { GoogleRequestError } from "./google.ts";
+export type { NetFetchOptions, NetResponse } from "./net.ts";
+export { NetRequestError } from "./net.ts";
 
 /** Всплывающее уведомление. */
 export const toast = (message: string, tone?: "info" | "success" | "error") => getHost().toast(message, tone);
@@ -42,6 +44,8 @@ export const useAi = hub.useAi;
 export const google = hub.google;
 /** Статус подключения Google в компоненте. */
 export const useGoogle = hub.useGoogle;
+/** Запросы в интернет через хаб (разрешение "network"): net.text(url), net.json(url), net.fetch(url). */
+export const net = hub.net;
 /** Коллекции документов модуля: db.collection<T>("name"). */
 export const db = hub.db;
 /** Хранилище ключ-значение модуля. */

@@ -8,6 +8,7 @@ export * from "./click";
 export * from "./metronome";
 export * from "./mic";
 export * from "./autocorrelate";
+export * from "./stabilizer";
 export * from "./chroma";
 export * from "./onset";
 export * from "./rhythm-analysis";

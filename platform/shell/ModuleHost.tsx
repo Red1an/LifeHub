@@ -3,7 +3,7 @@ import { pickRoute, RouteContext } from "../sdk/router.tsx";
 import { Button, Loading, Card } from "../sdk/ui.tsx";
 import { cn } from "../sdk/format.ts";
 import { request } from "../sdk/core.ts";
-import type { ModuleDefinition } from "../sdk/define.ts";
+import type { ModuleDefinition, NavItem } from "../sdk/define.ts";
 import { useHub, getCheckCommand, type ModuleInfo } from "./state.ts";
 import { loadModule } from "./loader.ts";
 import { Link, useModuleNavSetter } from "./nav.ts";
@@ -18,7 +18,8 @@ export function ModuleHost({ id, subpath }: { id: string; subpath: string }) {
   const [loaded, setLoaded] = useState<{ hash: string; def: ModuleDefinition } | null>(null);
   const [loadError, setLoadError] = useState<{ hash: string; error: Error } | null>(null);
 
-  const hash = info?.status === "ok" ? info.hash : "";
+  // Сервис не грузится как бандл: его страница открывается во фрейме.
+  const hash = info?.status === "ok" && info.manifest?.type !== "service" ? info.hash : "";
   useEffect(() => {
     if (!info || !hash) return;
     let alive = true;
@@ -71,6 +72,7 @@ export function ModuleHost({ id, subpath }: { id: string; subpath: string }) {
       </Centered>
     );
   }
+  if (info.manifest?.type === "service" && info.status !== "error") return <ServiceHost info={info} subpath={subpath} />;
   if (info.status === "error") return <BuildErrors info={info} />;
   if (loadError && loadError.hash === hash) return <RuntimeError info={info} error={loadError.error} />;
   if (!def || loaded?.hash !== hash) {
@@ -95,7 +97,7 @@ export function ModuleHost({ id, subpath }: { id: string; subpath: string }) {
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <ModuleHeader info={info} def={def} />
+      <ModuleHeader info={info} nav={def.nav ?? []} />
       {/* Область модуля: модуль сам решает, как она выглядит; theme переопределяет токены темы внутри. */}
       <div className="lh-module flex flex-1 flex-col" data-theme={def.theme}>
         <ErrorBoundary key={`${hash}:${route?.pattern}`} info={info}>
@@ -112,9 +114,8 @@ export function ModuleHost({ id, subpath }: { id: string; subpath: string }) {
  * Компьютер: только если у модуля есть разделы (nav) — название + вкладки.
  * Иначе на компьютере весь экран отдан модулю, а в модуль ведёт его иконка в полосе слева.
  */
-function ModuleHeader({ info, def }: { info: ModuleInfo; def: ModuleDefinition }) {
+function ModuleHeader({ info, nav }: { info: ModuleInfo; nav: NavItem[] }) {
   const base = `/m/${info.id}`;
-  const nav = def.nav ?? [];
   const name = (
     <Link to={base} className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface-2" title="На главную модуля">
       <ModuleIcon m={info} className="size-5 text-base" />
@@ -151,6 +152,70 @@ function ModuleHeader({ info, def }: { info: ModuleInfo; def: ModuleDefinition }
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Модуль-сервис: своё приложение со своим сервером. Хаб запускает его и показывает
+ * во фрейме через прокси /s/<id>/, пока сервис ставится или запускается — его состояние.
+ */
+function ServiceHost({ info, subpath }: { info: ModuleInfo; subpath: string }) {
+  const svc = info.service;
+  // Адрес фрейма фиксируется при открытии: дальше сервис сам ходит по своим страницам.
+  const [src] = useState(() => `/s/${info.id}${subpath === "/" ? (info.manifest?.service?.path ?? "/") : subpath}`);
+  const [busy, setBusy] = useState(false);
+  const restart = async () => {
+    setBusy(true);
+    try {
+      await request("POST", `/api/modules/${info.id}/restart-service`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  let body: ReactNode;
+  if (svc?.state === "running") {
+    body = (
+      <iframe
+        src={src}
+        title={info.manifest?.name ?? info.id}
+        allow="microphone; camera; autoplay; clipboard-read; clipboard-write; fullscreen"
+        className="block h-[calc(100dvh-44px-env(safe-area-inset-top))] w-full border-0 lg:h-dvh"
+      />
+    );
+  } else if (svc?.state === "error") {
+    const log = svc.log.join("\n");
+    body = (
+      <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+        <Card className="border-danger/40">
+          <div className="flex items-start gap-3">
+            <AlertIcon className="mt-0.5 size-6 shrink-0 text-danger" />
+            <div className="min-w-0 flex-1">
+              <h2 className="font-semibold">«{info.manifest?.name ?? info.id}» не запускается</h2>
+              <p className="mt-1 text-sm text-muted">{svc.error}</p>
+            </div>
+          </div>
+          {log && <pre className="mt-4 max-h-96 overflow-auto rounded-md bg-surface-2 p-3 text-xs leading-relaxed whitespace-pre-wrap">{log}</pre>}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button variant="primary" icon={<RefreshIcon className="size-4" />} loading={busy} onClick={restart}>
+              Перезапустить
+            </Button>
+            <Button icon={<CopyIcon className="size-4" />} onClick={() => copyText(reportFor(info, "сервис не запускается", `${svc.error ?? ""}\n\n${log}`))}>
+              Скопировать для Claude Code
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  } else {
+    body = <Loading text={svc?.state === "installing" ? "Устанавливаю и собираю модуль — первый раз это может занять пару минут…" : "Запускаю модуль…"} />;
+  }
+
+  return (
+    <div className="flex min-h-full flex-1 flex-col">
+      <ModuleHeader info={info} nav={[]} />
+      {body}
+    </div>
   );
 }
 

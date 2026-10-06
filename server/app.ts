@@ -21,6 +21,8 @@ import { tailscaleStatus, enableServe, disableServe } from "./tailscale.ts";
 import { ngrokStatus, configureNgrok } from "./ngrok.ts";
 import { googleStatus, configureGoogle, authUrl, finishAuth, disconnectGoogle, googleFetch, GoogleError } from "./google.ts";
 import { PNG_ICONS, pngIcon } from "./icons.ts";
+import { proxyService } from "./proxy.ts";
+import { netFetch } from "./net.ts";
 import { SDK_VERSION, type PlatformBuild } from "./compiler.ts";
 import { FILES_DIR, MODULES_DIR, MODULE_ID_RE, HOME, CHECK_COMMAND } from "./paths.ts";
 import type { Manifest } from "./manifest.ts";
@@ -215,6 +217,11 @@ export function createApp(opts: AppOptions) {
   app.post("/api/modules/:id/enabled", async (c) => {
     const b = await c.req.json();
     await reg.setEnabled(c.req.param("id"), !!b.enabled);
+    return c.json({ ok: true });
+  });
+
+  app.post("/api/modules/:id/restart-service", async (c) => {
+    await reg.restartModuleService(c.req.param("id"));
     return c.json({ ok: true });
   });
 
@@ -595,6 +602,22 @@ export function createApp(opts: AppOptions) {
     return c.json(await googleFetch(m.permissions, { method: String(b.method ?? "GET"), url: String(b.url ?? ""), body: b.body }));
   });
 
+  /** Запрос модуля в интернет через хаб (разрешение "network"): { url, method, headers, body } → { status, url, contentType, text }. */
+  app.post("/api/net/:module/fetch", async (c) => {
+    const caller = c.req.header("x-lifehub-module") ?? c.req.param("module");
+    const m = manifestOf(caller);
+    if (!m) throw new HubError("Неизвестный модуль", 404);
+    const b = await c.req.json();
+    return c.json(
+      await netFetch(m.permissions, {
+        url: String(b.url ?? ""),
+        method: b.method ? String(b.method) : undefined,
+        headers: b.headers && typeof b.headers === "object" ? b.headers : undefined,
+        body: typeof b.body === "string" ? b.body : undefined,
+      }),
+    );
+  });
+
   /* ─────────────── работа в фоне и автозапуск ─────────────── */
 
   app.get("/api/system", (c) =>
@@ -674,6 +697,16 @@ export function createApp(opts: AppOptions) {
   });
 
   /* ─────────────── SPA ─────────────── */
+
+  /* ─────────────── модули-сервисы ─────────────── */
+
+  const service = (c: Context) => {
+    const id = c.req.param("id")!;
+    if (!MODULE_ID_RE.test(id) || manifestOf(id)?.type !== "service") return c.notFound();
+    return proxyService(c, id);
+  };
+  app.all("/s/:id", service);
+  app.all("/s/:id/*", service);
 
   app.get("*", (c) => {
     if (c.req.path.startsWith("/api/")) return c.json({ error: "Не найдено" }, 404);

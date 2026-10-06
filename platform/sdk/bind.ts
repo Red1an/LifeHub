@@ -5,6 +5,7 @@ import { createRouting } from "./router.tsx";
 import { getHost, type ModuleManifest } from "./core.ts";
 import { createAi, makeUseAi } from "./ai.ts";
 import { createGoogle, makeUseGoogle } from "./google.ts";
+import { createNet } from "./net.ts";
 
 /**
  * Всё, что зависит от того, какой модуль вызывает SDK. Хаб подставляет
@@ -22,6 +23,7 @@ export function bind(id: string) {
     useAi: makeUseAi(ai),
     google,
     useGoogle: makeUseGoogle(google),
+    net: createNet(id),
     db: {
       collection: <T = Record<string, unknown>>(name: string, opts?: CollectionOptions): Collection<T> => createCollection<T>(id, name, opts),
     },

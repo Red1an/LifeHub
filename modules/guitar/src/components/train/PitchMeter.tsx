@@ -17,30 +17,30 @@ export function PitchMeter({ cents, midi, tolerance = 15, caption }: Props) {
   const position = 50 + (clamped / RANGE) * 50;
 
   return (
-    <div className="flex flex-col items-center gap-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6">
+    <div className="gt-panel flex flex-col items-center gap-4 p-6">
       <div className="flex flex-col items-center gap-1">
         <span
-          className={`text-5xl font-bold tabular-nums transition-colors ${
+          className={`gt-num text-6xl font-bold transition-colors ${
             cents === null
-              ? "text-zinc-300 dark:text-zinc-700"
+              ? "text-[var(--gt-line)]"
               : inTune
-                ? "text-emerald-500"
-                : "text-zinc-900 dark:text-zinc-100"
+                ? "text-[var(--gt-green)]"
+                : "text-[var(--gt-fg)]"
           }`}
         >
           {midi === null ? "—" : midiToName(midi)}
         </span>
-        <span className="text-sm text-zinc-500">
+        <span className="text-sm text-[var(--gt-muted)]">
           {midi === null ? "тишина" : midiToSolfege(midi)}
         </span>
       </div>
 
       <div className="relative h-14 w-full max-w-sm">
         {/* scale */}
-        <div className="absolute inset-x-0 top-6 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800" />
+        <div className="absolute inset-x-0 top-6 h-1.5 rounded-full bg-[#2a2420]" />
         <div
           className={`absolute top-6 h-1.5 rounded-full transition-colors ${
-            inTune ? "bg-emerald-500/30" : "bg-amber-500/20"
+            inTune ? "bg-[var(--gt-green)]/30" : "bg-[var(--gt-brass)]/20"
           }`}
           style={{
             left: `${50 - (tolerance / RANGE) * 50}%`,
@@ -48,23 +48,23 @@ export function PitchMeter({ cents, midi, tolerance = 15, caption }: Props) {
           }}
         />
         {/* centre line */}
-        <div className="absolute left-1/2 top-3 h-8 w-0.5 -translate-x-1/2 bg-zinc-400 dark:bg-zinc-600" />
+        <div className="absolute left-1/2 top-3 h-8 w-0.5 -translate-x-1/2 bg-[var(--gt-muted)]" />
 
         {/* needle */}
         {cents !== null && (
           <div
-            className="absolute top-1 transition-[left] duration-75"
+            className="absolute top-1 transition-[left] duration-150 ease-out"
             style={{ left: `${position}%` }}
           >
             <div
               className={`h-12 w-1 -translate-x-1/2 rounded-full ${
-                inTune ? "bg-emerald-500" : "bg-amber-500"
+                inTune ? "bg-[var(--gt-green)]" : "bg-[var(--gt-brass)]"
               }`}
             />
           </div>
         )}
 
-        <div className="absolute inset-x-0 bottom-0 flex justify-between text-[10px] text-zinc-400">
+        <div className="absolute inset-x-0 bottom-0 flex justify-between text-[10px] text-[var(--gt-muted)]">
           <span>−50¢</span>
           <span>0</span>
           <span>+50¢</span>
@@ -73,11 +73,11 @@ export function PitchMeter({ cents, midi, tolerance = 15, caption }: Props) {
 
       <div className="h-5 text-sm">
         {cents === null ? (
-          <span className="text-zinc-500">{caption ?? "Сыграй или спой ноту"}</span>
+          <span className="text-[var(--gt-muted)]">{caption ?? "Сыграй или спой ноту"}</span>
         ) : inTune ? (
-          <span className="font-medium text-emerald-500">Точно в ноту</span>
+          <span className="font-bold text-[var(--gt-green)]">Точно в ноту</span>
         ) : (
-          <span className="text-zinc-500">
+          <span className="text-[var(--gt-muted)]">
             {cents > 0 ? "Выше на" : "Ниже на"} {Math.abs(Math.round(cents))}¢
           </span>
         )}
