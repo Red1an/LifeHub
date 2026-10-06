@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type { Context, Next } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { getSettings, updateSettings } from "./settings.ts";
+import { PNG_ICONS } from "./icons.ts";
 
 /*
  * Доступ:
@@ -26,6 +27,9 @@ export function remoteAddress(c: Context): string {
 }
 
 export function isLocal(c: Context): boolean {
+  // Туннели (ngrok, tailscale serve) подключаются к хабу с этого же компьютера, но
+  // помечают пересланные запросы X-Forwarded-For — такие запросы пришли извне.
+  if (c.req.header("x-forwarded-for")) return false;
   return LOCAL_ADDRS.has(remoteAddress(c)) && LOCAL_HOSTS.test(c.req.header("host") ?? "");
 }
 
@@ -93,7 +97,7 @@ export function handleLogout(c: Context) {
   return c.redirect("/login");
 }
 
-const PUBLIC_PATHS = new Set(["/login", "/manifest.webmanifest", "/icon.svg"]);
+const PUBLIC_PATHS = new Set(["/login", "/manifest.webmanifest", "/icon.svg", ...Object.keys(PNG_ICONS)]);
 
 export async function authMiddleware(c: Context, next: Next) {
   const p = c.req.path;

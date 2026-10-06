@@ -119,6 +119,8 @@ export interface AskOptions {
   system?: string;
   /** "fast" — быстрая модель, "smart" — основная (по умолчанию). */
   model?: "fast" | "smart";
+  /** Картинки к запросу (base64). Передаются в сообщении, файловых инструментов у Claude по-прежнему нет. */
+  images?: { mime: string; data: string }[];
   onDelta?: (text: string) => void;
   signal?: AbortSignal;
 }
@@ -152,11 +154,14 @@ export async function ask(opts: AskOptions): Promise<string> {
 function run(bin: ClaudeBin, opts: AskOptions, full: boolean): Promise<string> {
   fs.mkdirSync(WORKDIR, { recursive: true });
   const model = modelFor(opts.model);
+  const withImages = !!opts.images?.length;
   const args = [
     ...bin.prefix,
     "-p",
     "--output-format", "stream-json",
     "--verbose",
+    // Картинки можно передать только сообщением в формате stream-json.
+    ...(withImages ? ["--input-format", "stream-json"] : []),
     ...(full ? ["--include-partial-messages", "--tools", "", "--no-session-persistence", "--strict-mcp-config", "--setting-sources", ""] : []),
     ...(opts.system ? ["--system-prompt", opts.system] : []),
     ...(model ? ["--model", model] : []),
@@ -241,7 +246,15 @@ function run(bin: ClaudeBin, opts: AskOptions, full: boolean): Promise<string> {
       if (text) return finish(null, text);
       finish(new AiError((stderr.trim() || `Claude Code завершился с кодом ${code}`).split("\n").slice(-3).join("\n")));
     });
-    child.stdin!.end(opts.prompt);
+    if (withImages) {
+      const content = [
+        ...opts.images!.map((im) => ({ type: "image", source: { type: "base64", media_type: im.mime, data: im.data } })),
+        { type: "text", text: opts.prompt },
+      ];
+      child.stdin!.end(JSON.stringify({ type: "user", message: { role: "user", content } }) + "\n");
+    } else {
+      child.stdin!.end(opts.prompt);
+    }
   });
 }
 

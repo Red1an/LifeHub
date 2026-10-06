@@ -4,7 +4,7 @@ import { request, getHost } from "../../sdk/core.ts";
 import { cn } from "../../sdk/format.ts";
 import { useHub, saveSettings, type HubSettings } from "../state.ts";
 import { copyText } from "../util.ts";
-import { BackgroundSection, RemoteSection, AiSection } from "./SystemSettings.tsx";
+import { BackgroundSection, RemoteSection, NgrokSection, AiSection, GoogleSection } from "./SystemSettings.tsx";
 import { CopyIcon, DownloadIcon } from "../icons.tsx";
 
 const ACCENTS = [
@@ -60,8 +60,10 @@ export function SettingsPage() {
       </Section>
 
       <RemoteSection />
+      <NgrokSection />
       <BackgroundSection />
       <AiSection />
+      <GoogleSection />
 
       <Section title="Каталоги модулей">
         <Catalogs catalogs={s.catalogs} />

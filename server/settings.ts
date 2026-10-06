@@ -26,6 +26,10 @@ export interface Settings {
   designV2?: boolean;
   /** Нейронка: свой путь к Claude Code и модели. */
   ai?: { claudePath?: string; fastModel?: string; smartModel?: string };
+  /** Доступ вне дома через ngrok: постоянный домен и единственный email для входа через Google. */
+  ngrok?: { enabled: boolean; domain: string; email: string };
+  /** Google: OAuth-клиент пользователя и refresh token (только на сервере). */
+  google?: { clientId: string; clientSecret: string; refreshToken?: string; email?: string };
 }
 
 const DEFAULTS: Settings = {

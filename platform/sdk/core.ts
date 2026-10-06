@@ -103,7 +103,7 @@ export interface ModuleManifest {
   author?: string;
   type: "app" | "library";
   permissions: string[];
-  exports: { collections: string[] };
+  exports: { collections: string[]; stores: string[] };
   deps: Record<string, string>;
   uses: Record<string, string>;
   forkedFrom?: string;

@@ -43,8 +43,8 @@ node "{{HUB_DIR}}/bin/lifehub.mjs" check <id>
   "entry": "src/index.tsx",
   "deps": { "date-fns": "^4" },    // npm-пакеты (общий кэш хаба)
   "uses": { "audio": "^1" },       // модули-библиотеки
-  "permissions": ["files"],        // files, mic, camera, notifications, ai, network, read:<id>
-  "exports": { "collections": ["transactions"] },  // что могут читать другие модули
+  "permissions": ["files"],        // files, mic, camera, notifications, ai, network, google:calendar, read:<id>
+  "exports": { "collections": ["transactions"], "stores": ["budget"] },  // что могут читать другие модули
   "forkedFrom": "author/finance@0.3.0"             // заполняет хаб при форке
 }
 ```
@@ -132,9 +132,13 @@ await kv.set("lastExport", Date.now());
 ### Чужие данные
 
 Модуль «Отчёты» хочет читать расходы модуля `finance`:
-1. в `finance/lifehub.json`: `"exports": { "collections": ["expenses"] }`;
+1. в `finance/lifehub.json`: `"exports": { "collections": ["expenses"], "stores": ["budget"] }`;
 2. в `reports/lifehub.json`: `"permissions": ["read:finance"]`;
-3. `useCollection<Expense>("expenses", { from: "finance" })` — только чтение.
+3. `useCollection<Expense>("expenses", { from: "finance" })` или `db.collection("expenses", { from: "finance" }).list()`,
+   а ключ `useStore` — `await kv.get("budget", 0, { from: "finance" })`. Всё только для чтения.
+
+Формат чужих данных может поменяться в любой момент — читай их осторожно (поле может отсутствовать).
+Открывая свои данные, не меняй потом их формат без нужды: на них могут опираться другие модули.
 
 ### Файлы (разрешение "files")
 
@@ -173,6 +177,9 @@ const cats = await ai.json<{ category: string }[]>(
 // Диалог:
 const reply = await ai.chat([{ role: "user", content: "Привет" }, { role: "assistant", content: "Здравствуйте!" }, { role: "user", content: "Как дела?" }]);
 
+// С картинками (до 5): Blob/File или id файла модуля. Большие фото хаб уменьшает сам.
+const parsed = await ai.json<{ title: string; time: string }[]>("Перепиши расписание с фото в JSON […]", { images: [photoFile] });
+
 // В компоненте — с потоковым выводом и отменой:
 const { run, text, loading, error, cancel } = useAi();
 <Button onClick={() => run("Разбери мой текст: " + draft, { system: "Ты редактор" })} loading={loading}>Разобрать</Button>
@@ -183,6 +190,30 @@ const { run, text, loading, error, cancel } = useAi();
   на каждое нажатие клавиши.
 - Результаты, которые нужны потом (разборы, категории), сохраняй в коллекцию — не запрашивай повторно.
 - Не отправляй лишнего: только текст, который нужен для ответа.
+- С картинками используй основную модель (`"smart"`), быстрая хуже читает фото.
+
+### Google Календарь (разрешение "google:calendar")
+
+Пользователь один раз подключает аккаунт Google в настройках хаба. Модуль ходит в
+[Calendar API v3](https://developers.google.com/calendar/api/v3/reference) через хаб и не видит токен,
+поэтому работает и с телефона.
+
+```tsx
+import { google, useGoogle, GoogleRequestError } from "@lifehub/sdk";
+
+const { status } = useGoogle();           // { configured, connected, email } | null
+if (status && !status.connected) /* покажи «Подключите Google в настройках хаба» и <Link to="~/settings"> */;
+
+const cals = await google.calendar<{ items: any[] }>("/users/me/calendarList");
+const evs = await google.calendar("/calendars/primary/events", {
+  query: { timeMin: from.toISOString(), timeMax: to.toISOString(), singleEvents: true, orderBy: "startTime" },
+});
+await google.calendar("/calendars/primary/events", { method: "POST", body: { summary: "Встреча", start: {…}, end: {…} } });
+```
+
+- Ошибки — `GoogleRequestError` (`status` 401 — аккаунт не подключён или доступ отозван). Покажи текст пользователю.
+- Помечай свои события (`extendedProperties.private`), чтобы отличать их от событий пользователя, и не трогай чужие
+  без явной просьбы. Перед массовыми изменениями показывай черновик.
 
 ## Интерфейс и дизайн
 

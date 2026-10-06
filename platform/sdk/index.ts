@@ -18,6 +18,8 @@ export type { FileMeta } from "./files.ts";
 export type { ModuleManifest } from "./core.ts";
 export type { AiOptions, ChatMessage } from "./ai.ts";
 export { AiRequestError, parseJson } from "./ai.ts";
+export type { GoogleStatus, GoogleFetchOptions } from "./google.ts";
+export { GoogleRequestError } from "./google.ts";
 
 /** Всплывающее уведомление. */
 export const toast = (message: string, tone?: "info" | "success" | "error") => getHost().toast(message, tone);
@@ -36,6 +38,10 @@ const hub = bind("hub");
 export const ai = hub.ai;
 /** Запрос к нейронке с потоковым выводом в компоненте. */
 export const useAi = hub.useAi;
+/** Google (разрешение "google:calendar"): google.calendar("/users/me/calendarList"). Аккаунт подключается в настройках хаба. */
+export const google = hub.google;
+/** Статус подключения Google в компоненте. */
+export const useGoogle = hub.useGoogle;
 /** Коллекции документов модуля: db.collection<T>("name"). */
 export const db = hub.db;
 /** Хранилище ключ-значение модуля. */

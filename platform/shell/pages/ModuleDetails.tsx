@@ -134,8 +134,8 @@ export function ModuleDetailsPage({ id }: { id: string }) {
             ) : (
               <p className="text-sm text-muted">Только свои данные</p>
             )}
-            {m && m.exports.collections.length > 0 && (
-              <p className="mt-3 text-sm text-muted">Открывает другим модулям: {m.exports.collections.join(", ")}</p>
+            {m && m.exports.collections.length + m.exports.stores.length > 0 && (
+              <p className="mt-3 text-sm text-muted">Открывает другим модулям: {[...m.exports.collections, ...m.exports.stores].join(", ")}</p>
             )}
           </Card>
         </Section>

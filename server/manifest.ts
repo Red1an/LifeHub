@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { MODULE_ID_RE } from "./paths.ts";
 
-export const KNOWN_PERMISSIONS = ["files", "mic", "camera", "notifications", "network", "ai"] as const;
+export const KNOWN_PERMISSIONS = ["files", "mic", "camera", "notifications", "network", "ai", "google:calendar"] as const;
 
 export interface Manifest {
   id: string;
@@ -20,10 +20,10 @@ export interface Manifest {
   deps: Record<string, string>;
   /** Модули-библиотеки: id → semver-диапазон. */
   uses: Record<string, string>;
-  /** files, mic, camera, notifications, network, read:<moduleId>. */
+  /** files, mic, camera, notifications, network, ai, google:calendar, read:<moduleId>. */
   permissions: string[];
-  /** Коллекции, которые другие модули могут читать (с разрешением read:<id>). */
-  exports: { collections: string[] };
+  /** Коллекции и ключи useStore, которые другие модули могут читать (с разрешением read:<id>). */
+  exports: { collections: string[]; stores: string[] };
   forkedFrom?: string;
 }
 
@@ -72,7 +72,10 @@ export function normalizeManifest(raw: any): Manifest {
     deps,
     uses,
     permissions: perms,
-    exports: { collections: Array.isArray(raw.exports?.collections) ? raw.exports.collections : [] },
+    exports: {
+      collections: Array.isArray(raw.exports?.collections) ? raw.exports.collections : [],
+      stores: Array.isArray(raw.exports?.stores) ? raw.exports.stores : [],
+    },
     forkedFrom: raw.forkedFrom,
   };
 }

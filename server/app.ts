@@ -18,6 +18,9 @@ import { HistoryError } from "./history.ts";
 import { ask, aiStatus, aiTest, updateAiSettings, AiError } from "./ai.ts";
 import * as sys from "./system.ts";
 import { tailscaleStatus, enableServe, disableServe } from "./tailscale.ts";
+import { ngrokStatus, configureNgrok } from "./ngrok.ts";
+import { googleStatus, configureGoogle, authUrl, finishAuth, disconnectGoogle, googleFetch, GoogleError } from "./google.ts";
+import { PNG_ICONS, pngIcon } from "./icons.ts";
 import { SDK_VERSION, type PlatformBuild } from "./compiler.ts";
 import { FILES_DIR, MODULES_DIR, MODULE_ID_RE, HOME, CHECK_COMMAND } from "./paths.ts";
 import type { Manifest } from "./manifest.ts";
@@ -33,11 +36,27 @@ const ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 
 const STARTED_AT = Date.now();
 
+const IMAGE_MIMES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
+/** Картинки для нейронки: [{ mime, data: base64 }], до 5 штук по ~5 МБ. */
+function parseImages(raw: unknown): { mime: string; data: string }[] | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (!Array.isArray(raw)) throw new HubError("images должен быть массивом");
+  if (raw.length > 5) throw new HubError("Не больше 5 картинок за запрос");
+  return raw.map((x: any) => {
+    const mime = String(x?.mime ?? "");
+    const data = String(x?.data ?? "");
+    if (!IMAGE_MIMES.includes(mime)) throw new HubError(`Неподдерживаемый формат картинки: ${mime || "?"}`);
+    if (!/^[A-Za-z0-9+/]+=*$/.test(data) || data.length > 7_000_000) throw new HubError("Картинка повреждена или больше 5 МБ");
+    return { mime, data };
+  });
+}
+
 export function createApp(opts: AppOptions) {
   const app = new Hono();
 
   app.onError((err, c) => {
-    if (err instanceof HubError) return c.json({ error: err.message }, err.status as any);
+    if (err instanceof HubError || err instanceof GoogleError) return c.json({ error: err.message }, err.status as any);
     if (err instanceof LibError || err instanceof HistoryError || err instanceof AiError) return c.json({ error: err.message }, 400);
     console.error(err);
     return c.json({ error: err.message || "Внутренняя ошибка" }, 500);
@@ -79,22 +98,34 @@ export function createApp(opts: AppOptions) {
   });
 
   app.get("/manifest.webmanifest", (c) =>
-    c.json({
-      name: "LifeHub",
-      short_name: "LifeHub",
-      start_url: "/",
-      display: "standalone",
-      background_color: "#121211",
-      theme_color: "#121211",
-      icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }],
-    }),
+    c.body(
+      JSON.stringify({
+        id: "/",
+        name: "LifeHub",
+        short_name: "LifeHub",
+        description: "Хаб модулей для жизни",
+        lang: "ru",
+        start_url: "/",
+        scope: "/",
+        display: "standalone",
+        background_color: "#121211",
+        theme_color: "#121211",
+        icons: [
+          { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
+        ],
+      }),
+      200,
+      { "content-type": "application/manifest+json", "cache-control": "no-cache" },
+    ),
   );
   app.get("/icon.svg", (c) => c.body(ICON, 200, { "content-type": "image/svg+xml", "cache-control": "max-age=86400" }));
-  app.get("/sw.js", (c) =>
-    c.body(`self.addEventListener("install", () => self.skipWaiting());\nself.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));\nself.addEventListener("fetch", () => {});\n`, 200, {
-      "content-type": "text/javascript",
-    }),
-  );
+  for (const p of Object.keys(PNG_ICONS)) {
+    app.get(p, (c) => c.body(pngIcon(p) as any, 200, { "content-type": "image/png", "cache-control": "max-age=86400" }));
+  }
+  app.get("/sw.js", (c) => c.body(SERVICE_WORKER, 200, { "content-type": "text/javascript", "cache-control": "no-cache" }));
 
   /* ─────────────── состояние и события ─────────────── */
 
@@ -338,8 +369,9 @@ export function createApp(opts: AppOptions) {
   /**
    * Модуль работает со своими данными свободно; чужие коллекции он может только
    * читать, если владелец их экспортировал, а модуль запросил read:<id>.
+   * kvKey — запрос к ключу useStore (null — ко всем ключам сразу, чужим нельзя).
    */
-  const access = (c: Context, write: boolean) => {
+  const access = (c: Context, write: boolean, kvKey?: string | null) => {
     const module = c.req.param("module")!;
     const collection = c.req.param("collection");
     if (!MODULE_ID_RE.test(module) && module !== "hub") throw new HubError("Неверный модуль");
@@ -353,6 +385,8 @@ export function createApp(opts: AppOptions) {
       throw new HubError(`Модулю "${caller}" нужно разрешение "read:${module}" в lifehub.json`, 403);
     if (collection && !target?.exports.collections.includes(collection))
       throw new HubError(`Модуль "${module}" не открывает коллекцию "${collection}" для других модулей`, 403);
+    if (kvKey !== undefined && !(kvKey && target?.exports.stores.includes(kvKey)))
+      throw new HubError(`Модуль "${module}" не открывает ${kvKey ? `ключ "${kvKey}"` : "свои ключи"} для других модулей`, 403);
     return { module, collection: collection! };
   };
   const changed = (c: Context, module: string, collection: string) =>
@@ -398,11 +432,11 @@ export function createApp(opts: AppOptions) {
   });
 
   app.get("/api/kv/:module", (c) => {
-    const { module } = access(c, false);
+    const { module } = access(c, false, null);
     return c.json(db.allKv(module));
   });
   app.get("/api/kv/:module/:key", (c) => {
-    const { module } = access(c, false);
+    const { module } = access(c, false, c.req.param("key"));
     return c.json({ value: db.getKv(module, c.req.param("key")) ?? null });
   });
   app.put("/api/kv/:module/:key", async (c) => {
@@ -483,6 +517,7 @@ export function createApp(opts: AppOptions) {
     if (prompt.length > 400_000) throw new HubError("Запрос слишком большой");
     const system = typeof b.system === "string" ? b.system.slice(0, 50_000) : undefined;
     const model = b.model === "fast" ? "fast" : "smart";
+    const images = parseImages(b.images);
     const abort = new AbortController();
     const enc = new TextEncoder();
     const body = new ReadableStream({
@@ -493,7 +528,7 @@ export function createApp(opts: AppOptions) {
           } catch {}
         };
         try {
-          const text = await ask({ prompt, system, model, signal: abort.signal, onDelta: (d) => send({ delta: d }) });
+          const text = await ask({ prompt, system, model, images, signal: abort.signal, onDelta: (d) => send({ delta: d }) });
           send({ done: true, text });
         } catch (e) {
           send({ error: (e as Error).message, code: e instanceof AiError ? e.code : "error" });
@@ -507,6 +542,57 @@ export function createApp(opts: AppOptions) {
       },
     });
     return new Response(body, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-cache" } });
+  });
+
+  /* ─────────────── Google ─────────────── */
+
+  // Desktop-клиент Google принимает любой порт на 127.0.0.1 — адрес не нужно регистрировать.
+  const googleRedirect = `${opts.https ? "https" : "http"}://127.0.0.1:${opts.port}/api/google/callback`;
+  app.get("/api/google/status", (c) => c.json(googleStatus(googleRedirect)));
+  app.put("/api/google/config", async (c) => {
+    requireLocal(c);
+    const b = await c.req.json();
+    configureGoogle(String(b.clientId ?? ""), String(b.clientSecret ?? ""));
+    return c.json(googleStatus(googleRedirect));
+  });
+  app.get("/api/google/connect", (c) => {
+    requireLocal(c);
+    return c.redirect(authUrl(googleRedirect));
+  });
+  app.get("/api/google/callback", async (c) => {
+    requireLocal(c);
+    const err = c.req.query("error");
+    let text: string;
+    let ok = false;
+    try {
+      if (err) throw new GoogleError(err === "access_denied" ? "Вход отменён" : `Google: ${err}`);
+      const email = await finishAuth(c.req.query("code") ?? "", c.req.query("state") ?? "");
+      text = `Google подключён${email ? ` (${email})` : ""}. Это окно можно закрыть.`;
+      ok = true;
+      emit({ type: "settings" });
+    } catch (e) {
+      text = (e as Error).message;
+    }
+    const esc = text.replace(/[&<>"]/g, (ch) => `&#${ch.charCodeAt(0)};`);
+    return c.html(
+      `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LifeHub · Google</title>` +
+        `<body style="font:16px system-ui;display:grid;place-items:center;min-height:90vh;background:#121211;color:#eee"><div style="max-width:420px;text-align:center">` +
+        `<div style="font-size:40px">${ok ? "✅" : "⚠️"}</div><p>${esc}</p><p><a style="color:#9cf" href="/settings">Вернуться в настройки</a></p></div>` +
+        (ok ? `<script>setTimeout(()=>{try{window.close()}catch{}},1500)</script>` : ""),
+    );
+  });
+  app.post("/api/google/disconnect", async (c) => {
+    requireLocal(c);
+    await disconnectGoogle();
+    return c.json(googleStatus(googleRedirect));
+  });
+  /** Запрос модуля к API Google через хаб: { method, url, body } → { status, data }. */
+  app.post("/api/google/:module/fetch", async (c) => {
+    const caller = c.req.header("x-lifehub-module") ?? c.req.param("module");
+    const m = manifestOf(caller);
+    if (!m) throw new HubError("Неизвестный модуль", 404);
+    const b = await c.req.json();
+    return c.json(await googleFetch(m.permissions, { method: String(b.method ?? "GET"), url: String(b.url ?? ""), body: b.body }));
   });
 
   /* ─────────────── работа в фоне и автозапуск ─────────────── */
@@ -566,6 +652,25 @@ export function createApp(opts: AppOptions) {
     const r = b.enabled ? await enableServe(opts.port, opts.https) : await disableServe();
     if (!r.ok) throw new HubError(r.message);
     return c.json({ ...(await tailscaleStatus(opts.port)), message: r.message });
+  });
+
+  /* ─────────────── доступ вне дома (ngrok) ─────────────── */
+
+  const ngrokInfo = async () => {
+    const st = await ngrokStatus();
+    const qr = st.url ? await QRCode.toString(st.url, { type: "svg", margin: 1 }) : null;
+    return { ...st, qr, hasPassword: !!getSettings().password };
+  };
+  app.get("/api/remote/ngrok", async (c) => c.json(await ngrokInfo()));
+  app.post("/api/remote/ngrok", async (c) => {
+    requireLocal(c);
+    const b = await c.req.json();
+    try {
+      await configureNgrok({ enabled: !!b.enabled, domain: String(b.domain ?? ""), email: String(b.email ?? "") });
+    } catch (e) {
+      throw new HubError((e as Error).message);
+    }
+    return c.json(await ngrokInfo());
   });
 
   /* ─────────────── SPA ─────────────── */
@@ -660,11 +765,13 @@ function indexHtml(platformHash: string) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>LifeHub</title>
-<link rel="manifest" href="/manifest.webmanifest">
+<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
 <link rel="icon" href="/icon.svg">
-<link rel="apple-touch-icon" href="/icon.svg">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#121211">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="LifeHub">
 <script>
 (function(){var t=${JSON.stringify(s.theme)};if(t==="auto")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
 var d=document.documentElement;d.dataset.theme=t;d.dataset.accent=${JSON.stringify(s.accent)};})();
@@ -683,3 +790,56 @@ const ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
 <g fill="#f7f7f5"><rect x="15" y="15" width="15" height="15" rx="3"/><rect x="34" y="15" width="15" height="15" rx="3" opacity=".55"/>
 <rect x="15" y="34" width="15" height="15" rx="3" opacity=".55"/><rect x="34" y="34" width="15" height="15" rx="3" opacity=".3"/></g>
 </svg>`;
+
+/*
+ * Service worker установленного приложения. Хаб работает только онлайн, поэтому SW
+ * ничего не кэширует — лишь вместо ошибки сети или страницы ngrok «endpoint offline»
+ * (компьютер спит или выключен) показывает понятный экран с кнопкой «Повторить».
+ */
+const OFFLINE_HTML = `<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#121211">
+<title>LifeHub</title><style>
+:root{color-scheme:light dark;font-family:system-ui,sans-serif}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#121211;color:#e9e9e4}
+@media (prefers-color-scheme:light){body{background:#f7f7f5;color:#1a1a18}button{background:#1a1a18!important;color:#fff!important}}
+main{width:min(320px,100% - 32px)}h1{font-size:18px;font-weight:600;margin:12px 0 8px}p{opacity:.7;font-size:15px;line-height:1.45;margin:0 0 20px}
+button{font:inherit;font-size:15px;padding:10px 16px;border-radius:6px;border:0;background:#e9e9e4;color:#121211;font-weight:500}
+</style></head><body><main>
+<div style="width:36px;height:36px">${ICON}</div><h1>Хаб недоступен</h1>
+<p>Компьютер с LifeHub спит, выключен или без интернета. Как только он проснётся, хаб снова откроется.</p>
+<button onclick="location.reload()">Повторить</button>
+</main></body></html>`;
+
+const SERVICE_WORKER = `const OFFLINE = ${JSON.stringify(OFFLINE_HTML)};
+const offline = () => new Response(OFFLINE, { status: 503, headers: { "content-type": "text/html; charset=utf-8" } });
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
+// На бесплатном ngrok браузерам раз в неделю показывается страница-предупреждение — и в
+// установленном приложении вместо скриптов приходила бы она. Владелец сайта может её
+// пропустить заголовком ngrok-skip-browser-warning: добавляем его ко всем своим запросам.
+const NGROK = /\\.ngrok(-free)?\\.(app|dev|io)$/.test(location.hostname);
+const isOffline = (r) => /ERR_NGROK_(3200|8012)/.test(r.headers.get("ngrok-error-code") || "");
+
+function send(req) {
+  if (!NGROK) return fetch(req);
+  const headers = new Headers(req.headers);
+  headers.set("ngrok-skip-browser-warning", "1");
+  // GET собираем заново: у навигаций и no-cors запросов (картинки, стили) свой заголовок
+  // не добавить. Остальное — fetch() из платформы, его можно дополнить как есть.
+  // POST-навигация (форма входа) идёт без заголовка: cookie ngrok в этот момент уже есть.
+  if (req.method === "GET") {
+    return fetch(req.url, { headers, credentials: "include", mode: "same-origin", redirect: req.mode === "navigate" ? "manual" : "follow", signal: req.signal });
+  }
+  if (req.mode === "navigate" || req.mode === "no-cors") return fetch(req);
+  return fetch(req, { headers });
+}
+
+self.addEventListener("fetch", (e) => {
+  if (new URL(e.request.url).origin !== location.origin) return;
+  if (e.request.mode !== "navigate") {
+    if (NGROK) e.respondWith(send(e.request));
+    return;
+  }
+  e.respondWith(send(e.request).then((r) => (isOffline(r) ? offline() : r)).catch(offline));
+});
+`;

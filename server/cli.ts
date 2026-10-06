@@ -13,6 +13,7 @@ import { createApp, lanAddresses } from "./app.ts";
 import { emit } from "./events.ts";
 import { formatEsbuildError } from "./libs.ts";
 import { setPassword } from "./auth.ts";
+import { startNgrok } from "./ngrok.ts";
 import { supervise, isSupervised, EXIT_PORT_BUSY, enableAutostart, disableAutostart, autostartEnabled } from "./system.ts";
 
 const run = promisify(execFile);
@@ -89,6 +90,7 @@ async function start(args: string[]) {
       for (const ip of lanAddresses()) console.log(`  В локальной сети:    ${proto}://${ip}:${port}`);
       console.log(`\n  Модули:  ${MODULES_DIR}`);
       console.log(`  Данные:  ${HOME}\n`);
+      startNgrok(port, useHttps);
     },
   );
   // Порт занят: либо хаб уже работает (в фоне), либо предыдущий процесс ещё не освободил порт.

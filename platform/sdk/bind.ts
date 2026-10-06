@@ -4,6 +4,7 @@ import { createMedia } from "./media.ts";
 import { createRouting } from "./router.tsx";
 import { getHost, type ModuleManifest } from "./core.ts";
 import { createAi, makeUseAi } from "./ai.ts";
+import { createGoogle, makeUseGoogle } from "./google.ts";
 
 /**
  * Всё, что зависит от того, какой модуль вызывает SDK. Хаб подставляет
@@ -15,9 +16,12 @@ export function bind(id: string) {
   const basePath = `/m/${id}`;
   const routing = createRouting(basePath);
   const ai = createAi(id);
+  const google = createGoogle(id);
   return {
     ai,
     useAi: makeUseAi(ai),
+    google,
+    useGoogle: makeUseGoogle(google),
     db: {
       collection: <T = Record<string, unknown>>(name: string, opts?: CollectionOptions): Collection<T> => createCollection<T>(id, name, opts),
     },

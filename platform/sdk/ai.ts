@@ -12,6 +12,11 @@ export interface AiOptions {
   system?: string;
   /** "fast" — быстрая модель для коротких ответов, "smart" (по умолчанию) — основная. */
   model?: "fast" | "smart";
+  /**
+   * Картинки к запросу (до 5): Blob/File или id файла модуля (files.upload).
+   * Большие фото уменьшаются в браузере до 1568px по длинной стороне.
+   */
+  images?: (Blob | string)[];
   /** Кусочки ответа по мере генерации. */
   onDelta?: (delta: string, full: string) => void;
   signal?: AbortSignal;
@@ -40,10 +45,11 @@ export function createAi(module: string) {
 
   async function ask(prompt: string, opts: AiOptions = {}): Promise<string> {
     checkPermission();
+    const images = opts.images?.length ? await Promise.all(opts.images.map((im) => encodeImage(module, im))) : undefined;
     const res = await fetch(`/api/ai/${module}`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-lifehub": "1", "x-lifehub-module": module, "x-lifehub-client": clientId },
-      body: JSON.stringify({ prompt, system: opts.system, model: opts.model }),
+      body: JSON.stringify({ prompt, system: opts.system, model: opts.model, images }),
       signal: opts.signal,
     });
     if (!res.ok || !res.body) {
@@ -105,6 +111,42 @@ export function createAi(module: string) {
   }
 
   return { ask, chat, json, status };
+}
+
+const MAX_SIDE = 1568;
+
+/** Картинка → { mime, data: base64 }; большие уменьшаются и пережимаются в JPEG. */
+async function encodeImage(module: string, im: Blob | string): Promise<{ mime: string; data: string }> {
+  let blob: Blob;
+  if (typeof im === "string") {
+    const res = await fetch(`/api/files/${module}/${im}`);
+    if (!res.ok) throw new AiRequestError("Картинка не найдена", "error");
+    blob = await res.blob();
+  } else blob = im;
+  if (!blob.type.startsWith("image/")) throw new AiRequestError("Можно передавать только картинки", "error");
+  let bitmap: ImageBitmap | null = null;
+  try {
+    bitmap = await createImageBitmap(blob);
+  } catch {}
+  const small = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(blob.type) && blob.size < 3_500_000;
+  if (bitmap && (Math.max(bitmap.width, bitmap.height) > MAX_SIDE || !small)) {
+    const k = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * k);
+    canvas.height = Math.round(bitmap.height * k);
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    blob = await new Promise<Blob>((ok, fail) => canvas.toBlob((b) => (b ? ok(b) : fail(new AiRequestError("Не удалось обработать картинку", "error"))), "image/jpeg", 0.85));
+  } else if (!small) {
+    throw new AiRequestError("Этот формат картинки не поддерживается — сохраните её как JPEG или PNG", "error");
+  }
+  bitmap?.close();
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+  return { mime: blob.type, data: btoa(bin) };
 }
 
 export function parseJson<T>(text: string): T {

@@ -28,6 +28,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   notifications: "Уведомления",
   network: "Запросы в интернет",
   ai: "Нейронка (через ваш Claude Code)",
+  "google:calendar": "Google Календарь: читать и менять события",
 };
 
 export function permissionLabel(p: string): string {

@@ -276,7 +276,15 @@ function kvFor(module: string, key: string) {
 
 export function createKv(module: string) {
   return {
-    async get<T>(key: string, fallback?: T): Promise<T> {
+    /**
+     * Значение ключа. { from: "fit" } — прочитать ключ другого модуля (только чтение;
+     * владелец должен открыть его в exports.stores, а модулю нужно разрешение read:<id>).
+     */
+    async get<T>(key: string, fallback?: T, opts: { from?: string } = {}): Promise<T> {
+      if (opts.from && opts.from !== module) {
+        const r = await request<{ value: unknown }>("GET", `/api/kv/${opts.from}/${key}`, { module });
+        return (r.value as T) ?? (fallback as T);
+      }
       const s = kvFor(module, key);
       if (!s.loaded) await s.refresh();
       return (s.state.value as T) ?? (fallback as T);
