@@ -1,14 +1,15 @@
 {
   "id": "notes",
   "name": "Заметки",
-  "version": "1.0.0",
-  "description": "Заметки в markdown с тегами и поиском",
+  "version": "2.2.0",
+  "description": "Воронка для мыслей: кидай текстом, голосом, фото или через «Поделиться» — нейронка разложит по типам, проектам и сферам, найдёт связи и события, ответит на вопросы по заметкам",
   "icon": "📝",
   "author": "lifehub",
   "type": "app",
   "sdk": "^1",
   "entry": "src/index.tsx",
   "deps": { "marked": "^16" },
-  "permissions": [],
-  "exports": { "collections": ["notes"] }
+  "permissions": ["ai", "mic", "network", "files"],
+  "exports": { "collections": ["notes", "topics", "topic_log"] },
+  "share": "/"
 }

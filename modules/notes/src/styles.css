@@ -1,0 +1,138 @@
+@import url("https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Lora:ital,wght@0,500;0,600;0,700;1,500&display=swap");
+
+/* Все классы модуля начинаются с nt-. Стиль — тёплая бумага; тёмная тема следует хабу. */
+.nt-root {
+  --nt-bg: #f6f2ea;
+  --nt-paper: #fffdf8;
+  --nt-paper-2: #f0eadf;
+  --nt-line: #e4dccd;
+  --nt-ink: #2a2520;
+  --nt-muted: #8a8173;
+  --nt-accent: #d8692e;
+  --nt-accent-soft: #d8692e1f;
+  --lh-accent: #d8692e;
+  --lh-accent-fg: #ffffff;
+  background: var(--nt-bg);
+  color: var(--nt-ink);
+  font-family: "Golos Text", system-ui, sans-serif;
+  min-height: 100%;
+}
+[data-theme="dark"] .nt-root,
+[data-theme="dark"].nt-root {
+  --nt-bg: #14120f;
+  --nt-paper: #1d1a16;
+  --nt-paper-2: #27231d;
+  --nt-line: #353027;
+  --nt-ink: #efe8dc;
+  --nt-muted: #9c9283;
+  --nt-accent: #f08a4b;
+  --nt-accent-soft: #f08a4b24;
+  --lh-accent: #f08a4b;
+  --lh-accent-fg: #1a120c;
+}
+
+.nt-serif { font-family: Lora, Georgia, serif; }
+.nt-h1 { font-family: Lora, Georgia, serif; font-weight: 600; font-size: 1.75rem; line-height: 1.15; letter-spacing: -0.01em; }
+.nt-h2 { font-family: Lora, Georgia, serif; font-weight: 600; font-size: 1.15rem; }
+.nt-muted { color: var(--nt-muted); }
+.nt-accent { color: var(--nt-accent); }
+
+.nt-paper {
+  background: var(--nt-paper);
+  border: 1px solid var(--nt-line);
+  border-radius: 16px;
+}
+.nt-soft { background: var(--nt-paper-2); border-radius: 12px; }
+.nt-line { border-color: var(--nt-line); }
+a.nt-paper, button.nt-paper { transition: transform 0.12s ease, box-shadow 0.12s ease; }
+a.nt-paper:hover, button.nt-paper:hover { box-shadow: 0 6px 18px -10px rgba(60, 40, 20, 0.35); }
+a.nt-paper:active, button.nt-paper:active { transform: scale(0.985); }
+
+/* Поле захвата */
+.nt-capture {
+  background: var(--nt-paper);
+  border: 1.5px solid var(--nt-line);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px -18px rgba(60, 40, 20, 0.35);
+  transition: border-color 0.15s ease;
+}
+.nt-capture:focus-within { border-color: var(--nt-accent); }
+.nt-input {
+  width: 100%;
+  background: transparent;
+  color: var(--nt-ink);
+  outline: none;
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+.nt-input::placeholder { color: var(--nt-muted); }
+.nt-field {
+  width: 100%;
+  background: var(--nt-paper);
+  border: 1px solid var(--nt-line);
+  border-radius: 12px;
+  padding: 9px 12px;
+  color: var(--nt-ink);
+  outline: none;
+}
+.nt-field:focus { border-color: var(--nt-accent); }
+
+.nt-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 40px; padding: 0 16px; border-radius: 999px;
+  font-weight: 600; font-size: 0.92rem; white-space: nowrap;
+  background: var(--nt-accent); color: #fff;
+  transition: filter 0.12s ease, transform 0.12s ease, opacity 0.12s ease;
+}
+[data-theme="dark"] .nt-btn { color: #1a120c; }
+.nt-btn:hover { filter: brightness(1.05); }
+.nt-btn:active { transform: scale(0.97); }
+.nt-btn:disabled { opacity: 0.5; pointer-events: none; }
+.nt-btn-ghost { background: var(--nt-paper-2); color: var(--nt-ink); }
+[data-theme="dark"] .nt-btn-ghost { color: var(--nt-ink); }
+.nt-btn-sm { height: 32px; padding: 0 12px; font-size: 0.82rem; }
+
+.nt-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 28px; padding: 0 10px; border-radius: 999px;
+  font-size: 0.8rem; font-weight: 500;
+  background: var(--nt-paper-2); color: var(--nt-ink);
+  white-space: nowrap;
+}
+.nt-chip-on { background: var(--nt-accent); color: #fff; }
+[data-theme="dark"] .nt-chip-on { color: #1a120c; }
+.nt-mic {
+  width: 44px; height: 44px; border-radius: 999px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--nt-paper-2); font-size: 1.15rem;
+}
+.nt-mic-on { background: var(--nt-accent); color: #fff; animation: nt-pulse 1.4s ease-in-out infinite; }
+@keyframes nt-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--nt-accent-soft); }
+  50% { box-shadow: 0 0 0 10px transparent; }
+}
+
+.nt-slip {
+  background: var(--nt-paper);
+  border: 1px dashed var(--nt-line);
+  border-radius: 12px;
+}
+.nt-new { animation: nt-drop 0.35s ease-out; }
+@keyframes nt-drop {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.nt-shelf-dot { width: 8px; height: 8px; border-radius: 999px; flex: none; }
+.nt-scroll-x { overflow-x: auto; scrollbar-width: none; }
+.nt-scroll-x::-webkit-scrollbar { display: none; }
+
+.nt-graph text { font-family: "Golos Text", system-ui, sans-serif; fill: var(--nt-ink); }
+.nt-graph .nt-edge { stroke: var(--nt-line); }
+
+.nt-funnel { display: inline-block; animation: nt-spin 1.6s linear infinite; }
+@keyframes nt-spin { to { transform: rotate(360deg); } }
+
+/* [[Ссылки]]: на заметку — как обычная ссылка, на несуществующую — пунктиром (нажатие создаст её). */
+.nt-root .lh-prose a[href^="#nt:"] { text-decoration-style: solid; }
+.nt-root .lh-prose a[href^="#nt-new:"] { color: var(--nt-muted); text-decoration-style: dashed; }
