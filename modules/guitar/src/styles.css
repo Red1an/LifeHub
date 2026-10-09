@@ -90,6 +90,8 @@
 .gt-sheet .gt-chord:hover { background: rgba(255, 181, 71, 0.15); }
 .gt-sheet[data-hide="true"] .gt-chord { color: transparent; background: rgba(255, 181, 71, 0.14); }
 .gt-sheet[data-hide="true"] .gt-chord[data-shown="true"] { color: var(--gt-brass); background: transparent; }
+.gt-sheet .gt-chord[data-now="true"] { background: var(--gt-brass); color: #1a1006; box-shadow: 0 0 0 3px rgba(255, 181, 71, 0.35); }
+.gt-sheet .gt-chord[data-next="true"] { outline: 1px dashed rgba(255, 181, 71, 0.6); }
 .gt-sheet .gt-section {
   display: inline-block; margin-top: 1.1em; margin-bottom: 0.25em; padding: 0.1em 0.6em; border-radius: 6px;
   background: rgba(94, 200, 255, 0.12); color: var(--gt-sky); font-family: "Golos Text", sans-serif; font-weight: 700; font-size: 0.8em;

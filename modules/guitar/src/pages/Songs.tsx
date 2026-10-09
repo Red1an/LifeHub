@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { cn, Link, useNavigate, useSearchParams } from "@lifehub/sdk";
+import { cn, Link, plural, useNavigate, useSearchParams } from "@lifehub/sdk";
 import { Btn, Empty, Header, LinkBtn, Panel, Pill, Screen, Section } from "../components/kit";
 import { STATUS_RU, useLibrary, type LibSong, type SongMeta } from "../lib/songs";
+import { searchSst, type SstSong } from "../lib/songsterr";
 import { groupResults, searchUg, ugScore, UG_TYPE_RU, type UgGroup, type UgResult } from "../lib/ug";
 
 type Filter = "all" | "learning" | "want" | "learned" | "fav" | "tab";
@@ -17,9 +18,10 @@ const FILTERS: { id: Filter; label: string }[] = [
 
 const IDEAS = ["Кино", "Сплин", "Король и Шут", "ДДТ", "Би-2", "Звери", "Nirvana", "Metallica", "Oasis", "Radiohead"];
 
-const searchCache = new Map<string, UgGroup[]>();
+const searchCache = new Map<string, { ug: UgGroup[]; sst: SstSong[] }>();
 
 const norm = (s: string) => s.toLowerCase().replace(/ё/g, "е");
+const key = (artist: string, title: string) => norm(`${artist}|${title}`).replace(/\s*\(.*?\)\s*/g, "").replace(/[^a-zа-я0-9|]+/g, "");
 
 export function SongsPage() {
   const lib = useLibrary();
@@ -28,6 +30,7 @@ export function SongsPage() {
   const [query, setQuery] = useState(params.get("q") ?? "");
   const [filter, setFilter] = useState<Filter>("all");
   const [online, setOnline] = useState<UgGroup[] | null>(null);
+  const [sst, setSst] = useState<SstSong[]>([]);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,18 +41,27 @@ export function SongsPage() {
     setParams({ q: text });
     setError(null);
     const cached = searchCache.get(norm(text));
-    if (cached) return setOnline(cached);
-    setSearching(true);
-    try {
-      const groups = groupResults(await searchUg(text), text);
-      searchCache.set(norm(text), groups);
-      setOnline(groups);
-    } catch (e) {
-      setError((e as Error).message);
-      setOnline(null);
-    } finally {
-      setSearching(false);
+    if (cached) {
+      setSst(cached.sst);
+      return setOnline(cached.ug);
     }
+    setSearching(true);
+    // Ищем сразу в двух местах: аккорды и табы — Ultimate Guitar, табы партий — Songsterr.
+    const [ug, ss] = await Promise.allSettled([searchUg(text), searchSst(text, 20)]);
+    if (ug.status === "rejected" && ss.status === "rejected") {
+      setError((ug.reason as Error).message);
+      setOnline(null);
+      setSst([]);
+    } else {
+      const groups = ug.status === "fulfilled" ? groupResults(ug.value, text) : [];
+      const have = new Set(groups.map((g) => key(g.artist, g.song)));
+      const extra = ss.status === "fulfilled" ? ss.value.filter((x) => x.tracks.some((t) => t.kind === "guitar") && !have.has(key(x.artist, x.title))) : [];
+      searchCache.set(norm(text), { ug: groups, sst: extra });
+      setOnline(groups);
+      setSst(extra);
+      if (ug.status === "rejected" && !extra.length) setError((ug.reason as Error).message);
+    }
+    setSearching(false);
   };
 
   useEffect(() => {
@@ -111,20 +123,43 @@ export function SongsPage() {
 
       {online && (
         <Section
-          title={`В интернете · ${online.length}`}
+          title={`В интернете · ${online.length + sst.length}`}
           right={
-            <button className="text-xs text-[var(--gt-muted)] underline" onClick={() => setOnline(null)}>
+            <button className="text-xs text-[var(--gt-muted)] underline" onClick={() => { setOnline(null); setSst([]); }}>
               скрыть
             </button>
           }
         >
-          {online.length === 0 && <Panel className="text-sm text-[var(--gt-muted)]">Ничего не нашлось. Попробуй только название песни или только исполнителя.</Panel>}
+          {online.length === 0 && !sst.length && <Panel className="text-sm text-[var(--gt-muted)]">Ничего не нашлось. Попробуй только название песни или только исполнителя — или латиницей.</Panel>}
           <div className="space-y-2">
             {online.slice(0, 40).map((g) => (
               <OnlineGroup key={g.key} group={g} onOpen={(v) => navigate(`/song/ug-${v.id}?u=${encodeURIComponent(v.url)}`)} />
             ))}
           </div>
-          <div className="mt-2 text-center text-xs text-[var(--gt-muted)]">Аккорды и табы — с Ultimate Guitar. Платные версии скрыты.</div>
+          {online.length > 0 && <div className="mt-2 text-center text-xs text-[var(--gt-muted)]">Аккорды и табы — с Ultimate Guitar. Платные версии скрыты.</div>}
+          {sst.length > 0 && (
+            <>
+              <div className="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-[var(--gt-muted)]">Табы партий · Songsterr</div>
+              <div className="space-y-2">
+                {sst.slice(0, 20).map((x) => (
+                  <Link key={x.songId} to={`/song/sst-${x.songId}`} className="gt-panel flex items-center gap-3 !rounded-2xl p-3 transition hover:border-[var(--gt-brass)]">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--gt-violet)]/15 text-lg">🎼</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold">{x.title}</span>
+                      <span className="block truncate text-sm text-[var(--gt-muted)]">
+                        {x.artist} · {(() => {
+                          const n = x.tracks.filter((t) => t.kind === "guitar").length;
+                          return `${n} ${plural(n, ["партия", "партии", "партий"])} гитары`;
+                        })()}
+                        {x.tracks.some((t) => t.kind === "bass") ? " + бас" : ""}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-[var(--gt-brass)]">→</span>
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
         </Section>
       )}
 

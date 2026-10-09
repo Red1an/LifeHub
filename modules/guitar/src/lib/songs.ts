@@ -27,6 +27,10 @@ export interface SavedSong {
   strums?: UgStrum[];
   tags?: string[];
   addedAt?: number;
+  /** Аккорды проставлены автоматически (по табам Songsterr, lib/autochords.ts). */
+  auto?: "songsterr";
+  /** Откуда слова у автоматической версии: «таб», «LRCLIB»… */
+  lyricsFrom?: string;
 }
 
 export type SongStatus = "want" | "learning" | "learned";
@@ -44,6 +48,13 @@ export interface SongMeta {
   lessons?: Video[];
   original?: Video | null;
   videosAt?: number;
+  /** Скорость автопрокрутки этой песни, пикс/с (подстраивается под игру). */
+  scrollSpeed?: number;
+  /** Песня на Songsterr (табы партий); null — искали и не нашли. */
+  sst?: { songId: number; title: string; artist: string } | null;
+  sstAt?: number;
+  /** Выбранная партия Songsterr. */
+  sstTrack?: number | null;
   /** Полный адрес версии на Ultimate Guitar (для песен, открытых из поиска). */
   src?: string;
   /** Пункты чек-листа разучивания (components/SongPractice). */

@@ -79,6 +79,9 @@ function markedLine(line: string): { chunks: Chunk[]; rest: string } {
     last = re.lastIndex;
   }
   out += line.slice(last);
+  // Пометка повтора «×2» в строке аккордов — тоже элемент строки (показывается приглушённо).
+  for (const r of out.matchAll(/×\d+/g)) if (!chunks.some((c) => r.index! >= c.col && r.index! < c.col + c.chord.length)) chunks.push({ col: r.index!, chord: r[0] });
+  chunks.sort((a, b) => a.col - b.col);
   let rest = out;
   for (const c of [...chunks].reverse()) rest = rest.slice(0, c.col) + " ".repeat(c.chord.length) + rest.slice(c.col + c.chord.length);
   return { chunks, rest };

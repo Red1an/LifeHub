@@ -77,11 +77,18 @@ const TYPE_ORDER: Record<string, number> = { Chords: 0, Tabs: 1, "Ukulele Chords
 async function searchPage(query: string, page: number): Promise<any[]> {
   const url = `https://www.ultimate-guitar.com/search.php?search_type=title&value=${encodeURIComponent(query)}&page=${page}`;
   const r = await hubNet().fetch(url);
+  // Когда ничего не найдено, UG отвечает 404 — это пустая выдача, а не поломка.
+  if (r.status === 404) return [];
   if (!r.ok) {
     if (page > 1) return [];
     throw new Error(`Ultimate Guitar ответил ошибкой ${r.status}`);
   }
-  return readStore(r.text)?.store?.page?.data?.results ?? [];
+  try {
+    return readStore(r.text)?.store?.page?.data?.results ?? [];
+  } catch {
+    if (page > 1) return [];
+    throw new Error("Ultimate Guitar поменял страницу — не удалось прочитать результаты");
+  }
 }
 
 /** Поиск песен (первые 3 страницы — для запроса по исполнителю это весь его репертуар). Платные (Pro, Official) отбрасываем. */

@@ -1,19 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { cn, confirm, Link, Loading, toast, useCollection, useDoc, useNavigate, useParams, useSearchParams } from "@lifehub/sdk";
+import { cn, confirm, Link, Loading, Modal, toast, uid, useCollection, useDoc, useNavigate, useParams, useSearchParams } from "@lifehub/sdk";
 import { ChordCard, ChordModal } from "../components/ChordCard";
 import { ChordDiagram } from "../components/ChordDiagram";
 import { Sheet } from "../components/Sheet";
+import { ChordEditor } from "../components/ChordEditor";
+import { ScrollDock } from "../components/ScrollDock";
+import { SongTabsTab, sectionRange, useSongTabs } from "../components/SongTabs";
+import { TabPlayer } from "../components/TabPlayer";
+import { autoChords, autoChordsWithText, loadSstMeta, trackLabel, type Part, type SstTrack } from "../lib/songsterr";
 import { CHECK_COUNT, SongPracticeTab } from "../components/SongPractice";
 import { VideoCard } from "../components/Videos";
 import { Btn, Empty, Header, Panel, Pill, Screen, Section, Segments } from "../components/kit";
 import { bestShape, transpose } from "../lib/chords";
-import { capoOptions, guessKey, mainProgression, parseSheet, sheetChords, transposeSheet } from "../lib/sheet";
+import { capoOptions, guessKey, mainProgression, parseSheet, sheetChords, transposeSheet, type SheetFormat } from "../lib/sheet";
 import { SEED, STATUS_RU, formatOf, fromUg, metaDb, songsDb, type LibSong, type SavedSong, type SongMeta, type SongStatus } from "../lib/songs";
 import { markPractice } from "../lib/train-stats";
 import { DIFFICULTY_RU, UG_TYPE_RU, loadUg } from "../lib/ug";
 import { findLessons, findOriginal } from "../lib/youtube";
 
-type Tab = "text" | "video" | "practice" | "chords";
+type Tab = "text" | "tabs" | "video" | "practice" | "chords";
 
 const ugCache = new Map<number, Promise<SavedSong>>();
 function fetchUg(id: number, url: string | null) {
@@ -26,17 +31,6 @@ function fetchUg(id: number, url: string | null) {
   return p;
 }
 
-/** Ближайший прокручиваемый контейнер (модуль живёт внутри рамки хаба). */
-function scrollParent(el: HTMLElement | null): HTMLElement {
-  let n = el?.parentElement ?? null;
-  while (n) {
-    const s = getComputedStyle(n);
-    if (/(auto|scroll)/.test(s.overflowY) && n.scrollHeight > n.clientHeight) return n;
-    n = n.parentElement;
-  }
-  return (document.scrollingElement as HTMLElement) ?? document.documentElement;
-}
-
 /** Песня по id: встроенная, сохранённая или открытая из поиска Ultimate Guitar. */
 function useSong(id: string, meta: { loading: boolean; src?: string }) {
   const saved = useDoc<SavedSong>("songs", id);
@@ -46,12 +40,34 @@ function useSong(id: string, meta: { loading: boolean; src?: string }) {
   const [online, setOnline] = useState<SavedSong | null>(null);
   const [error, setError] = useState<string | null>(null);
   const ugId = id.startsWith("ug-") ? Number(id.slice(3)) : null;
-  const needOnline = !seed && !saved.loading && !meta.loading && !saved.doc && ugId !== null;
+  const sstId = id.startsWith("sst-") ? Number(id.slice(4)) : null;
+  const needOnline = !seed && !saved.loading && !meta.loading && !saved.doc && (ugId !== null || sstId !== null);
 
   useEffect(() => {
     if (!needOnline) return;
     let alive = true;
     setError(null);
+    // Песня только с Songsterr: текста с аккордами нет, есть табы партий.
+    if (sstId !== null) {
+      loadSstMeta(sstId).then(
+        async (m) => {
+          if (!alive) return;
+          void metaDb.update(id, { sst: { songId: m.songId, title: m.title, artist: m.artist }, sstAt: Date.now() });
+          // Текста с аккордами нет — вычисляем аккорды по партиям и раскладываем по словам вокала.
+          const auto = await autoChords(m).catch(() => null);
+          if (!alive) return;
+          setOnline(
+            auto
+              ? { title: m.title, artist: m.artist, kind: "chords", body: auto.body, format: "plain", key: auto.key, auto: "songsterr", lyricsFrom: auto.lyricsSource }
+              : { title: m.title, artist: m.artist, kind: "tab", body: "" },
+          );
+        },
+        (e) => alive && setError((e as Error).message),
+      );
+      return () => {
+        alive = false;
+      };
+    }
     fetchUg(ugId!, url).then(
       (s) => {
         if (!alive) return;
@@ -63,7 +79,7 @@ function useSong(id: string, meta: { loading: boolean; src?: string }) {
     return () => {
       alive = false;
     };
-  }, [needOnline, ugId]);
+  }, [needOnline, ugId, sstId]);
 
   const song: LibSong | null = seed ?? (saved.doc ? { ...saved.doc, id } : online ? { ...online, id } : null);
   return { song, isSaved: !!saved.doc, loading: !seed && (saved.loading || (needOnline && !online && !error)), error };
@@ -78,9 +94,11 @@ export function SongPage() {
   const [tab, setTab] = useState<Tab>("text");
   const [chord, setChord] = useState<string | null>(null);
   const [hide, setHide] = useState(false);
-  const [scrolling, setScrolling] = useState(false);
-  const [speed, setSpeed] = useState(25);
   const [capoOpen, setCapoOpen] = useState(false);
+  // Редактор аккордов: текст, который правим (null — не правим), и окно «добавить слова».
+  const [editBody, setEditBody] = useState<{ body: string; format?: SheetFormat } | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [wordsOpen, setWordsOpen] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
 
   const setMeta = (patch: Partial<SongMeta>) => metaDb.update(id, { title: song?.title, artist: song?.artist, ...patch });
@@ -100,39 +118,23 @@ export function SongPage() {
   const lines = useMemo(() => transposeSheet(baseLines, shift, flats), [baseLines, shift, flats]);
   const chords = useMemo(() => sheetChords(lines), [lines]);
   const progression = useMemo(() => mainProgression(lines), [lines]);
+  // Есть ли в тексте слова (не только аккорды и заголовки).
+  const hasLyrics = useMemo(() => baseLines.some((l) => (l.t === "pair" && l.lyric.trim()) || l.t === "text"), [baseLines]);
+  const sequence = useMemo(() => lines.flatMap((l) => (l.t === "pair" ? l.chords.map((c) => c.chord) : [])), [lines]);
   const soundingChords = useMemo(() => sheetChords(transposeSheet(baseLines, t + songCapo, flats)), [baseLines, t, songCapo, flats]);
   const origKey = song?.key || guessKey(baseLines);
   const keyName = origKey ? transpose(origKey, t, flats) : null;
   const ugShapes = song?.shapes ?? {};
-
-  // Автопрокрутка.
-  useEffect(() => {
-    if (!scrolling) return;
-    const box = scrollParent(sheetRef.current);
-    let raf = 0;
-    let last = performance.now();
-    let acc = 0;
-    markPractice(`song:${id}`);
-    const step = (now: number) => {
-      acc += (speed * (now - last)) / 1000;
-      last = now;
-      if (acc >= 1) {
-        const px = Math.floor(acc);
-        acc -= px;
-        const before = box.scrollTop;
-        box.scrollTop += px;
-        if (box.scrollTop === before && before > 0) return setScrolling(false);
-      }
-      raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    const stop = () => setScrolling(false);
-    box.addEventListener("touchstart", stop, { passive: true });
-    return () => {
-      cancelAnimationFrame(raf);
-      box.removeEventListener("touchstart", stop);
-    };
-  }, [scrolling, speed]);
+  // Табы вступления и проигрышей прямо в тексте — партия с Songsterr (соло-гитара, если есть).
+  const hasInstrumental = useMemo(() => baseLines.some((l) => l.t === "section" && /вступ|intro|проигр|instrument|interlude|соло|solo|рифф|riff/i.test(l.label)), [baseLines]);
+  const inline = useSongTabs(id, song?.title ?? "", song?.artist ?? "", meta, tab === "text" && hasInstrumental, "lead");
+  // Бой и аппликатуры из оригинала — ритм-партия Songsterr.
+  const rhythm = useSongTabs(id, song?.title ?? "", song?.artist ?? "", meta, tab === "practice", "rhythm");
+  const sectionExtra = (label: string, occ: number) => {
+    if (!inline.part) return null;
+    const r = sectionRange(inline.part, label, occ);
+    return r ? <InlineTab part={inline.part} from={r.from} to={r.to} label={r.label} track={inline.meta?.tracks.find((t) => t.partId === inline.partId)} /> : null;
+  };
 
   if (loading) return <Loading />;
   if (!song)
@@ -213,9 +215,10 @@ export function SongPage() {
       <Segments
         value={tab}
         onChange={setTab}
-        className="sticky top-0 z-20 mb-4 backdrop-blur"
+        className="sticky top-[calc(2.75rem+env(safe-area-inset-top))] z-20 mb-4 backdrop-blur lg:top-2"
         items={[
           { id: "text", label: song.kind === "tab" ? "Таб" : "Текст" },
+          { id: "tabs", label: "🎸 Табы" },
           { id: "video", label: "Видео" },
           { id: "practice", label: "Практика" },
           { id: "chords", label: `Аккорды${chords.length ? ` · ${chords.length}` : ""}` },
@@ -249,6 +252,11 @@ export function SongPage() {
                 </button>
               </div>
               <button onClick={() => setMeta({ flats: !flats })} data-on={flats} className="gt-chip !min-h-10">♭</button>
+              {song.body.trim() && (
+                <button onClick={() => setEditBody({ body: song.body, format: formatOf(song) })} data-on={!!editBody} className="gt-chip !min-h-10" title="Расставить или поправить аккорды над словами">
+                  ✏️ Аккорды
+                </button>
+              )}
               {(t !== 0 || capo !== songCapo) && (
                 <button className="text-xs text-[var(--gt-muted)] underline" onClick={() => setMeta({ transpose: 0, capo: songCapo })}>
                   как в оригинале
@@ -298,8 +306,73 @@ export function SongPage() {
           )}
 
           <div ref={sheetRef} className="gt-panel px-3 py-4 sm:px-6">
-            <Sheet lines={lines} fontSize={font} hideChords={hide} onChord={setChord} />
+            {editBody ? (
+              <ChordEditor
+                body={editBody.body}
+                format={editBody.format}
+                palette={[...new Set([...sheetChords(baseLines), ...sheetChords(parseSheet(editBody.body, editBody.format))])]}
+                saving={savingEdit}
+                onCancel={() => setEditBody(null)}
+                onSave={async (body) => {
+                  setSavingEdit(true);
+                  try {
+                    if (id.startsWith("u-")) {
+                      await songsDb.update(id, { body, format: "plain" });
+                      toast("Аккорды сохранены", "success");
+                      setEditBody(null);
+                    } else {
+                      // Встроенную или найденную песню не трогаем — сохраняем свою версию.
+                      const { id: _i, builtIn: _b, ...data } = song;
+                      const newId = `u-${uid()}`;
+                      await songsDb.put(newId, { ...data, body, format: "plain", kind: "chords", auto: undefined, source: undefined, addedAt: Date.now() });
+                      toast("Сохранено как твоя версия песни", "success");
+                      setEditBody(null);
+                      navigate(`/song/${newId}`);
+                    }
+                  } finally {
+                    setSavingEdit(false);
+                  }
+                }}
+              />
+            ) : (
+              <>
+            {song.auto && (
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--gt-violet)]/10 px-3 py-2 font-sans text-xs text-[var(--gt-muted)]">
+                <span className="min-w-0 flex-1">
+                  🪄 Аккорды проставлены автоматически по табам партий (Songsterr){song.lyricsFrom && song.lyricsFrom !== "таб" ? `, слова — ${song.lyricsFrom}` : ""}. Могут быть неточности — сверяй с оригиналом и правь «✏️ Аккорды».
+                </span>
+                {!hasLyrics && (
+                  <button className="gt-btn gt-btn-brass !min-h-8 !px-3 text-xs" onClick={() => setWordsOpen(true)}>
+                    📝 Добавить слова
+                  </button>
+                )}
+              </div>
+            )}
+            {song.body.trim() && chords.length === 0 && <AutoChordsOffer id={id} song={song} meta={meta} />}
+            {song.body.trim() ? (
+              <Sheet lines={lines} fontSize={font} hideChords={hide} onChord={setChord} sectionExtra={sectionExtra} />
+            ) : (
+              <div className="py-6 text-center text-sm text-[var(--gt-muted)]">
+                Текста с аккордами для этой песни нет — смотри табы партий на вкладке{" "}
+                <button className="text-[var(--gt-brass)] underline" onClick={() => setTab("tabs")}>
+                  «Табы»
+                </button>
+                .
+              </div>
+            )}
+              </>
+            )}
           </div>
+          <AddWords
+            open={wordsOpen}
+            onClose={() => setWordsOpen(false)}
+            sstId={meta.sst?.songId ?? null}
+            onResult={(body, aligned) => {
+              setWordsOpen(false);
+              setEditBody({ body, format: "plain" });
+              toast(aligned ? "Слова разложены по мелодии — проверь и поправь аккорды, потом «Сохранить»" : "В табе нет мелодии вокала — расставь аккорды нажатием на слова", "success");
+            }}
+          />
 
           {song.source?.url && (
             <div className="mt-3 text-center text-xs text-[var(--gt-muted)]">
@@ -310,16 +383,20 @@ export function SongPage() {
             </div>
           )}
 
-          <div className="sticky bottom-3 z-20 mt-4 flex justify-end">
-            <div className="gt-panel flex items-center gap-2 !rounded-full p-1.5 pl-3 shadow-xl">
-              {scrolling && <input type="range" min={8} max={90} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="w-24 accent-[var(--gt-brass)]" aria-label="Скорость прокрутки" />}
-              <button className={cn("gt-btn !min-h-10 !rounded-full", scrolling ? "gt-btn-ghost" : "gt-btn-brass")} onClick={() => setScrolling(!scrolling)}>
-                {scrolling ? "⏸" : "▶ Прокрутка"}
-              </button>
-            </div>
-          </div>
+          <div className="h-24" />
+          <ScrollDock
+            songId={id}
+            target={sheetRef}
+            sequence={sequence}
+            capo={capo}
+            speed={meta.scrollSpeed}
+            onSpeed={(v) => setMeta({ scrollSpeed: v })}
+            duration={meta.original?.d}
+          />
         </>
       )}
+
+      {tab === "tabs" && <SongTabsTab id={id} title={song.title} artist={song.artist} meta={meta} />}
 
       {tab === "video" && <SongVideos id={id} song={song} meta={meta} />}
 
@@ -332,6 +409,8 @@ export function SongPage() {
           strums={song.strums ?? []}
           checks={meta.checks ?? []}
           onToggleCheck={toggleCheck}
+          rhythmPart={rhythm.part}
+          rhythmLoading={rhythm.loading}
           onEar={() => {
             setHide(true);
             setTab("text");
@@ -413,5 +492,115 @@ function SongVideos({ id, song, meta }: { id: string; song: LibSong; meta: SongM
         </a>
       </Section>
     </div>
+  );
+}
+
+/** Раскрываемый таб части (вступление, проигрыш, соло) под её заголовком в тексте. */
+function InlineTab({ part, from, to, label, track }: { part: Part; from: number; to: number; label: string; track?: SstTrack }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="my-2" style={{ fontFamily: "'Golos Text', sans-serif", fontSize: 14 }}>
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-2 rounded-xl border border-[var(--gt-line)] bg-[var(--gt-panel-2)] px-3 py-1.5 text-xs font-semibold">
+        <span>🎸</span>
+        <span>
+          Таб: {label}
+          {track ? <span className="text-[var(--gt-muted)]"> · {trackLabel(track)}</span> : null}
+        </span>
+        <span className="text-[var(--gt-muted)]">{open ? "▴" : "▾"}</span>
+      </button>
+      {open && (
+        <div className="gt-slide mt-2 rounded-xl bg-black/20 p-2">
+          <TabPlayer part={part} from={from} to={to} compact />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Песня без аккордов (таб, свой текст): вычислить аккорды по табам партий этой песни. */
+function AutoChordsOffer({ id, song, meta }: { id: string; song: LibSong; meta: SongMeta }) {
+  const [want, setWant] = useState(false);
+  const tabs = useSongTabs(id, song.title, song.artist, meta, want);
+  const [result, setResult] = useState<{ body: string; key: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!want || !tabs.meta || result) return;
+    setBusy(true);
+    autoChords(tabs.meta)
+      .then((r) => (r ? setResult({ body: r.body, key: r.key }) : setError("Не получилось вычислить аккорды по этим табам.")))
+      .catch((e) => setError((e as Error).message))
+      .finally(() => setBusy(false));
+  }, [want, tabs.meta?.songId]);
+
+  const lines = useMemo(() => (result ? parseSheet(result.body, "plain") : []), [result]);
+  const save = async () => {
+    if (!result) return;
+    const newId = `u-${uid()}`;
+    await songsDb.put(newId, { title: song.title, artist: song.artist, kind: "chords", body: result.body, format: "plain", key: result.key, auto: "songsterr", addedAt: Date.now() });
+    toast("Сохранено отдельной песней с аккордами", "success");
+    navigate(`/song/${newId}`);
+  };
+
+  if (!want)
+    return (
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--gt-panel-2)] px-3 py-2 font-sans text-sm">
+        <span className="flex-1 text-[var(--gt-muted)]">В этой версии нет аккордов.</span>
+        <button className="gt-btn gt-btn-brass !min-h-9 text-sm" onClick={() => setWant(true)}>
+          🪄 Проставить аккорды
+        </button>
+      </div>
+    );
+  return (
+    <div className="mb-4 rounded-xl border border-[var(--gt-violet)]/40 p-3 font-sans text-sm">
+      {(busy || tabs.loading) && !result && <div className="text-[var(--gt-muted)]">Ищу табы партий и вычисляю аккорды…</div>}
+      {(tabs.notFound || error) && <div className="text-[var(--gt-muted)]">{error ?? "Табов этой песни на Songsterr нет — проставить аккорды не по чему."}</div>}
+      {result && (
+        <>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="flex-1 text-[var(--gt-muted)]">🪄 Аккорды по табам партий · тональность {result.key}</span>
+            <button className="gt-btn gt-btn-brass !min-h-9 text-sm" onClick={save}>
+              Сохранить как песню с аккордами
+            </button>
+          </div>
+          <div className="gt-mono" style={{ fontSize: 14 }}>
+            <Sheet lines={lines} fontSize={14} onChord={() => {}} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Окно «Добавить слова»: вставленный текст раскладывается по вокальной мелодии из табов. */
+function AddWords({ open, onClose, sstId, onResult }: { open: boolean; onClose: () => void; sstId: number | null; onResult: (body: string, aligned: boolean) => void }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    if (!text.trim()) return;
+    setBusy(true);
+    try {
+      const m = sstId ? await loadSstMeta(sstId) : null;
+      const r = m ? await autoChordsWithText(m, text) : null;
+      if (r) onResult(r.body, true);
+      else onResult(text.trim(), false);
+    } catch (e) {
+      toast((e as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal open={open} onClose={onClose} title="Слова песни">
+      <div className="space-y-3">
+        <div className="text-sm text-[var(--gt-muted)]">Вставь текст песни по строкам. Если в табе есть мелодия вокала, разложу слова по ней и поставлю аккорды над нужными словами; дальше можно поправить вручную.</div>
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={12} className="gt-input w-full text-sm" placeholder={"Первая строка песни\nВторая строка…"} />
+        <Btn block onClick={run} loading={busy} disabled={!text.trim()}>
+          Расставить аккорды
+        </Btn>
+      </div>
+    </Modal>
   );
 }
