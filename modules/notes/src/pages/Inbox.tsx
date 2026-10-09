@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Modal, Switch, cn, confirm, db, files, formatRelative, plural, toast, useCollection, useSearchParams, useStore } from "@lifehub/sdk";
 import { MicButton, useDictation } from "../components/input.tsx";
-import { Head, NoteCard, Wrap, topicMap, usePrefs } from "../components/kit.tsx";
+import { Head, NoteCard, Wrap, topicMap, useAreas, usePrefs } from "../components/kit.tsx";
 import { PlanView } from "../components/plan.tsx";
 import { enrichMany } from "../lib/enrich.ts";
 import { drain, enqueue, pendingCount } from "../lib/outbox.ts";
@@ -29,6 +29,7 @@ export function InboxPage() {
   const notes = useCollection<Note>("notes");
   const topics = useCollection<Topic>("topics");
   const { prefs } = usePrefs();
+  const { areas } = useAreas();
   const [stored, setPlan] = useStore<TriagePlan | null>("triage", null);
   const plan = isCurrentPlan(stored) ? stored : null;
   const [params, setParams] = useSearchParams();
@@ -164,7 +165,7 @@ export function InboxPage() {
   const triage = async () => {
     setBusy("Читаю воронку…");
     try {
-      const p = await makeTriage({ inbox, filed: known, topics: topics.items, prefs, onStep: setBusy });
+      const p = await makeTriage({ inbox, filed: known, topics: topics.items, areas, prefs, onStep: setBusy });
       if (prefs.autoApply) {
         const asked = new Set(p.questions.map((q) => q.from));
         const sure = p.items.filter((it) => it.confidence >= 0.8 && !it.from.some((id) => asked.has(id)));

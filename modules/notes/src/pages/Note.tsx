@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { marked } from "marked";
 import { Link, Modal, cn, confirm, db, files, formatDate, toast, useCollection, useNavigate, useParams, useSearchParams } from "@lifehub/sdk";
-import { EventBox, Gallery, Head, LinkPreview, NoteCard, Stars, Wrap, propsLine, topicMap, useDone, useSendDeadline, useSendToCalendar } from "../components/kit.tsx";
+import { EventBox, Gallery, Head, LinkPreview, NoteCard, Stars, Wrap, propsLine, topicMap, useAreas, useDone, useSendDeadline, useSendToCalendar } from "../components/kit.tsx";
 import { canEnrich, enrichNote } from "../lib/enrich.ts";
 import { CONTEXTS, KINDS, isSnoozed, kindOf, snoozeOptions } from "../lib/kinds.ts";
 import { similar } from "../lib/related.ts";
@@ -30,6 +30,7 @@ export function NotePage() {
   const [linking, setLinking] = useState(false);
   const [snoozing, setSnoozing] = useState(false);
   const [enriching, setEnriching] = useState(false);
+  const { areas } = useAreas();
   const note = notes.items.find((n) => n.id === id);
   const tmap = useMemo(() => topicMap(topics.items), [topics.items]);
   const byId = useMemo(() => new Map(notes.items.map((n) => [n.id, n])), [notes.items]);
@@ -46,6 +47,9 @@ export function NotePage() {
 
   const kind = kindOf(note);
   const back = backlinks(note, notes.items);
+  // Запись дня ↔ вынесенное из неё.
+  const day = note.fromDay ? byId.get(note.fromDay) : undefined;
+  const fromThisDay = kind.id === "day" ? notes.items.filter((n) => n.fromDay === note.id) : [];
   const related =(note.related ?? []).map((r) => byId.get(r)).filter((x): x is NoteDoc => !!x);
   const update = (patch: Partial<Note>) => notes.update(note.id, patch);
   const archived = note.status === "archived";
@@ -104,6 +108,15 @@ export function NotePage() {
       />
 
       {inbox && <div className="nt-soft mb-3 p-3 text-sm">🌀 Эта запись ещё в воронке — разберётся при следующем разборе.</div>}
+      {day && (
+        <Link to={`/n/${day.id}`} className="nt-soft mb-3 flex items-center gap-2 p-3 text-sm">
+          <span>📓</span>
+          <span className="min-w-0 flex-1 truncate">
+            Из записи дня{day.dayDate ? ` за ${shortDate(day.dayDate)}` : ""}: {titleOf(day)}
+          </span>
+          <span className="nt-accent">→</span>
+        </Link>
+      )}
       {archived && <div className="nt-soft mb-3 p-3 text-sm">🗃️ В архиве — не показывается на полках.</div>}
       {isSnoozed(note) && (
         <div className="nt-soft mb-3 flex items-center gap-2 p-3 text-sm">
@@ -261,10 +274,21 @@ export function NotePage() {
         </section>
 
         <section>
-          <Label>Проект или сфера</Label>
+          <Label>Сфера</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {areas.map((a) => (
+              <button key={a.id} type="button" className={cn("nt-chip", note.area === a.id && "nt-chip-on")} onClick={() => update({ area: a.id })}>
+                {a.emoji} {a.name}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <Label>Проект</Label>
           <div className="flex gap-2">
             <select className="nt-field" value={note.topicId ?? ""} onChange={(e) => update({ topicId: e.target.value || null })}>
-              <option value="">Без темы</option>
+              <option value="">Без проекта</option>
               {topics.items
                 .filter((t) => !t.closedAt || t.id === note.topicId)
                 .map((t) => (
@@ -303,6 +327,17 @@ export function NotePage() {
             <p className="nt-muted text-sm">Пока ни с чем не связано.</p>
           )}
         </section>
+
+        {fromThisDay.length > 0 && (
+          <section>
+            <div className="nt-muted mb-1.5 text-xs font-medium uppercase tracking-wide">Что вышло из этой записи</div>
+            <div className="space-y-2">
+              {fromThisDay.map((r) => (
+                <NoteCard key={r.id} note={r} topic={r.topicId ? tmap.get(r.topicId) : undefined} compact />
+              ))}
+            </div>
+          </section>
+        )}
 
         {back.length > 0 && (
           <section>

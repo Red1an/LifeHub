@@ -3,7 +3,8 @@ import { Modal, cn, files, uid } from "@lifehub/sdk";
 import { CONTEXTS, KINDS, contextById, kindById } from "../lib/kinds.ts";
 import { eventWhen, extractUrls, preview, shortDate } from "../lib/text.ts";
 import type { TriageItem, TriagePlan } from "../lib/triage.ts";
-import type { ContextId, KindId, NoteDoc, TopicDoc, TopicKind } from "../lib/types.ts";
+import { useAreas } from "./kit.tsx";
+import type { AreaId, ContextId, KindId, NoteDoc, TopicDoc, TopicKind } from "../lib/types.ts";
 
 interface Props {
   plan: TriagePlan;
@@ -96,6 +97,8 @@ function PlanCard({
   onSplit: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { areaOf } = useAreas();
+  const area = areaOf(item.area);
   const kind = kindById(item.kind);
   const topicId = item.topic && "id" in item.topic ? item.topic.id : null;
   const topic = topicId ? topics.find((t) => t.id === topicId) : null;
@@ -118,6 +121,8 @@ function PlanCard({
       <div className="p-4">
         <div className="nt-muted mb-1 flex items-center gap-2 text-xs">
           <span>{n}.</span>
+          {item.kind === "day" && <span className="nt-accent font-medium">📓 весь рассказ сохранится целиком</span>}
+          {item.fromDayKey && <span>↳ из записи дня</span>}
           <button type="button" className="underline decoration-dotted underline-offset-2" onClick={() => setOpen(!open)}>
             {item.from.length > 1 ? `${item.from.length} обрывка → одна заметка` : "исходник"}
           </button>
@@ -144,6 +149,11 @@ function PlanCard({
           <span className="nt-chip !h-6" style={{ color: kind.color }}>
             {kind.emoji} {kind.name}
           </span>
+          {area && (
+            <span className="nt-chip !h-6">
+              {area.emoji} {area.name}
+            </span>
+          )}
           {topic && (
             <span className="nt-chip !h-6">
               {topic.emoji} {topic.name}
@@ -210,6 +220,8 @@ function EditorBody({ item, topics, onSave }: { item: TriageItem; topics: TopicD
   const [title, setTitle] = useState(item.title);
   const [body, setBody] = useState(item.body);
   const [kind, setKind] = useState<KindId>(item.kind);
+  const { areas } = useAreas();
+  const [area, setArea] = useState<AreaId | undefined>(item.area);
   const [props, setProps] = useState(item.props);
   const [context, setContext] = useState<ContextId[]>(item.context);
   const [topicSel, setTopicSel] = useState(item.topic ? ("id" in item.topic ? item.topic.id : "__new") : "");
@@ -236,6 +248,7 @@ function EditorBody({ item, topics, onSave }: { item: TriageItem; topics: TopicD
       title: title.trim() || item.title,
       body,
       kind,
+      area,
       props: Object.fromEntries(Object.entries(props).filter(([k, v]) => keys.has(k) && v.trim())),
       context,
       topic,
@@ -274,6 +287,14 @@ function EditorBody({ item, topics, onSave }: { item: TriageItem; topics: TopicD
         </div>
       )}
       <div>
+        <div className="nt-muted mb-1.5 text-xs">Сфера</div>
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {areas.map((a) => (
+            <button key={a.id} type="button" className={cn("nt-chip", area === a.id && "nt-chip-on")} onClick={() => setArea(a.id)}>
+              {a.emoji} {a.name}
+            </button>
+          ))}
+        </div>
         <div className="nt-muted mb-1.5 text-xs">Когда</div>
         <div className="flex flex-wrap gap-1.5">
           {CONTEXTS.map((c) => (

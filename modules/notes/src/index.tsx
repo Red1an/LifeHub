@@ -3,13 +3,15 @@ import { Link, defineModule, toast, useCollection, useStore } from "@lifehub/sdk
 import "./prose.css";
 import "./styles.css";
 import { InboxPage } from "./pages/Inbox.tsx";
-import { CollectionPage, ShelfPage, ShelvesPage } from "./pages/Shelves.tsx";
+import { AreaPage, CollectionPage, ShelfPage, ShelvesPage } from "./pages/Shelves.tsx";
+import { WordsPage } from "./pages/Words.tsx";
 import { TopicPage, TopicsPage } from "./pages/Topics.tsx";
 import { GraphPage } from "./pages/Graph.tsx";
 import { ReviewPage } from "./pages/Review.tsx";
 import { AskPage } from "./pages/Ask.tsx";
 import { NotePage } from "./pages/Note.tsx";
 import { AllPage } from "./pages/All.tsx";
+import { DaysPage } from "./pages/Days.tsx";
 import { MicButton, useDictation } from "./components/input.tsx";
 import { localReview, type ReviewCache } from "./lib/review.ts";
 import type { Note, Topic } from "./lib/types.ts";
@@ -84,12 +86,15 @@ export default defineModule({
     "/review": ReviewPage,
     "/n/:id": NotePage,
     "/all": AllPage,
+    "/days": DaysPage,
+    "/words": WordsPage,
+    "/area/:id": AreaPage,
     "*": InboxPage,
   },
   nav: [
     { to: "/", label: "Воронка", icon: "🌀" },
     { to: "/shelves", label: "Полки", icon: "🗄️" },
-    { to: "/topics", label: "Темы", icon: "🗂️" },
+    { to: "/topics", label: "Проекты", icon: "🚀" },
     { to: "/ask", label: "Спросить", icon: "💬" },
     { to: "/review", label: "Обзор", icon: "🔭" },
   ],

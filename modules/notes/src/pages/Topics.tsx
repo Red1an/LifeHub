@@ -1,17 +1,22 @@
 import { useMemo, useState } from "react";
 import { Link, Modal, cn, confirm, formatDate, formatRelative, plural, prompt, toast, useCollection, useNavigate, useParams } from "@lifehub/sdk";
-import { Empty, Head, NoteCard, Wrap } from "../components/kit.tsx";
+import { Empty, Head, NoteCard, Wrap, useAreas } from "../components/kit.tsx";
 import { localKey, shortDate } from "../lib/text.ts";
-import type { Note, Topic, TopicDoc, TopicKind, TopicLog, TopicLogDoc } from "../lib/types.ts";
+import type { AreaId, Note, Topic, TopicDoc, TopicKind, TopicLog, TopicLogDoc } from "../lib/types.ts";
 
 /** null вместо undefined: undefined в JSON пропадает и поле не сбросится. */
 const clear = null as unknown as undefined;
 
 const kindOfTopic = (t: Topic): TopicKind => t.kind ?? "area";
 
+/**
+ * Проекты (PARA): дело с результатом, которое закончится, — внутри одной из постоянных сфер.
+ * Старые темы-сферы (до 2.4) показываются отдельно как «Другие темы».
+ */
 export function TopicsPage() {
   const notes = useCollection<Note>("notes");
   const topics = useCollection<Topic>("topics");
+  const { areas, areaOf } = useAreas();
   const [creating, setCreating] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
   const count = useMemo(() => {
@@ -21,8 +26,9 @@ export function TopicsPage() {
   }, [notes.items]);
   const sorted = [...topics.items].sort((a, b) => b.updatedAt - a.updatedAt);
   const projects = sorted.filter((t) => kindOfTopic(t) === "project" && !t.closedAt);
-  const areas = sorted.filter((t) => kindOfTopic(t) === "area");
+  const others = sorted.filter((t) => kindOfTopic(t) === "area");
   const closed = sorted.filter((t) => kindOfTopic(t) === "project" && t.closedAt);
+  const byArea = [...areas.map((a) => ({ area: a, list: projects.filter((t) => t.area === a.id) })), { area: null, list: projects.filter((t) => !areaOf(t.area)) }].filter((g) => g.list.length);
 
   const card = (t: TopicDoc) => (
     <Link key={t.id} to={`/t/${t.id}`} className={cn("nt-paper block p-4", !!t.closedAt && "opacity-60")}>
@@ -43,33 +49,33 @@ export function TopicsPage() {
   return (
     <Wrap>
       <Head
-        title="Темы"
-        sub="Проекты — с целью и концом. Сферы — то, что с тобой надолго."
+        title="Проекты"
+        sub="Дела с результатом, которые когда-нибудь закончатся. Постоянные сферы — на «Полках»."
         right={
           <>
             <Link to="/graph" className="nt-mic !h-9 !w-9 !text-base" aria-label="Граф связей">
               🕸️
             </Link>
             <button type="button" className="nt-btn nt-btn-ghost nt-btn-sm" onClick={() => setCreating(true)}>
-              ＋ Тема
+              ＋ Проект
             </button>
           </>
         }
       />
       {!topics.items.length ? (
-        <Empty icon="🗂️" title="Тем пока нет" text="Нейронка предложит проект или сферу, когда увидит, что ты несколько раз пишешь про одно и то же. Или создай сам." />
+        <Empty icon="🚀" title="Проектов пока нет" text="Нейронка предложит проект, когда увидит, что ты несколько раз пишешь про одно дело с результатом. Или создай сам." />
       ) : (
         <div className="space-y-6">
-          {projects.length > 0 && (
-            <section>
-              <h2 className="nt-h2 mb-2">🚀 Проекты</h2>
-              <div className="grid gap-3 sm:grid-cols-2">{projects.map(card)}</div>
+          {byArea.map(({ area, list }) => (
+            <section key={area?.id ?? "none"}>
+              <h2 className="nt-h2 mb-2">{area ? `${area.emoji} ${area.name}` : "🚀 Без сферы"}</h2>
+              <div className="grid gap-3 sm:grid-cols-2">{list.map(card)}</div>
             </section>
-          )}
-          {areas.length > 0 && (
+          ))}
+          {others.length > 0 && (
             <section>
-              <h2 className="nt-h2 mb-2">🌱 Сферы</h2>
-              <div className="grid gap-3 sm:grid-cols-2">{areas.map(card)}</div>
+              <h2 className="nt-h2 mb-2">🗂️ Другие темы</h2>
+              <div className="grid gap-3 sm:grid-cols-2">{others.map(card)}</div>
             </section>
           )}
           {closed.length > 0 && (
@@ -88,39 +94,37 @@ export function TopicsPage() {
 }
 
 function NewTopic({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (t: Topic) => Promise<unknown> }) {
+  const { areas } = useAreas();
   const [name, setName] = useState("");
-  const [kind, setKind] = useState<TopicKind>("project");
+  const [area, setArea] = useState<AreaId | undefined>();
   const [goal, setGoal] = useState("");
   const [due, setDue] = useState("");
   const create = async () => {
     if (!name.trim()) return;
-    await onCreate({ name: name.trim(), emoji: kind === "project" ? "🚀" : "🌱", summary: "", kind, goal: kind === "project" && goal.trim() ? goal.trim() : undefined, due: kind === "project" && due ? due : undefined });
+    await onCreate({ name: name.trim(), emoji: "🚀", summary: "", kind: "project", area, goal: goal.trim() || undefined, due: due || undefined });
     setName("");
     setGoal("");
     setDue("");
+    setArea(undefined);
     onClose();
   };
   return (
-    <Modal open={open} onClose={onClose} title="Новая тема">
+    <Modal open={open} onClose={onClose} title="Новый проект">
       <div className="nt-root -mx-5 -my-4 space-y-3 px-5 py-4">
-        <div className="flex gap-1.5">
-          {(["project", "area"] as const).map((k) => (
-            <button key={k} type="button" className={cn("nt-chip flex-1 justify-center", kind === k && "nt-chip-on")} onClick={() => setKind(k)}>
-              {k === "project" ? "🚀 Проект" : "🌱 Сфера"}
+        <p className="nt-muted text-xs">Есть результат, к которому идёшь, и когда-нибудь проект закончится.</p>
+        <input className="nt-field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Название" />
+        <input className="nt-field" value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Цель: что будет, когда закончишь" />
+        <div className="flex flex-wrap gap-1.5">
+          {areas.map((a) => (
+            <button key={a.id} type="button" className={cn("nt-chip", area === a.id && "nt-chip-on")} onClick={() => setArea(a.id)}>
+              {a.emoji} {a.name}
             </button>
           ))}
         </div>
-        <p className="nt-muted text-xs">{kind === "project" ? "Есть результат, к которому идёшь, и когда-нибудь он закончится." : "Постоянная часть жизни: учёба, здоровье, музыка, друзья."}</p>
-        <input className="nt-field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Название" />
-        {kind === "project" && (
-          <>
-            <input className="nt-field" value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Цель: что будет, когда закончишь" />
-            <label className="nt-muted flex items-center gap-2 text-sm">
-              Срок
-              <input type="date" className="nt-field !w-auto" value={due} onChange={(e) => setDue(e.target.value)} />
-            </label>
-          </>
-        )}
+        <label className="nt-muted flex items-center gap-2 text-sm">
+          Срок
+          <input type="date" className="nt-field !w-auto" value={due} onChange={(e) => setDue(e.target.value)} />
+        </label>
         <button type="button" className="nt-btn w-full" disabled={!name.trim()} onClick={create}>
           Создать
         </button>
@@ -137,6 +141,7 @@ export function TopicPage() {
   const log = useCollection<TopicLog>("topic_log");
   const topic = topics.items.find((t) => t.id === id);
   const [editing, setEditing] = useState<string | null>(null);
+  const { areas } = useAreas();
 
   const list = useMemo(
     () => notes.items.filter((n) => n.topicId === id && n.status !== "inbox").sort((a, b) => (b.capturedAt ?? b.createdAt) - (a.capturedAt ?? a.createdAt)),
@@ -195,7 +200,7 @@ export function TopicPage() {
   const switchKind = async () => {
     const next: TopicKind = kind === "project" ? "area" : "project";
     await topics.update(topic.id, { kind: next, closedAt: clear });
-    await addLog(next === "project" ? "Стала проектом" : "Стала сферой");
+    await addLog(next === "project" ? "Стала проектом" : "Стала постоянной темой");
   };
 
   const toggleClosed = async () => {
@@ -241,7 +246,7 @@ export function TopicPage() {
         sub={
           <>
             <button type="button" className="underline decoration-dotted underline-offset-2" onClick={switchKind}>
-              {kind === "project" ? (topic.closedAt ? "завершённый проект" : "проект") : "сфера"}
+              {kind === "project" ? (topic.closedAt ? "завершённый проект" : "проект") : "тема"}
             </button>
             {` · ${list.length} ${plural(list.length, ["заметка", "заметки", "заметок"])} · с ${formatDate(topic.createdAt, "long")}`}
           </>
@@ -256,6 +261,13 @@ export function TopicPage() {
 
       {kind === "project" && (
         <section className="nt-paper mb-4 space-y-3 p-4">
+          <div className="flex flex-wrap gap-1.5">
+            {areas.map((a) => (
+              <button key={a.id} type="button" className={cn("nt-chip", topic.area === a.id && "nt-chip-on")} onClick={() => topics.update(topic.id, { area: a.id })}>
+                {a.emoji} {a.name}
+              </button>
+            ))}
+          </div>
           <button type="button" className="block w-full text-left" onClick={editGoal}>
             <div className="nt-muted text-xs font-medium uppercase tracking-wide">Цель</div>
             <div className={cn("mt-0.5", !topic.goal && "nt-muted")}>{topic.goal ? `🎯 ${topic.goal}` : "Не задана — нажми, чтобы задать"}</div>

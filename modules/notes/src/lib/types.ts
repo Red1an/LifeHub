@@ -1,7 +1,10 @@
 import type { WithDoc } from "@lifehub/sdk";
 
 /** Тип вещи — определяет поля и жизненный цикл (см. lib/kinds.ts). */
-export type KindId = "thought" | "task" | "event" | "person" | "movie" | "book" | "media" | "app" | "link" | "place" | "buy" | "wish" | "other";
+export type KindId = "thought" | "task" | "event" | "person" | "movie" | "book" | "media" | "app" | "link" | "place" | "buy" | "wish" | "day" | "game" | "trip" | "word" | "ref" | "other";
+
+/** Постоянные сферы жизни (lib/kinds.ts, AREAS). */
+export type AreaId = "study" | "work" | "health" | "money" | "people" | "growth" | "fun" | "home";
 
 /** Полки 2.0 — только для чтения старых заметок (поле shelf). */
 export type ShelfId = "ideas" | "watch" | "apps" | "sites" | "todo" | "events" | "people" | "buy" | "misc";
@@ -85,6 +88,14 @@ export interface Note {
   enrichedAt?: number;
   capturedAt?: number;
   mergedFrom?: string[];
+  /** Запись дня (kind "day"): о каком дне рассказ, YYYY-MM-DD. */
+  dayDate?: string;
+  /** Заметка вынесена из записи дня — её id. */
+  fromDay?: string;
+  /** Сфера жизни — проставляет нейронка при разборе. */
+  area?: AreaId;
+  /** Повторение слова: шаг и день следующего повтора. */
+  srs?: { step: number; due: string };
 }
 
 export type NoteDoc = WithDoc<Note>;
@@ -104,6 +115,8 @@ export interface Topic {
   due?: string;
   /** Проект завершён. */
   closedAt?: number | null;
+  /** В какой сфере проект. */
+  area?: AreaId;
 }
 
 export type TopicDoc = WithDoc<Topic>;

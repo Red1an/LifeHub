@@ -1,13 +1,24 @@
 import { useState, type ReactNode } from "react";
 import { Link, Modal, cn, db, files, formatRelative, useNavigate, useStore } from "@lifehub/sdk";
-import { contextById, isSnoozed, kindById, kindOf } from "../lib/kinds.ts";
+import { contextById, isSnoozed, kindById, kindOf, withNames } from "../lib/kinds.ts";
 import { KIND_LABEL } from "../lib/links.ts";
 import { eventWhen, hostOf, preview, shortDate, titleOf } from "../lib/text.ts";
-import { DEFAULT_PREFS, type LinkCard, type Note, type NoteDoc, type NoteEvent, type Prefs, type TopicDoc } from "../lib/types.ts";
+import { DEFAULT_PREFS, type AreaId, type LinkCard, type Note, type NoteDoc, type NoteEvent, type Prefs, type TopicDoc } from "../lib/types.ts";
 
 export function usePrefs() {
   const [p, set] = useStore<Prefs>("prefs", DEFAULT_PREFS);
   return { prefs: { ...DEFAULT_PREFS, ...p }, setPrefs: (patch: Partial<Prefs>) => set((prev) => ({ ...DEFAULT_PREFS, ...prev, ...patch })) };
+}
+
+/** Сферы с переименованиями пользователя (useStore("areas")). */
+export function useAreas() {
+  const [custom, set] = useStore<Partial<Record<AreaId, { name?: string; emoji?: string }>>>("areas", {});
+  const areas = withNames(custom);
+  return {
+    areas,
+    areaOf: (id: string | undefined | null) => areas.find((a) => a.id === id),
+    rename: (id: AreaId, patch: { name?: string; emoji?: string }) => set((prev) => ({ ...prev, [id]: { ...prev?.[id], ...patch } })),
+  };
 }
 
 /** Шапка страницы в стиле модуля. */

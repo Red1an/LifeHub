@@ -1,16 +1,16 @@
 import { ai, db, uid } from "@lifehub/sdk";
-import { CONTEXTS, KINDS, isContext, isKind } from "./kinds.ts";
+import { CONTEXTS, KINDS, isArea, isContext, isKind, type Area } from "./kinds.ts";
 import { fetchCards, KIND_LABEL } from "./links.ts";
 import { linkPatches, similar } from "./related.ts";
-import { extractUrls, localKey, preview } from "./text.ts";
-import type { ContextId, KindId, LinkCard, Note, NoteDoc, NoteEvent, Prefs, Topic, TopicDoc, TopicKind, TopicLog } from "./types.ts";
+import { extractUrls, localKey, preview, shortDate } from "./text.ts";
+import type { AreaId, ContextId, KindId, LinkCard, Note, NoteDoc, NoteEvent, Prefs, Topic, TopicDoc, TopicKind, TopicLog } from "./types.ts";
 
 /*
  * Разбор воронки: один запрос к нейронке → план (вертикальный список карточек) → одно подтверждение.
  * Нейронка только предлагает; применяет код, и только то, что пользователь оставил в плане.
  */
 
-export type NewTopic = { name: string; emoji: string; kind: TopicKind; goal?: string };
+export type NewTopic = { name: string; emoji: string; kind: TopicKind; goal?: string; area?: AreaId };
 export type TopicRef = { id: string } | NewTopic | null;
 
 export interface TriageItem {
@@ -20,6 +20,8 @@ export interface TriageItem {
   title: string;
   body: string;
   kind: KindId;
+  /** Сфера жизни — одна из AREAS. */
+  area?: AreaId;
   props: Record<string, string>;
   tags: string[];
   context: ContextId[];
@@ -39,6 +41,10 @@ export interface TriageItem {
   images: string[];
   /** Это уже есть в заметках: дописать туда, а не создавать новую. */
   mergeInto?: string;
+  /** Запись дня: о каком дне. */
+  dayDate?: string;
+  /** Вынесено из записи дня — её key в этом плане. */
+  fromDayKey?: string;
   skip?: boolean;
 }
 
@@ -56,6 +62,7 @@ interface RawItem {
   title?: unknown;
   body?: unknown;
   kind?: unknown;
+  area?: unknown;
   props?: unknown;
   tags?: unknown;
   context?: unknown;
@@ -68,6 +75,7 @@ interface RawItem {
   topicSummary?: unknown;
   topicLog?: unknown;
   mergeInto?: unknown;
+  dayDate?: unknown;
   confidence?: unknown;
 }
 
@@ -77,12 +85,16 @@ const SYSTEM = `Ты — помощник по личным заметкам. П
 
 Правила:
 - Склеивай записи, сделанные подряд (обычно до 15 минут) и явно относящиеся к одному: «Лёша», «стартап доставки», «созвон в чт» → одна заметка. Несвязанное не склеивай. Список «посмотреть: А, Б, В» — наоборот, раздели на отдельные заметки по одной вещи.
+- Рассказ о дне или длинная запись про разное (несколько тем, сфер, событий): сделай ОДНУ заметку kind "day" — в body весь исходный текст целиком (только исправь распознавание речи и разбей на абзацы, ничего не выкидывай), title — «Вторник: …» с главным за день, dayDate — о каком дне рассказ (вчера, сегодня…), props.mood и props.highlight, topic — null. И ОТДЕЛЬНО вынеси из той же записи (тот же from) всё, с чем потом что-то делать: дела, события с датой, фильмы, книги, места, покупки, людей, важные мысли — каждую своей заметкой со своей темой. Настроение и впечатления дня отдельными заметками не выносить — они остаются в записи дня.
 - Текст пользователя сохраняй: исправь ошибки распознавания речи и пунктуацию, можно оформить списком, но не додумывай факты. Ссылки оставляй в тексте как есть. С фото перепиши суть (что на скриншоте/афише).
 - title — короткий (до 60 символов), по-русски, без кавычек; для фильма/книги/приложения/места — просто название.
 - props — поля типа, только то, в чём уверен (из текста, ссылки, фото или общеизвестное: год фильма, автор книги). Не выдумывай.
 - context — когда этим удобно заняться (0–2 значения), только если очевидно из смысла или сказано.
 - Не уверен в смысле обрывка — всё равно сделай заметку (kind other, confidence ниже 0.5) и задай вопрос в questions.
-- Темы бывают двух видов: project — проект с результатом, который закончится (стартап, переезд, курсовая, подготовка к поездке); area — постоянная сфера жизни (учёба, здоровье, музыка, работа, друзья). Используй существующую, если подходит. Новую предлагай, только если по ней явно будет больше одной заметки или пользователь назвал проект. Разовые вещи и простые «посмотреть фильм» — без темы.
+- area — сфера жизни, ОБЯЗАТЕЛЬНО у каждой заметки, одна из списка сфер (по смыслу: фильм — досуг, лаба — учёба, подарок другу — друзья и близкие, новое слово — развитие).
+- topic — только ПРОЕКТ: дело с результатом, которое когда-нибудь закончится (стартап, переезд, курсовая, подготовка к поездке, ремонт). Используй существующий, если подходит. Новый предлагай, только если по нему явно будет больше одной заметки или пользователь назвал проект. Для нового проекта укажи его сферу. Обычные вещи («посмотреть фильм», «купить молоко») — без проекта, им хватает сферы.
+- Купить (buy) — ТОЛЬКО если явно сказано купить/заказать/нужно взять. Просто название лекарства, бренда, вещи, программы или канала без действия — это ref («на заметку»): записал, чтобы не забыть и найти, когда пригодится. В props.what — что это, в props.use — от чего / для чего (из общих знаний, коротко, если уверен; если голос исказил название и ты узнаёшь настоящее — напиши правильное в title, а исходное оставь в body).
+- Слово (kind word): незнакомое слово, термин, понятие или иностранное слово — props.meaning заполняй из общих знаний (коротко, понятно), props.example — фраза с ним. Всё, что упомянуто только для сравнения («лучше, чем X»), отдельной заметкой не выносить.
 - topicSummary — новая сводка темы «что сейчас» (3–5 строк), только если заметка что-то в ней меняет; не теряй важное из старой сводки. topicLog — одна строка для истории темы («было → стало»).
 - related — только id из списка «Похожие прошлые заметки», и только если связь реальная (та же вещь, человек, проект, продолжение мысли).
 - event — только если названа дата или день недели (и, возможно, время): мероприятие, встреча, концерт. Дату считай от сегодняшней, формат YYYY-MM-DD, время HH:MM.
@@ -115,13 +127,14 @@ const MAX_IMAGES = 5;
 
 export interface TriageInput {
   inbox: NoteDoc[];
+  areas: Area[];
   filed: NoteDoc[];
   topics: TopicDoc[];
   prefs: Prefs;
   onStep?: (s: string) => void;
 }
 
-export async function makeTriage({ inbox, filed, topics, prefs, onStep }: TriageInput): Promise<TriagePlan> {
+export async function makeTriage({ inbox, filed, topics, areas, prefs, onStep }: TriageInput): Promise<TriagePlan> {
   const sorted = [...inbox].sort((a, b) => (a.capturedAt ?? a.createdAt) - (b.capturedAt ?? b.createdAt));
 
   const urls = [...new Set(sorted.flatMap((n) => extractUrls(n.body)))];
@@ -159,9 +172,10 @@ export async function makeTriage({ inbox, filed, topics, prefs, onStep }: Triage
   const prompt = [
     `Сейчас: ${hhmm(Date.now())}. Ближайшие дни:\n${daysText(new Date())}`,
     `Типы (поле kind) и их поля (props):\n${kindsText()}`,
+    `Сферы (поле area): ${areas.map((a) => `${a.id} — ${a.emoji} ${a.name} (${a.hint})`).join("; ")}`,
     `Контексты (поле context): ${CONTEXTS.map((c) => `${c.id} — ${c.name} (${c.hint})`).join("; ")}`,
     openTopics.length
-      ? `Темы:\n${openTopics.map((t) => `- id=${t.id} [${t.kind === "project" ? "проект" : "сфера"}] ${t.emoji} ${t.name}${t.goal ? ` — цель: ${t.goal}` : ""}${t.summary ? `\n  сводка: ${t.summary.replace(/\s+/g, " ").slice(0, 400)}` : ""}`).join("\n")}`
+      ? `Проекты и старые темы:\n${openTopics.map((t) => `- id=${t.id} [${t.kind === "project" ? `проект${t.area ? `, сфера ${t.area}` : ""}` : "тема"}] ${t.emoji} ${t.name}${t.goal ? ` — цель: ${t.goal}` : ""}${t.summary ? `\n  сводка: ${t.summary.replace(/\s+/g, " ").slice(0, 400)}` : ""}`).join("\n")}`
       : "Тем пока нет.",
     candidates.size
       ? `Похожие прошлые заметки (для related и mergeInto):\n${[...candidates.values()]
@@ -187,12 +201,12 @@ export async function makeTriage({ inbox, filed, topics, prefs, onStep }: Triage
       })
       .join("\n")}`,
     `Верни JSON:
-{"notes":[{"from":["id записи воронки"],"title":"…","body":"…","kind":"movie","props":{"year":"2024"},"tags":["…"],"context":["evening"],
-  "topic":{"id":"id темы"} | {"new":"Название","emoji":"🚀","type":"project|area","goal":"цель проекта"} | null,
+{"notes":[{"from":["id записи воронки"],"title":"…","body":"…","kind":"movie","area":"fun","props":{"year":"2024"},"tags":["…"],"context":["evening"],
+  "topic":{"id":"id темы"} | {"new":"Название проекта","emoji":"🚀","goal":"цель проекта","area":"сфера проекта"} | null,
   "related":["id прошлой заметки"],
   "event":{"title":"…","date":"YYYY-MM-DD","start":"HH:MM","end":"HH:MM","place":"…"} | null,
   "due":"YYYY-MM-DD" | null,"effort":6 | null,"snoozeUntil":"YYYY-MM-DD" | null,
-  "topicSummary":"…" | null,"topicLog":"…" | null,"mergeInto":"id прошлой заметки" | null,"confidence":0.9}],
+  "topicSummary":"…" | null,"topicLog":"…" | null,"mergeInto":"id прошлой заметки" | null,"dayDate":"YYYY-MM-DD (только для kind day)" | null,"confidence":0.9}],
  "questions":[{"from":"id записи воронки","text":"вопрос пользователю"}]}
 Каждая запись воронки должна попасть хотя бы в одну заметку (одна запись может дать несколько заметок, если это список разных вещей). tags — 0–3 коротких тега в нижнем регистре.`,
   ].join("\n\n");
@@ -204,6 +218,43 @@ export async function makeTriage({ inbox, filed, topics, prefs, onStep }: Triage
     images: images.length ? images : undefined,
   });
   return normalize(raw, sorted, topics, candidates, cards, dupes);
+}
+
+/** Длинная запись, из которой вышло несколько заметок, — это рассказ: исходник надо сохранить. */
+const LONG_STORY = 280;
+
+/**
+ * Записи дня и вынесенное из них. Если нейронка разрезала длинный рассказ, но забыла
+ * сохранить его целиком, — сохраняем сами: исходный текст не должен потеряться.
+ * Записи дня встают первыми — при применении они забирают id записи воронки.
+ */
+function linkDays(items: TriageItem[], inbox: Map<string, NoteDoc>) {
+  for (const [id, n] of inbox) {
+    const parts = items.filter((it) => it.from.includes(id));
+    if (parts.length < 2 || parts.some((it) => it.kind === "day") || n.body.length < LONG_STORY) continue;
+    const at = n.capturedAt ?? n.createdAt;
+    items.push({
+      key: uid(),
+      from: [id],
+      title: `Запись за ${shortDate(localKey(new Date(at)))}`,
+      body: n.body,
+      kind: "day",
+      props: {},
+      tags: [],
+      context: [],
+      topic: null,
+      related: [],
+      event: null,
+      confidence: 1,
+      links: [],
+      images: n.images ?? [],
+      dayDate: localKey(new Date(at)),
+    });
+  }
+  for (const day of items.filter((it) => it.kind === "day")) {
+    for (const it of items) if (it !== day && it.kind !== "day" && it.from.some((id) => day.from.includes(id))) it.fromDayKey = day.key;
+  }
+  items.sort((a, b) => Number(b.kind === "day") - Number(a.kind === "day"));
 }
 
 const normUrl = (u: string) => {
@@ -279,7 +330,13 @@ function normalize(
     if (r.topic && typeof r.topic === "object") {
       if (typeof r.topic.id === "string" && topicIds.has(r.topic.id)) topic = { id: r.topic.id };
       else if (str(r.topic.new))
-        topic = { name: str(r.topic.new).slice(0, 40), emoji: str(r.topic.emoji) || "🗂️", kind: r.topic.type === "project" ? "project" : "area", goal: str(r.topic.goal) || undefined };
+        topic = {
+          name: str(r.topic.new).slice(0, 40),
+          emoji: str(r.topic.emoji) || "🚀",
+          kind: "project",
+          goal: str(r.topic.goal) || undefined,
+          area: isArea((r.topic as { area?: unknown }).area) ? ((r.topic as { area?: unknown }).area as AreaId) : undefined,
+        };
     }
     const ev = r.event && typeof r.event === "object" && ymd(r.event.date) ? r.event : null;
     const kind: KindId = isKind(r.kind) ? r.kind : ev ? "event" : "other";
@@ -288,7 +345,7 @@ function normalize(
     if (r.props && typeof r.props === "object") {
       for (const [k, v] of Object.entries(r.props as Record<string, unknown>)) {
         const s = str(typeof v === "number" ? String(v) : v);
-        if (fields.has(k) && s) props[k] = s.slice(0, 120);
+        if (fields.has(k) && s) props[k] = s.slice(0, k === "meaning" || k === "example" ? 300 : 120);
       }
     }
     const urls = [...new Set(src.flatMap((n) => extractUrls(n.body)))];
@@ -299,6 +356,7 @@ function normalize(
       title: str(r.title).slice(0, 80) || preview(src.map((n) => n.body).join(" "), 60) || "Фото",
       body: str(r.body) || src.map((n) => n.body).join("\n"),
       kind,
+      area: isArea(r.area) ? r.area : undefined,
       props,
       tags: (Array.isArray(r.tags) ? r.tags : []).map((t) => str(t).toLowerCase().replace(/^#/, "")).filter(Boolean).slice(0, 5),
       context: (Array.isArray(r.context) ? r.context : []).filter(isContext).slice(0, 2),
@@ -312,7 +370,9 @@ function normalize(
       snoozeUntil: ymd(r.snoozeUntil),
       topicSummary: str(r.topicSummary) || undefined,
       topicLog: str(r.topicLog) || undefined,
-      mergeInto: (typeof r.mergeInto === "string" && candidates.has(r.mergeInto) ? r.mergeInto : undefined) ?? (reused ? undefined : urlDupe(src, candidates, dupes)),
+      mergeInto:
+        kind === "day" ? undefined : ((typeof r.mergeInto === "string" && candidates.has(r.mergeInto) ? r.mergeInto : undefined) ?? (reused ? undefined : urlDupe(src, candidates, dupes))),
+      dayDate: kind === "day" ? (ymd(r.dayDate) ?? localKey(new Date(src[0].capturedAt ?? src[0].createdAt))) : undefined,
       confidence: typeof r.confidence === "number" ? Math.max(0, Math.min(1, r.confidence)) : 0.5,
       // У отделённой из списка заметки ссылки и фото — только если они в её тексте.
       links: urls.filter((u) => !reused || str(r.body).includes(u)).map((u) => cards.get(u) ?? { url: u, kind: "site" as const }),
@@ -341,6 +401,8 @@ function normalize(
       images: n.images ?? [],
     });
   }
+
+  linkDays(items, byId);
 
   const questions = (Array.isArray(raw?.questions) ? raw.questions : [])
     .map((q) => ({ from: String(q.from ?? ""), text: str(q.text) }))
@@ -422,6 +484,8 @@ export async function applyItems(items: TriageItem[], allNotes: NoteDoc[], topic
   const known = new Map(topics.map((tp) => [tp.name.toLowerCase(), tp.id]));
   const today = localKey(new Date());
   const created: string[] = [];
+  // key записи дня в плане → id её заметки: вынесенное ссылается на неё.
+  const dayIds = new Map<string, string>();
   const consumed = new Set<string>();
   const live = items.filter((it) => !it.skip);
   // Записи, которые пользователь где-то пропустил, не удаляем — они остаются в воронке.
@@ -447,6 +511,7 @@ export async function applyItems(items: TriageItem[], allNotes: NoteDoc[], topic
         props: { ...it.props, ...target.props },
         // Снова захотелось то, что было в архиве или отложено, — возвращаем на полку.
         status: target.status === "archived" ? "filed" : target.status,
+        area: target.area ?? it.area,
         snoozeUntil: null as unknown as undefined,
       });
       notes.set(doc.id, doc);
@@ -465,7 +530,7 @@ export async function applyItems(items: TriageItem[], allNotes: NoteDoc[], topic
       const k = it.topic.name.toLowerCase();
       topicId = newTopics.get(k) ?? known.get(k);
       if (!topicId) {
-        const tp = await t.add<Topic>("topics", { name: it.topic.name, emoji: it.topic.emoji, summary: it.topicSummary ?? "", kind: it.topic.kind, goal: it.topic.goal });
+        const tp = await t.add<Topic>("topics", { name: it.topic.name, emoji: it.topic.emoji, summary: it.topicSummary ?? "", kind: it.topic.kind, goal: it.topic.goal, area: it.topic.area ?? it.area });
         topicId = tp.id;
         fresh = true;
         newTopics.set(k, tp.id);
@@ -473,12 +538,17 @@ export async function applyItems(items: TriageItem[], allNotes: NoteDoc[], topic
     }
 
     const data: Note = {
+      dayDate: it.dayDate,
+      fromDay: it.fromDayKey ? dayIds.get(it.fromDayKey) : undefined,
       title: it.title,
       body: it.body,
       tags: it.tags,
       pinned: all.some((n) => n.pinned),
       status: "filed",
       kind: it.kind,
+      area: it.area,
+      // Новое слово — первый повтор завтра.
+      srs: it.kind === "word" ? { step: 0, due: localKey(new Date(Date.now() + 86_400_000)) } : undefined,
       props: Object.keys(it.props).length ? it.props : undefined,
       context: it.context.length ? it.context : undefined,
       topicId: topicId ?? null,
@@ -504,6 +574,7 @@ export async function applyItems(items: TriageItem[], allNotes: NoteDoc[], topic
     }
     notes.set(doc.id, doc);
     created.push(doc.id);
+    if (it.kind === "day") dayIds.set(it.key, doc.id);
 
     for (const p of linkPatches(notes, it.related.map((r) => [doc.id, r] as [string, string]))) {
       const upd = await t.update<Note>("notes", p.id, { related: p.related });
