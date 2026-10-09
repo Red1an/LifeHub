@@ -30,6 +30,16 @@ export interface Settings {
   ngrok?: { enabled: boolean; domain: string; email: string };
   /** Google: OAuth-клиент пользователя и refresh token (только на сервере). */
   google?: { clientId: string; clientSecret: string; refreshToken?: string; email?: string };
+  /**
+   * Джарвис — навык Алисы: секрет в адресе вебхука, привязанный навык, счётчик вопросов к нейронке.
+   * Остальные настройки — в модуле «Джарвис» (server/jarvis/prefs.ts).
+   */
+  jarvis?: {
+    secret: string;
+    skillId?: string;
+    lastAt?: number;
+    aiUsed?: { date: string; n: number };
+  };
 }
 
 const DEFAULTS: Settings = {

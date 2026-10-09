@@ -1,0 +1,145 @@
+@import url("https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700&display=swap");
+
+/* Джарвис: тёмный HUD с голубым свечением. Все классы — с префиксом jarvis-. */
+
+.jarvis-root {
+  --jv-bg: #04070c;
+  --jv-panel: rgba(16, 32, 48, 0.55);
+  --jv-line: rgba(90, 200, 255, 0.18);
+  --jv-cyan: #5ad1ff;
+  --jv-cyan-soft: rgba(90, 209, 255, 0.12);
+  --jv-amber: #ffb547;
+  background:
+    radial-gradient(1200px 500px at 50% -200px, rgba(40, 140, 220, 0.18), transparent 70%),
+    linear-gradient(rgba(90, 200, 255, 0.035) 1px, transparent 1px) 0 0 / 100% 28px,
+    var(--jv-bg);
+  color: #d8ecf7;
+}
+
+.jarvis-title {
+  font-family: "Exo 2", system-ui, sans-serif;
+  letter-spacing: 0.04em;
+}
+
+.jarvis-panel {
+  background: var(--jv-panel);
+  border: 1px solid var(--jv-line);
+  border-radius: 14px;
+  backdrop-filter: blur(6px);
+  box-shadow: inset 0 1px 0 rgba(140, 220, 255, 0.06);
+}
+
+.jarvis-glow {
+  color: var(--jv-cyan);
+  text-shadow: 0 0 12px rgba(90, 209, 255, 0.55);
+}
+
+/* Ядро (арк-реактор) */
+.jarvis-orb {
+  position: relative;
+  border-radius: 9999px;
+  background: radial-gradient(circle, #e9fbff 0 10%, #7fdcff 22%, rgba(40, 150, 230, 0.45) 45%, transparent 68%);
+  box-shadow: 0 0 24px rgba(90, 209, 255, 0.55), 0 0 64px rgba(40, 140, 220, 0.3);
+}
+.jarvis-orb::before,
+.jarvis-orb::after {
+  content: "";
+  position: absolute;
+  inset: -12%;
+  border-radius: 9999px;
+  border: 2px dashed rgba(120, 215, 255, 0.55);
+  animation: jarvis-spin 14s linear infinite;
+}
+.jarvis-orb::after {
+  inset: -28%;
+  border: 1px solid rgba(120, 215, 255, 0.25);
+  border-top-color: rgba(120, 215, 255, 0.9);
+  animation-duration: 3.5s;
+}
+.jarvis-orb[data-state="off"] {
+  filter: grayscale(1) brightness(0.6);
+}
+.jarvis-orb[data-state="off"]::before,
+.jarvis-orb[data-state="off"]::after {
+  animation: none;
+}
+.jarvis-orb[data-state="busy"]::after {
+  animation-duration: 0.9s;
+}
+
+@keyframes jarvis-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.jarvis-dots span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 2px;
+  border-radius: 9999px;
+  background: var(--jv-cyan);
+  animation: jarvis-blink 1.2s infinite ease-in-out;
+}
+.jarvis-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.jarvis-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes jarvis-blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.2;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.jarvis-chip {
+  border: 1px solid var(--jv-line);
+  background: var(--jv-cyan-soft);
+  color: #bfe9ff;
+  border-radius: 9999px;
+  padding: 8px 14px;
+  font-size: 14px;
+  line-height: 1.2;
+  transition: background 0.15s, border-color 0.15s;
+}
+.jarvis-chip:hover {
+  background: rgba(90, 209, 255, 0.2);
+  border-color: rgba(90, 209, 255, 0.45);
+}
+
+.jarvis-step-num {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 9999px;
+  border: 1px solid var(--jv-line);
+  font-family: "Exo 2", system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--jv-cyan);
+}
+.jarvis-step-num[data-done="true"] {
+  background: var(--jv-cyan);
+  color: #04121c;
+  border-color: var(--jv-cyan);
+  box-shadow: 0 0 14px rgba(90, 209, 255, 0.6);
+}
+
+.jarvis-code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 12.5px;
+  word-break: break-all;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--jv-line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}

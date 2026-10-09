@@ -23,6 +23,7 @@ import { googleStatus, configureGoogle, authUrl, finishAuth, disconnectGoogle, g
 import { PNG_ICONS, pngIcon } from "./icons.ts";
 import { proxyService } from "./proxy.ts";
 import { netFetch } from "./net.ts";
+import { handleAlice } from "./jarvis/index.ts";
 import { SDK_VERSION, type PlatformBuild } from "./compiler.ts";
 import { FILES_DIR, MODULES_DIR, MODULE_ID_RE, HOME, CHECK_COMMAND } from "./paths.ts";
 import type { Manifest } from "./manifest.ts";
@@ -67,6 +68,12 @@ export function createApp(opts: AppOptions) {
   app.get("/login", (c) => c.html(loginPage()));
   app.post("/login", handleLogin);
   app.post("/logout", handleLogout);
+  // Вебхук Джарвиса (навык Алисы): без входа, доступ — по секрету в адресе (server/jarvis).
+  app.post("/alice/:secret", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const r = await handleAlice(c.req.param("secret"), body);
+    return r ? c.json(r) : c.notFound();
+  });
   app.use("*", authMiddleware);
 
   const local = (c: Context) => c.get("local" as never) as unknown as boolean;

@@ -128,13 +128,17 @@ function onLine(raw: string) {
  */
 const PWA_PATHS = ["/manifest.webmanifest", "/icon.svg", ...Object.keys(PNG_ICONS)];
 
-function writePolicy(email: string) {
-  const pub = `!(req.url.path in [${PWA_PATHS.map((p) => `'${p}'`).join(", ")}])`;
-  fs.writeFileSync(
-    POLICY_FILE,
-    `# Создаётся хабом при запуске ngrok — правки вручную будут перезаписаны.
+/**
+ * Вебхук Джарвиса (навык Алисы): Яндекс не умеет входить через Google. Доступ к нему
+ * закрыт секретом в адресе — см. server/jarvis.
+ */
+const PUBLIC_PREFIX = "/alice/";
+
+function policy(email: string) {
+  const pub = `!(req.url.path in [${PWA_PATHS.map((p) => `'${p}'`).join(", ")}]) && !req.url.path.startsWith('${PUBLIC_PREFIX}')`;
+  return `# Создаётся хабом при запуске ngrok — правки вручную будут перезаписаны.
 # Вход через Google; пускается только ${email}, остальным — отказ.
-# Без входа доступны только манифест и иконки приложения.
+# Без входа доступны только манифест, иконки приложения и вебхук Алисы (${PUBLIC_PREFIX}<секрет>).
 on_http_request:
   - expressions:
       - "${pub}"
@@ -147,8 +151,25 @@ on_http_request:
       - "!(actions.ngrok.oauth.identity.email in ['${email}'])"
     actions:
       - type: deny
-`,
-  );
+`;
+}
+
+function writePolicy(email: string) {
+  fs.writeFileSync(POLICY_FILE, policy(email));
+}
+
+/** Туннель запущен со старой политикой (без вебхука Алисы) — перезапустить. */
+export async function ensureNgrokPolicy() {
+  const cfg = getSettings().ngrok;
+  if (!cfg?.enabled || !tunnel.child) return;
+  let current = "";
+  try {
+    current = fs.readFileSync(POLICY_FILE, "utf8");
+  } catch {}
+  if (current === policy(cfg.email)) return;
+  stop();
+  await launch();
+  await waitReady(15_000);
 }
 
 async function launch() {
