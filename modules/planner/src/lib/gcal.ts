@@ -113,6 +113,10 @@ function toEvent(e: GEvent, cal: CalendarInfo): CalEvent {
     recurringEventId: e.recurringEventId,
     ours: priv.lifehub === "planner",
     category: priv.category as Category | undefined,
+    kind: priv.kind === "reminder" ? "reminder" : "event",
+    taskId: priv.task || undefined,
+    source: priv.source,
+    free: e.transparency === "transparent",
     canEdit: cal.accessRole === "owner" || cal.accessRole === "writer",
   };
 }
@@ -174,18 +178,27 @@ function rrule(d: Draft): string[] | undefined {
   return [`RRULE:${parts.join(";")}`];
 }
 
+/** Напоминания события: явные, старый формат или по настройкам. */
+export function remindersOf(d: Draft, prefs: Prefs): number[] {
+  if (Array.isArray(d.reminders)) return d.reminders;
+  if (d.reminder !== undefined) return d.reminder === null ? [] : [d.reminder];
+  if (d.kind === "reminder") return [0];
+  const def = d.start ? prefs.reminder : prefs.allDayReminder;
+  return def >= 0 ? [def] : [];
+}
+
 function times(d: Draft, prefs: Prefs, tz: string) {
   if (!d.start) {
     return { start: { date: d.date }, end: { date: shiftKey(d.endDate && d.endDate >= d.date ? d.endDate : d.date, 1) } };
   }
-  const end = d.end ?? fromMinutes(toMinutes(d.start) + prefs.defaultMinutes);
+  const end = d.end ?? fromMinutes(toMinutes(d.start) + (d.kind === "reminder" ? 15 : prefs.defaultMinutes));
   // Конец раньше начала — событие заканчивается на следующий день.
   const endDate = toMinutes(end) <= toMinutes(d.start) ? shiftKey(d.date, 1) : d.date;
   return { start: { dateTime: `${d.date}T${d.start}:00`, timeZone: tz }, end: { dateTime: `${endDate}T${end}:00`, timeZone: tz } };
 }
 
 function body(d: Draft, prefs: Prefs, tz: string) {
-  const reminder = d.reminder === undefined ? (prefs.reminder >= 0 ? prefs.reminder : null) : d.reminder;
+  const reminders = [...new Set(remindersOf(d, prefs))].filter((m) => m >= 0 && m <= 40320).slice(0, 5);
   return {
     summary: d.title,
     description: d.description || undefined,
@@ -193,8 +206,12 @@ function body(d: Draft, prefs: Prefs, tz: string) {
     colorId: CATEGORIES[d.category]?.colorId,
     ...times(d, prefs, tz),
     recurrence: rrule(d),
-    reminders: reminder === null ? { useDefault: false, overrides: [] } : { useDefault: false, overrides: [{ method: "popup", minutes: reminder }] },
-    extendedProperties: { private: { lifehub: "planner", category: d.category, source: d.source ?? "text" } },
+    reminders: { useDefault: false, overrides: reminders.map((minutes) => ({ method: "popup", minutes })) },
+    // Напоминание не занимает время: его не видно как «занято» в календаре и у других людей.
+    transparency: d.kind === "reminder" ? "transparent" : "opaque",
+    extendedProperties: {
+      private: { lifehub: "planner", category: d.category, kind: d.kind ?? "event", source: d.source ?? "text", ...(d.taskId ? { task: d.taskId, role: d.taskRole ?? "block" } : {}) },
+    },
   };
 }
 
@@ -230,4 +247,43 @@ export async function deleteEvent(e: CalEvent, series = false) {
   const id = series && e.recurringEventId ? e.recurringEventId : e.id;
   await google.calendar(`/calendars/${enc(e.calendarId)}/events/${enc(id)}`, { method: "DELETE" });
   eventsChanged();
+}
+
+/** Перенос одного события (или одного дня серии) на новое время. */
+export async function moveEvent(e: CalEvent, date: string, start: string, end: string) {
+  const tz = timeZone();
+  const endDate = toMinutes(end) <= toMinutes(start) ? shiftKey(date, 1) : date;
+  await google.calendar(`/calendars/${enc(e.calendarId)}/events/${enc(e.id)}`, {
+    method: "PATCH",
+    body: { start: { dateTime: `${date}T${start}:00`, timeZone: tz }, end: { dateTime: `${endDate}T${end}:00`, timeZone: tz } },
+  });
+  eventsChanged();
+}
+
+/** Занятость на дни вперёд по видимым календарям (с начала сегодняшнего дня). */
+export async function loadBusy(prefs: Prefs, days = prefs.horizon): Promise<CalEvent[]> {
+  const all = await loadCalendars();
+  const from = new Date();
+  from.setHours(0, 0, 0, 0);
+  const to = new Date(from.getTime() + (days + 1) * 86_400_000);
+  return listEvents(visibleCalendars(all, prefs), from, to);
+}
+
+/** Свои серии/события с заданным source (например, расписание ГУАП) — исходные, без разворачивания повторов. */
+export async function listOurBySource(prefs: Prefs, source: string): Promise<{ id: string; summary?: string; recurrence?: string[] }[]> {
+  const cal = prefs.calendarId ?? "primary";
+  const items: GEvent[] = [];
+  let pageToken: string | undefined;
+  do {
+    const r = await google.calendar<{ items: GEvent[]; nextPageToken?: string }>(`/calendars/${enc(cal)}/events`, {
+      query: { privateExtendedProperty: ["lifehub=planner", `source=${source}`], maxResults: 2500, pageToken, showDeleted: false },
+    });
+    items.push(...(r.items ?? []));
+    pageToken = r.nextPageToken;
+  } while (pageToken);
+  return items.filter((e) => e.status !== "cancelled").map((e) => ({ id: e.id, summary: e.summary, recurrence: e.recurrence }));
+}
+
+export async function deleteById(calendarId: string, id: string) {
+  await google.calendar(`/calendars/${enc(calendarId)}/events/${enc(id)}`, { method: "DELETE" });
 }

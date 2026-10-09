@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link, confirm, toast } from "@lifehub/sdk";
 import { Btn, ConnectCard, Panel, Skeleton } from "../components/kit.tsx";
 import { createLifehubCalendar, useCalendars, usePrefs, visibleCalendars } from "../lib/gcal.ts";
-import { DEFAULT_PREFS } from "../lib/types.ts";
+import { DEFAULT_PREFS, reminderLabel } from "../lib/types.ts";
 import { timeZone } from "../lib/time.ts";
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -110,12 +110,25 @@ export function SettingsPage() {
           <Row label="Перерыв, мин" hint="между событиями">
             <input type="number" min={0} max={120} className="pl-input" value={prefs.buffer} onChange={(e) => update({ buffer: Math.max(0, Number(e.target.value) || 0) })} />
           </Row>
-          <Row label="Напоминание">
+          <Row label="Напоминание" hint="для событий со временем">
             <select className="pl-input" value={prefs.reminder} onChange={(e) => update({ reminder: Number(e.target.value) })}>
               <option value={-1}>без напоминания</option>
               {[0, 5, 10, 15, 30, 60].map((m) => (
                 <option key={m} value={m}>
                   {m ? `за ${m} мин` : "в момент начала"}
+                </option>
+              ))}
+            </select>
+          </Row>
+          <Row label="Напоминания без времени" hint="«напомни оплатить…»">
+            <input type="time" className="pl-input" value={prefs.reminderTime} onChange={(e) => e.target.value && update({ reminderTime: e.target.value })} />
+          </Row>
+          <Row label="Для событий на весь день" hint="дни рождения, поездки">
+            <select className="pl-input" value={prefs.allDayReminder} onChange={(e) => update({ allDayReminder: Number(e.target.value) })}>
+              <option value={-1}>без напоминания</option>
+              {[0, 240, 540, 1680].map((m) => (
+                <option key={m} value={m}>
+                  {reminderLabel(m, true)}
                 </option>
               ))}
             </select>
@@ -130,6 +143,24 @@ export function SettingsPage() {
             </select>
           </Row>
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Row label="Модель" hint="для составления расписания">
+            <select className="pl-input" value={prefs.model} onChange={(e) => update({ model: e.target.value as "sonnet" })}>
+              <option value="haiku">Haiku — быстро, проще</option>
+              <option value="sonnet">Sonnet — рекомендую</option>
+              <option value="opus">Opus — умнее, медленнее</option>
+            </select>
+          </Row>
+          <Row label="Задача в день, макс." hint="часов на одну задачу">
+            <select className="pl-input" value={prefs.taskPerDay} onChange={(e) => update({ taskPerDay: Number(e.target.value) })}>
+              {[60, 90, 120, 180, 240, 360].map((m) => (
+                <option key={m} value={m}>
+                  {m / 60} ч
+                </option>
+              ))}
+            </select>
+          </Row>
+        </div>
         <Row label="Мои правила" hint="Нейронка учитывает их в каждом запросе.">
           <textarea
             className="pl-input min-h-28"
@@ -138,6 +169,17 @@ export function SettingsPage() {
             onBlur={(e) => e.target.value !== prefs.notes && update({ notes: e.target.value })}
           />
         </Row>
+      </Panel>
+
+      <Panel className="mb-3">
+        <Link to="/guap" className="flex items-center gap-3">
+          <span className="text-2xl">🎓</span>
+          <span className="flex-1">
+            <span className="block font-medium">Расписание ГУАП</span>
+            <span className="pl-muted block text-xs">{prefs.guapGroup ? `гр. ${prefs.guapGroup} — обновить или убрать` : "загрузить пары группы в календарь"}</span>
+          </span>
+          <span className="pl-muted">›</span>
+        </Link>
       </Panel>
 
       <Btn

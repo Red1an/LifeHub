@@ -2,6 +2,7 @@ import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { Link, Modal, Spinner, confirm, cn, toast } from "@lifehub/sdk";
 import { CATEGORIES, type CalEvent, type CalendarInfo } from "../lib/types.ts";
 import { createLifehubCalendar, deleteEvent, usePrefs } from "../lib/gcal.ts";
+import { markBlock } from "../lib/tasks.ts";
 import { dayLabel, hhmm } from "../lib/time.ts";
 import { dayKey } from "@lifehub/sdk";
 
@@ -83,12 +84,15 @@ export function EventRow({ e, onClick }: { e: CalEvent; onClick: () => void }) {
         {e.allDay ? <span className="pl-muted">весь день</span> : (
           <>
             <div className="font-semibold">{hhmm(e.start)}</div>
-            <div className="pl-muted text-xs">{hhmm(e.end)}</div>
+            {e.kind !== "reminder" && <div className="pl-muted text-xs">{hhmm(e.end)}</div>}
           </>
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate font-semibold">{e.title}</div>
+        <div className="truncate font-semibold">
+          {e.kind === "reminder" && "🔔 "}
+          {e.title}
+        </div>
         {(e.location || e.recurringEventId || e.ours) && (
           <div className="pl-muted mt-0.5 flex flex-wrap gap-x-2 text-xs">
             {e.location && <span className="truncate">📍 {e.location}</span>}
@@ -101,7 +105,7 @@ export function EventRow({ e, onClick }: { e: CalEvent; onClick: () => void }) {
   );
 }
 
-export function EventModal({ e, onClose }: { e: CalEvent | null; onClose: () => void }) {
+export function EventModal({ e, onClose, onMove }: { e: CalEvent | null; onClose: () => void; onMove?: (e: CalEvent) => void }) {
   const [busy, setBusy] = useState(false);
   if (!e) return <Modal open={false} onClose={onClose} />;
   const remove = async (series: boolean) => {
@@ -136,6 +140,36 @@ export function EventModal({ e, onClose }: { e: CalEvent | null; onClose: () => 
         {e.description && <div className="whitespace-pre-wrap text-muted">{e.description}</div>}
         {e.ours && <div className="text-muted">✨ Поставлено модулем «Расписание»</div>}
         <div className="flex flex-wrap gap-2 pt-2">
+          {e.taskId && (
+            <Btn
+              main
+              loading={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  const r = await markBlock(e.taskId!, e.id);
+                  toast(r?.finished ? "Задача выполнена целиком 🎉" : "Отмечено: сделал", "success");
+                  onClose();
+                } catch (err) {
+                  toast((err as Error).message, "error");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              ✅ Сделал
+            </Btn>
+          )}
+          {e.canEdit && onMove && !e.allDay && (
+            <Btn
+              onClick={() => {
+                onMove(e);
+                onClose();
+              }}
+            >
+              {e.end.getTime() < Date.now() ? "↪ Не успел — перенести" : "↪ Перенести"}
+            </Btn>
+          )}
           {e.htmlLink && (
             <a className="pl-btn" href={e.htmlLink} target="_blank" rel="noreferrer">
               Открыть в Google

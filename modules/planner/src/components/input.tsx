@@ -51,16 +51,46 @@ const ERRORS: Record<string, string> = {
   "language-not-supported": "Браузер не умеет распознавать русскую речь",
 };
 
+const norm = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
+/**
+ * Склеивает результаты распознавания без повторов. Chrome на Android в режиме continuous
+ * присылает каждую фразу накопительно («поставь», «поставь что», «поставь что у меня»…) —
+ * фраза, которая продолжает предыдущую, заменяет её, а повтор отбрасывается.
+ */
+export function mergeResults(parts: string[]): string[] {
+  const out: string[] = [];
+  for (const raw of parts) {
+    const t = raw.trim();
+    if (!t) continue;
+    const last = out[out.length - 1];
+    if (last !== undefined) {
+      const a = norm(last);
+      const b = norm(t);
+      if (b.startsWith(a)) {
+        out[out.length - 1] = t;
+        continue;
+      }
+      if (a.startsWith(b) || a.endsWith(b)) continue;
+    }
+    out.push(t);
+  }
+  return out;
+}
+
 /**
  * Диктовка через распознавание речи браузера (Chrome, Edge, Safari).
- * onFinal получает готовые фразы, interim — то, что ещё распознаётся.
+ * value — текущий текст поля: продиктованное дописывается к тому, что было в поле при старте,
+ * onChange получает итоговый текст поля. interim — то, что ещё распознаётся.
  */
-export function useDictation(onFinal: (text: string) => void) {
+export function useDictation(value: string, onChange: (text: string) => void) {
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
   const rec = useRef<Recognition | null>(null);
-  const cb = useRef(onFinal);
-  cb.current = onFinal;
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const cb = useRef(onChange);
+  cb.current = onChange;
   const supported = !!recognitionClass();
 
   const stop = useCallback(() => rec.current?.stop(), []);
@@ -75,18 +105,30 @@ export function useDictation(onFinal: (text: string) => void) {
       toast("Голосовой ввод работает только по HTTPS (Tailscale или ngrok) или на компьютере с хабом", "error");
       return;
     }
+    const base = valueRef.current;
+    let lastFinal = "";
     const r = new Cls();
     r.lang = "ru-RU";
     r.continuous = true;
     r.interimResults = true;
     r.onresult = (e) => {
-      let live = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
+      // Каждый раз собираем всё заново из полного списка результатов — так повторы не копятся.
+      const finals: string[] = [];
+      const pending: string[] = [];
+      for (let i = 0; i < e.results.length; i++) {
         const res = e.results[i];
-        const t = res[0].transcript;
-        if (res.isFinal) cb.current(t.trim());
-        else live += t;
+        (res.isFinal ? finals : pending).push(res[0].transcript);
       }
+      const merged = mergeResults(finals);
+      const text = merged.join(" ");
+      if (text !== lastFinal) {
+        lastFinal = text;
+        cb.current(text ? appendText(base, text) : base);
+      }
+      // Промежуточный текст на Android тоже начинается с уже распознанного — показываем только новое.
+      let live = mergeResults(pending).join(" ");
+      const prev = merged[merged.length - 1];
+      if (prev && norm(live).startsWith(norm(prev))) live = live.trim().split(/\s+/).slice(prev.trim().split(/\s+/).length).join(" ");
       setInterim(live);
     };
     r.onerror = (e) => {

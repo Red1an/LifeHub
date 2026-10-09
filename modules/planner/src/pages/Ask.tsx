@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { cn, files, formatRelative, plural, toast, useCollection, useGoogle, useNavigate, useStore } from "@lifehub/sdk";
+import { Link, cn, files, formatRelative, plural, toast, useCollection, useGoogle, useNavigate, useSearchParams, useStore } from "@lifehub/sdk";
 import { Btn, CalendarSetup, ConnectCard, ErrorBox, Panel, Skeleton } from "../components/kit.tsx";
 import { DraftCard, DraftEditor } from "../components/drafts.tsx";
-import { AutoTextarea, MicButton, appendText, useDictation } from "../components/input.tsx";
-import { applyDraft, eventsChanged, listEvents, loadCalendars, useCalendars, usePrefs, visibleCalendars } from "../lib/gcal.ts";
+import { AutoTextarea, MicButton, useDictation } from "../components/input.tsx";
+import { applyDraft, eventsChanged, loadBusy as loadBusyEvents, useCalendars, usePrefs } from "../lib/gcal.ts";
+import { deadlineLabel, saveTasks } from "../lib/tasks.ts";
 import { makePlan } from "../lib/planner.ts";
 import { SOURCES, loadSource, type SourceState } from "../lib/sources.ts";
 import type { CalEvent, Draft, HistoryEntry, Plan } from "../lib/types.ts";
 
 const EXAMPLES = [
+  "Лаба по ИИС до 20 октября, часов на 6",
   "Завтра в 19:00 созвон с командой на час",
   "Поставь тренировки 3 раза в неделю вечером",
   "Каждый будний день 2 часа учёбы утром до работы",
@@ -43,12 +45,22 @@ export function AskPage() {
   const [refine, setRefine] = useState("");
   const [applying, setApplying] = useState<{ done: number; total: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const voice = useDictation((t) => setText((p) => appendText(p, t)));
-  const refineVoice = useDictation((t) => setRefine((p) => appendText(p, t)));
+  const voice = useDictation(text, setText);
+  const refineVoice = useDictation(refine, setRefine);
 
   useEffect(() => {
     for (const s of SOURCES) loadSource(s).then((st) => setSources((p) => ({ ...p, [s.id]: st })));
   }, []);
+
+  // ?text=… — запрос от другого модуля (например, событие из «Заметок»): подставляем в поле.
+  const [params, setParams] = useSearchParams();
+  const incoming = params.get("text");
+  useEffect(() => {
+    if (!incoming) return;
+    setText(incoming);
+    setParams({ text: null });
+    if (plan) toast("Запрос подставлен в поле — он появится, когда примените или сбросите текущий черновик");
+  }, [incoming]);
 
   useEffect(() => {
     if (!thinking) return;
@@ -56,13 +68,9 @@ export function AskPage() {
     return () => clearInterval(t);
   }, [thinking]);
 
-  /** Занятость на горизонт планирования. */
+  /** Занятость на горизонт планирования (для задач с дедлайном — на 120 дней вперёд). */
   const loadBusy = async () => {
-    const all = await loadCalendars();
-    const from = new Date();
-    from.setHours(0, 0, 0, 0);
-    const to = new Date(from.getTime() + (prefs.horizon + 1) * 86_400_000);
-    const ev = await listEvents(visibleCalendars(all, prefs), from, to);
+    const ev = await loadBusyEvents(prefs, Math.max(prefs.horizon, 120));
     setEvents(ev);
     return ev;
   };
@@ -106,10 +114,10 @@ export function AskPage() {
         sources: src,
         events: ev,
         prefs,
-        refine: refineText && plan ? { drafts: plan.drafts, feedback: refineText } : undefined,
+        refine: refineText && plan ? { drafts: plan.drafts, tasks: plan.tasks, feedback: refineText } : undefined,
       });
       if (!r.drafts.length && !r.questions.length) throw new Error(r.summary || "Нейронка не предложила изменений — попробуйте сформулировать иначе");
-      setPlan({ request, summary: r.summary, questions: r.questions, drafts: r.drafts, images, sources: used, createdAt: Date.now() });
+      setPlan({ request, summary: r.summary, questions: r.questions, drafts: r.drafts, tasks: r.tasks, images, sources: used, createdAt: Date.now() });
       setRefine("");
       if (!refineText) {
         setText("");
@@ -130,9 +138,11 @@ export function AskPage() {
     const counts = { created: 0, updated: 0, deleted: 0, failed: 0 };
     const failed: Draft[] = [];
     let lastError = "";
+    const applied: { draft: Draft; eventId: string; calendarId: string }[] = [];
     for (const d of todo) {
       try {
-        await applyDraft(d, prefs);
+        const eventId = await applyDraft(d, prefs);
+        applied.push({ draft: d, eventId, calendarId: d.op === "create" ? (prefs.calendarId ?? "primary") : (d.calendarId ?? prefs.calendarId ?? "primary") });
         counts[d.op === "create" ? "created" : d.op === "update" ? "updated" : "deleted"]++;
       } catch (e) {
         counts.failed++;
@@ -142,6 +152,7 @@ export function AskPage() {
       setApplying((a) => a && { ...a, done: a.done + 1 });
     }
     setApplying(null);
+    if (plan.tasks?.length) await saveTasks(plan.tasks, applied).catch((e) => toast(`Задачи не сохранились: ${(e as Error).message}`, "error"));
     eventsChanged();
     await history.add({ request: plan.request, summary: plan.summary, images: plan.images, sources: plan.sources, ...counts }).catch(() => {});
     if (failed.length) {
@@ -193,6 +204,27 @@ export function AskPage() {
             </div>
           )}
         </Panel>
+
+        {plan.tasks && plan.tasks.length > 0 && (
+          <Panel className="mb-3 space-y-2">
+            <div className="pl-muted text-xs uppercase tracking-wide">Задачи с дедлайном</div>
+            {plan.tasks.map((t) => {
+              const blocks = plan.drafts.filter((d) => d.taskId === t.id && d.taskRole === "block" && !d.skip);
+              const mins = blocks.reduce((s, d) => s + (d.end && d.start ? (Number(d.end.slice(0, 2)) * 60 + Number(d.end.slice(3))) - (Number(d.start.slice(0, 2)) * 60 + Number(d.start.slice(3))) : 0), 0);
+              return (
+                <div key={t.id} className="pl-soft p-3">
+                  <div className="font-semibold">📝 {t.title}</div>
+                  <div className="pl-muted text-sm">
+                    срок — {deadlineLabel(t)} · работы ~{Math.round(t.estimate / 6) / 10} ч · {blocks.length} {plural(blocks.length, ["блок", "блока", "блоков"])} ({Math.round(mins / 6) / 10} ч)
+                  </div>
+                  {!!t.unplaced && t.unplaced > 0 && (
+                    <div className="mt-1 text-xs text-[#ffd166]">⚠ До срока не хватает свободного времени: ещё ~{Math.round(t.unplaced / 6) / 10} ч. Освободите время или сдвиньте границы дня.</div>
+                  )}
+                </div>
+              );
+            })}
+          </Panel>
+        )}
 
         <div className="space-y-2">
           {plan.drafts.map((d) => (
@@ -304,6 +336,9 @@ export function AskPage() {
           <button className="pl-chip" onClick={() => fileRef.current?.click()} disabled={photos.length >= 5}>
             📷 Фото
           </button>
+          <Link to="/guap" className="pl-chip">
+            🎓 ГУАП
+          </Link>
           {SOURCES.map((s) => {
             const st = sources[s.id];
             const on = picked.includes(s.id);

@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { Link, cn, dayKey, startOfWeek, useSearchParams } from "@lifehub/sdk";
 import { Btn, CalendarSetup, ConnectCard, ErrorBox, EventModal, EventRow, Panel, Skeleton } from "../components/kit.tsx";
 import { useEvents, usePrefs } from "../lib/gcal.ts";
+import { MoveModal } from "../components/move.tsx";
+import { DaySummary } from "../components/summary.tsx";
 import { WEEKDAYS, dayLabel, fromKey, monthTitle, shiftKey } from "../lib/time.ts";
 import type { CalEvent } from "../lib/types.ts";
 
@@ -22,6 +24,7 @@ export function WeekPage() {
   const { events, error, google, calendars } = useEvents(from, to);
   const { prefs } = usePrefs();
   const [open, setOpen] = useState<CalEvent | null>(null);
+  const [moving, setMoving] = useState<CalEvent | null>(null);
   const days = Array.from({ length: 7 }, (_, i) => shiftKey(weekStart, i));
   const go = (k: string) => setParams({ d: k });
 
@@ -34,6 +37,7 @@ export function WeekPage() {
   else
     body = (
       <>
+        <DaySummary k={selected} events={events} />
         {/* Телефон: выбранный день */}
         <div className="lg:hidden">
           <DayList k={selected} events={eventsOn(events, selected)} onOpen={setOpen} />
@@ -110,7 +114,8 @@ export function WeekPage() {
           ✨ Запланировать
         </Link>
       )}
-      <EventModal e={open} onClose={() => setOpen(null)} />
+      <EventModal e={open} onClose={() => setOpen(null)} onMove={setMoving} />
+      <MoveModal target={moving} onClose={() => setMoving(null)} />
     </div>
   );
 }

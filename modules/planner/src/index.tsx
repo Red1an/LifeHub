@@ -4,6 +4,9 @@ import "./styles.css";
 import { WeekPage } from "./pages/Week.tsx";
 import { AskPage } from "./pages/Ask.tsx";
 import { SettingsPage } from "./pages/Settings.tsx";
+import { TasksPage } from "./pages/Tasks.tsx";
+import { StatsPage } from "./pages/Stats.tsx";
+import { GuapPage } from "./pages/Guap.tsx";
 import { useEvents } from "./lib/gcal.ts";
 import { hhmm, shiftKey, fromKey } from "./lib/time.ts";
 
@@ -51,11 +54,16 @@ export default defineModule({
     "/": WeekPage,
     "/ask": AskPage,
     "/settings": SettingsPage,
+    "/tasks": TasksPage,
+    "/stats": StatsPage,
+    "/guap": GuapPage,
     "*": WeekPage,
   },
   nav: [
     { to: "/", label: "Неделя", icon: "🗓️" },
     { to: "/ask", label: "Запланировать", icon: "✨" },
+    { to: "/tasks", label: "Дедлайны", icon: "🎯" },
+    { to: "/stats", label: "Статистика", icon: "📊" },
     { to: "/settings", label: "Настройки", icon: "⚙️" },
   ],
   widgets: {

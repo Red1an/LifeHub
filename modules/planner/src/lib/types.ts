@@ -1,4 +1,22 @@
-export type Category = "work" | "study" | "sport" | "health" | "personal" | "social" | "rest" | "other";
+export type Category = "work" | "study" | "sport" | "health" | "personal" | "social" | "rest" | "reminder" | "other";
+
+/** Варианты напоминаний (минут до начала). */
+export const REMINDER_OPTIONS = [0, 10, 30, 60, 120, 1440, 2880];
+
+export function reminderLabel(m: number, allDay = false): string {
+  if (allDay) {
+    // У событий на весь день напоминание считается от полуночи их дня.
+    if (m === 0) return "в полночь";
+    const days = Math.ceil(m / 1440);
+    const t = days * 1440 - m;
+    const at = `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+    return days === 1 ? `накануне в ${at}` : `за ${days} дн. в ${at}`;
+  }
+  if (m === 0) return "в момент начала";
+  if (m < 60) return `за ${m} мин`;
+  if (m < 1440) return `за ${m / 60} ч`;
+  return m === 1440 ? "за день" : `за ${m / 1440} дн.`;
+}
 
 export interface Recurrence {
   freq: "DAILY" | "WEEKLY" | "MONTHLY";
@@ -29,17 +47,66 @@ export interface Draft {
   endDate?: string;
   recurrence?: Recurrence;
   category: Category;
+  /** "reminder" — короткое напоминание в нужное время (не занимает время в календаре). */
+  kind?: "event" | "reminder";
   description?: string;
   location?: string;
-  /** Напоминание за N минут; null — без напоминания. */
+  /** Напоминания: за сколько минут до начала. [] — без напоминаний, нет поля — по настройкам. */
+  reminders?: number[];
+  /** Старый формат (одно напоминание) — читается в remindersOf. */
   reminder?: number | null;
   /** Откуда взялось: text, photo, fit, devpath, habits. */
   source?: string;
   /** Пользователь снял галочку. */
   skip?: boolean;
+  /** Блок работы над задачей (block) или напоминание о её дедлайне (deadline); taskId — id в коллекции tasks. */
+  taskId?: string;
+  taskRole?: "block" | "deadline";
+}
+
+/** Задача с дедлайном: программа сама раскладывает её на блоки по свободному времени. */
+export interface Task {
+  title: string;
+  /** YYYY-MM-DD */
+  deadline: string;
+  deadlineTime?: string;
+  /** Сколько всего работы, минут. */
+  estimate: number;
+  /** Длина одного блока, минут. */
+  chunk: number;
+  category: Category;
+  notes?: string;
+  done: boolean;
+  blocks: TaskBlock[];
+  deadlineEvent?: { eventId: string; calendarId: string };
+  source?: string;
+  createdAt?: number;
+}
+
+export interface TaskBlock {
+  eventId: string;
+  calendarId: string;
+  date: string;
+  start: string;
+  end: string;
+  minutes: number;
+  done?: boolean;
+  /** Пропущен и убран из календаря. */
+  missed?: boolean;
+}
+
+/** Задача из черновика: ещё не сохранена, блоки появятся после применения. */
+export interface PendingTask extends Omit<Task, "blocks" | "done"> {
+  id: string;
+  /** Уже существующая задача — перепланирование оставшейся работы. */
+  existing?: boolean;
+  /** Сколько работы не влезло до дедлайна, минут. */
+  unplaced?: number;
 }
 
 export interface Plan {
+  /** Задачи с дедлайном из этого черновика. */
+  tasks?: PendingTask[];
   request: string;
   summary: string;
   questions: string[];
@@ -62,10 +129,22 @@ export interface Prefs {
   buffer: number;
   /** Напоминание по умолчанию, минут; -1 — без напоминания. */
   reminder: number;
+  /** Для событий на весь день: минут до полуночи их дня (240 — накануне в 20:00); -1 — без напоминания. */
+  allDayReminder: number;
+  /** Во сколько ставить напоминания, если время не сказано. */
+  reminderTime: string;
   /** На сколько дней вперёд нейронка смотрит занятость. */
   horizon: number;
   /** Свои правила для нейронки. */
   notes: string;
+  /** Модель для составления расписания. */
+  model: "haiku" | "sonnet" | "opus";
+  /** Максимум работы над одной задачей в день, минут. */
+  taskPerDay: number;
+  /** Расписание ГУАП: номер группы, конец семестра, напоминание перед парой. */
+  guapGroup: string;
+  guapUntil: string;
+  guapReminder: number;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -76,8 +155,15 @@ export const DEFAULT_PREFS: Prefs = {
   defaultMinutes: 60,
   buffer: 10,
   reminder: 15,
+  allDayReminder: 240,
+  reminderTime: "09:00",
   horizon: 14,
   notes: "",
+  model: "sonnet",
+  taskPerDay: 180,
+  guapGroup: "",
+  guapUntil: "",
+  guapReminder: 15,
 };
 
 /** Коллекция history: применённые запросы. */
@@ -119,6 +205,12 @@ export interface CalEvent {
   /** Создано этим модулем. */
   ours: boolean;
   category?: Category;
+  kind?: "event" | "reminder";
+  /** Блок задачи: id в коллекции tasks. */
+  taskId?: string;
+  source?: string;
+  /** Не занимает время (transparency: transparent). */
+  free?: boolean;
   canEdit: boolean;
 }
 
@@ -130,6 +222,7 @@ export const CATEGORIES: Record<Category, { label: string; icon: string; colorId
   personal: { label: "Личное", icon: "✨", colorId: "5", color: "#f2b632" },
   social: { label: "Встречи", icon: "🫂", colorId: "4", color: "#ec7d7d" },
   rest: { label: "Отдых", icon: "🌿", colorId: "1", color: "#8f9be0" },
+  reminder: { label: "Напоминание", icon: "🔔", colorId: "6", color: "#f4793b" },
   other: { label: "Другое", icon: "📌", colorId: "8", color: "#8a8f98" },
 };
 
