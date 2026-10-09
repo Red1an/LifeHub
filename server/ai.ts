@@ -117,15 +117,16 @@ function release() {
 export interface AskOptions {
   prompt: string;
   system?: string;
-  /** "fast" — быстрая модель, "smart" — основная (по умолчанию). */
-  model?: "fast" | "smart";
+  /** "fast" — быстрая модель, "smart" — основная (по умолчанию), либо конкретная: haiku, sonnet, opus. */
+  model?: "fast" | "smart" | "haiku" | "sonnet" | "opus";
   /** Картинки к запросу (base64). Передаются в сообщении, файловых инструментов у Claude по-прежнему нет. */
   images?: { mime: string; data: string }[];
   onDelta?: (text: string) => void;
   signal?: AbortSignal;
 }
 
-function modelFor(kind: "fast" | "smart" | undefined): string {
+function modelFor(kind: AskOptions["model"]): string {
+  if (kind === "haiku" || kind === "sonnet" || kind === "opus") return kind;
   const s = getSettings().ai ?? {};
   return kind === "fast" ? (s.fastModel ?? "haiku") : (s.smartModel ?? "");
 }

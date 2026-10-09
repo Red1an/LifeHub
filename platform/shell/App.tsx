@@ -14,6 +14,7 @@ import { ModulesPage } from "./pages/Modules.tsx";
 import { ModuleDetailsPage } from "./pages/ModuleDetails.tsx";
 import { AddModulePage } from "./pages/AddModule.tsx";
 import { SettingsPage } from "./pages/Settings.tsx";
+import { SharePage } from "./pages/Share.tsx";
 
 /*
  * Оболочка хаба — нейтральная рамка вокруг модулей. У каждого модуля свой дизайн,
@@ -55,6 +56,7 @@ export function App() {
   else if (path === "/modules/add") page = <AddModulePage />;
   else if (matchPath("/modules/:id", path)) page = <ModuleDetailsPage id={matchPath("/modules/:id", path)!.id} />;
   else if (path === "/settings") page = <SettingsPage />;
+  else if (path === "/share") page = <SharePage />;
   else page = <NotFound />;
 
   const inModule = moduleMatch?.id;

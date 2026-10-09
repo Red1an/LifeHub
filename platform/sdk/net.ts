@@ -7,7 +7,7 @@ import { request } from "./core.ts";
 
 export interface NetFetchOptions {
   method?: "GET" | "POST" | "HEAD";
-  /** Разрешены accept, accept-language, content-type, referer, user-agent, x-requested-with. */
+  /** Разрешены accept, accept-language, authorization, content-type, referer, user-agent, x-requested-with. */
   headers?: Record<string, string>;
   /** Тело POST-запроса строкой (JSON.stringify или URLSearchParams.toString()). */
   body?: string;

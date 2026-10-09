@@ -110,6 +110,8 @@ export function createApp(opts: AppOptions) {
         start_url: "/",
         scope: "/",
         display: "standalone",
+        // «Поделиться» с телефона (Android, установленное приложение): хаб отдаёт модулю с полем share.
+        share_target: { action: "/share", method: "GET", params: { title: "title", text: "text", url: "url" } },
         background_color: "#121211",
         theme_color: "#121211",
         icons: [
@@ -523,7 +525,7 @@ export function createApp(opts: AppOptions) {
     if (!prompt.trim()) throw new HubError("Пустой запрос");
     if (prompt.length > 400_000) throw new HubError("Запрос слишком большой");
     const system = typeof b.system === "string" ? b.system.slice(0, 50_000) : undefined;
-    const model = b.model === "fast" ? "fast" : "smart";
+    const model = (["fast", "haiku", "sonnet", "opus"] as const).find((m) => m === b.model) ?? "smart";
     const images = parseImages(b.images);
     const abort = new AbortController();
     const enc = new TextEncoder();
@@ -837,10 +839,24 @@ body{margin:0;min-height:100vh;display:grid;place-items:center;background:#12121
 @media (prefers-color-scheme:light){body{background:#f7f7f5;color:#1a1a18}button{background:#1a1a18!important;color:#fff!important}}
 main{width:min(320px,100% - 32px)}h1{font-size:18px;font-weight:600;margin:12px 0 8px}p{opacity:.7;font-size:15px;line-height:1.45;margin:0 0 20px}
 button{font:inherit;font-size:15px;padding:10px 16px;border-radius:6px;border:0;background:#e9e9e4;color:#121211;font-weight:500}
+textarea{box-sizing:border-box;width:100%;min-height:84px;font:inherit;font-size:16px;padding:10px 12px;border-radius:8px;border:1px solid #8884;background:transparent;color:inherit;resize:vertical;margin:0 0 8px}
+.row{display:flex;gap:8px;align-items:center}.row span{font-size:13px;opacity:.6;flex:1}hr{border:0;border-top:1px solid #8883;margin:24px 0 16px}
 </style></head><body><main>
 <div style="width:36px;height:36px">${ICON}</div><h1>Хаб недоступен</h1>
 <p>Компьютер с LifeHub спит, выключен или без интернета. Как только он проснётся, хаб снова откроется.</p>
 <button onclick="location.reload()">Повторить</button>
+<hr><h1>Записать мысль</h1>
+<textarea id="t" placeholder="Сохраню на телефоне и отправлю в «Заметки», когда хаб проснётся"></textarea>
+<div class="row"><span id="n"></span><button onclick="save()">Сохранить</button></div>
+<script>
+// Очередь общая с модулем «Заметки» (modules/notes/src/lib/outbox.ts): он заберёт её при открытии.
+var K="lifehub-outbox";
+function list(){try{var v=JSON.parse(localStorage.getItem(K)||"[]");return Array.isArray(v)?v:[]}catch(e){return []}}
+function show(){var c=list().length;document.getElementById("n").textContent=c?"Ждут отправки: "+c:""}
+function save(){var t=document.getElementById("t");var v=t.value.trim();if(!v)return;var l=list();l.push({text:v,at:Date.now(),source:"offline"});
+try{localStorage.setItem(K,JSON.stringify(l))}catch(e){}t.value="";show()}
+show();
+</script>
 </main></body></html>`;
 
 const SERVICE_WORKER = `const OFFLINE = ${JSON.stringify(OFFLINE_HTML)};

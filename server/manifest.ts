@@ -28,6 +28,11 @@ export interface Manifest {
   /** Коллекции и ключи useStore, которые другие модули могут читать (с разрешением read:<id>). */
   exports: { collections: string[]; stores: string[] };
   forkedFrom?: string;
+  /**
+   * Путь внутри модуля, куда хаб передаёт «Поделиться» с телефона (?title=&text=&url=).
+   * Только для type: "app". Хаб — цель share_target своего PWA.
+   */
+  share?: string;
   /** Только для type: "service". */
   service?: ServiceConfig;
 }
@@ -47,6 +52,8 @@ export interface ServiceConfig {
   path: string;
   /** Адрес проверки готовности (любой HTTP-ответ — сервер готов). */
   health?: string;
+  /** Виджет на главной хаба: адрес внутри сервиса, отдающий JSON (см. platform/shell/ServiceWidget.tsx). */
+  widget?: string;
   env: Record<string, string>;
 }
 
@@ -88,6 +95,7 @@ export function normalizeManifest(raw: any): Manifest {
         build: typeof sv.build === "string" && sv.build.trim() ? sv.build : undefined,
         path: typeof sv.path === "string" && sv.path.startsWith("/") ? sv.path : "/",
         health: typeof sv.health === "string" && sv.health.startsWith("/") ? sv.health : undefined,
+        widget: typeof sv.widget === "string" && sv.widget.startsWith("/") ? sv.widget : undefined,
         env,
       };
     }
@@ -120,6 +128,7 @@ export function normalizeManifest(raw: any): Manifest {
       stores: Array.isArray(raw.exports?.stores) ? raw.exports.stores : [],
     },
     forkedFrom: raw.forkedFrom,
+    ...(type === "app" && typeof raw.share === "string" && raw.share.startsWith("/") ? { share: raw.share } : {}),
     ...(service ? { service } : {}),
   };
 }

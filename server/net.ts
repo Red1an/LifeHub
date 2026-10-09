@@ -1,6 +1,9 @@
 import dns from "node:dns/promises";
+import https from "node:https";
 import net from "node:net";
+import { Readable } from "node:stream";
 import { HubError } from "./registry.ts";
+import { caWithRussianRoot, needsRussianRoot } from "./ru-ca.ts";
 
 /*
  * Запросы модулей в интернет через хаб (разрешение "network").
@@ -27,7 +30,7 @@ export interface NetResponse {
 const MAX_BYTES = 8 * 1024 * 1024;
 const TIMEOUT_MS = 20_000;
 const MAX_REDIRECTS = 5;
-const ALLOWED_HEADERS = new Set(["accept", "accept-language", "content-type", "referer", "user-agent", "x-requested-with"]);
+const ALLOWED_HEADERS = new Set(["accept", "accept-language", "authorization", "content-type", "referer", "user-agent", "x-requested-with"]);
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
 
@@ -53,6 +56,23 @@ async function checkHost(url: URL) {
   if (ips.some(privateIp)) throw new HubError("Локальные адреса модулям недоступны", 403);
 }
 
+/** fetch через node:https с корнем Минцифры (встроенный fetch не принимает свои корневые сертификаты). */
+function fetchWithRussianRoot(url: URL, init: { method: string; headers: Record<string, string>; body?: string; signal: AbortSignal }): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const req = https.request(url, { method: init.method, headers: init.headers, ca: caWithRussianRoot(), signal: init.signal }, (res) => {
+      const headers = new Headers();
+      for (const [k, v] of Object.entries(res.headers)) if (v !== undefined) headers.set(k, Array.isArray(v) ? v.join(", ") : v);
+      const status = res.statusCode ?? 502;
+      const empty = [101, 204, 205, 304].includes(status);
+      if (empty) res.resume();
+      resolve(new Response(empty ? null : (Readable.toWeb(res) as ReadableStream), { status, headers }));
+    });
+    req.on("error", reject);
+    if (init.body !== undefined) req.write(init.body);
+    req.end();
+  });
+}
+
 export async function netFetch(permissions: string[], req: NetRequest): Promise<NetResponse> {
   if (!permissions.includes("network")) throw new HubError('Модулю нужно разрешение "network" в lifehub.json', 403);
   const method = (req.method ?? "GET").toUpperCase();
@@ -74,7 +94,11 @@ export async function netFetch(permissions: string[], req: NetRequest): Promise<
   for (let hop = 0; ; hop++) {
     await checkHost(url);
     try {
-      res = await fetch(url, { method, headers, body: method === "POST" ? req.body : undefined, redirect: "manual", signal });
+      const body = method === "POST" ? req.body : undefined;
+      res =
+        url.protocol === "https:" && needsRussianRoot(url.hostname)
+          ? await fetchWithRussianRoot(url, { method, headers, body, signal })
+          : await fetch(url, { method, headers, body, redirect: "manual", signal });
     } catch (e) {
       const msg = (e as Error).name === "TimeoutError" ? "сайт не ответил вовремя" : (e as Error).message;
       throw new HubError(`Не удалось загрузить ${url.hostname}: ${msg}`, 502);

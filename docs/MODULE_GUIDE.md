@@ -45,6 +45,7 @@ node "{{HUB_DIR}}/bin/lifehub.mjs" check <id>
   "uses": { "audio": "^1" },       // модули-библиотеки
   "permissions": ["files"],        // files, mic, camera, notifications, ai, network, google:calendar, read:<id>
   "exports": { "collections": ["transactions"], "stores": ["budget"] },  // что могут читать другие модули
+  "share": "/",                    // необязательно: сюда хаб передаёт «Поделиться» с телефона (см. ниже)
   "forkedFrom": "author/finance@0.3.0"             // заполняет хаб при форке
 }
 ```
@@ -165,7 +166,8 @@ import { ai, useAi } from "@lifehub/sdk";
 // Разовый запрос:
 const answer = await ai.ask("Придумай 3 скороговорки на звук Р", {
   system: "Ты логопед. Отвечай кратко, списком.",
-  model: "fast",                       // "fast" — быстро и дёшево, "smart" (по умолчанию) — умнее
+  model: "fast",                       // "fast" — быстро и дёшево, "smart" (по умолчанию) — основная из настроек хаба,
+                                       // "haiku" | "sonnet" | "opus" — конкретная, если задаче нужна сильная модель
   onDelta: (d, full) => setText(full), // поток ответа (необязательно)
 });
 
@@ -229,9 +231,19 @@ const r = await net.fetch(url, { method: "POST", body: JSON.stringify(x), header
 // r: { status, ok, url, contentType, text } — ошибки HTTP не бросают исключение
 ```
 
+- Заголовки запроса: `accept`, `accept-language`, `authorization` (токены API), `content-type`, `referer`, `user-agent`,
+  `x-requested-with`. Сайтам с сертификатом НУЦ Минцифры (API Т-Банка) хаб доверяет сам.
 - Разбирай HTML на клиенте (`new DOMParser().parseFromString(html, "text/html")` или регулярки по встроенному JSON).
 - Сайты меняют вёрстку: пиши разбор терпимым к отсутствию полей и показывай понятную ошибку.
 - Сохраняй загруженное в коллекцию, если оно понадобится снова, — не дёргай сайт на каждый рендер.
+
+### «Поделиться» с телефона (поле "share")
+
+Хаб, установленный на телефон как приложение (Android, по HTTPS), появляется в меню «Поделиться» других приложений.
+Присланное хаб открывает в модуле, у которого в манифесте есть `"share": "<путь в модуле>"`, с параметрами
+`?title=&text=&url=` (любые могут отсутствовать; ссылка часто приходит в `text`). Если таких модулей несколько —
+пользователь выбирает. Прочитай параметры через `useSearchParams()`, сохрани и убери их из адреса
+(`setParams({ title: null, text: null, url: null })`) — иначе обновление страницы добавит то же самое ещё раз.
 
 ## Интерфейс и дизайн
 
@@ -329,6 +341,7 @@ const r = await net.fetch(url, { method: "POST", body: JSON.stringify(x), header
     "build": "{python} build.py",    // необязательно: сборка перед запуском, когда файлы изменились
     "path": "/",                     // начальная страница
     "health": "/api/health",         // необязательно: адрес проверки готовности
+    "widget": "/api/widget",         // необязательно: виджет на главной хаба (JSON, формат ниже)
     "env": { "EDA_PORT": "{port}", "EDA_DATA": "{data}" }
   }
 }
@@ -338,6 +351,10 @@ const r = await net.fetch(url, { method: "POST", body: JSON.stringify(x), header
 храни данные там, а не в папке модуля), `{python}`, `{node}`. Есть `package.json` — хаб сам выполнит `npm install`.
 Хаб запускает сервис, перезапускает при сбое и показывает его во фрейме по адресу `/s/<id>/`. Запросы к
 корню (`fetch("/api/…")`) хаб переводит под этот адрес сам, но надёжнее относительные пути (`fetch("api/…")`).
+
+Виджет сервиса — не компонент, а данные: `GET service.widget` отдаёт
+`{ title, subtitle?, progress?: 0…1, note?, empty?, rows?: [{ img?, title, sub?, done?, muted?, action?: { label, post, body? } }] }`.
+Хаб рисует его сам; по кнопке шлёт `POST` на `action.post` (адрес внутри сервиса) с `body` и обновляет виджет.
 
 ## История версий, форки и обновления
 

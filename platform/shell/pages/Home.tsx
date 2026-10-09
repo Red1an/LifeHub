@@ -9,8 +9,12 @@ import { Link } from "../nav.ts";
 import { ErrorBoundary } from "../ModuleHost.tsx";
 import { ModuleIcon } from "../ModuleIcon.tsx";
 import { PlusIcon } from "../icons.tsx";
+import { ServiceWidget } from "../ServiceWidget.tsx";
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Один компонент на сервис: новый на каждом рендере сбрасывал бы виджет. */
+const serviceWidgets = new Map<string, ComponentType>();
 
 interface WidgetEntry {
   key: string;
@@ -26,8 +30,9 @@ export function HomePage() {
   const [defs, setDefs] = useState<Record<string, ModuleDefinition>>({});
   const [editing, setEditing] = useState(false);
   const apps = state ? appModules(state) : [];
-  // У сервисов нет виджетов: их интерфейс — отдельная страница во фрейме.
+  // Сервисы не грузятся бандлом: их виджет — данные по адресу service.widget (см. ServiceWidget).
   const ready = apps.filter((m) => m.status === "ok" && m.manifest?.type !== "service");
+  const services = apps.filter((m) => m.manifest?.type === "service" && m.manifest.service?.widget && m.service?.state === "running");
   const hashes = ready.map((m) => m.id + m.hash).join();
 
   useEffect(() => {
@@ -51,6 +56,17 @@ export function HomePage() {
       component: w.component,
     }));
   });
+  for (const m of services) {
+    const path = m.manifest!.service!.widget!;
+    widgets.push({
+      key: `${m.id}:service`,
+      module: m,
+      def: { routes: {} } as ModuleDefinition,
+      title: m.manifest?.name ?? m.id,
+      size: "sm",
+      component: serviceWidgets.get(m.id) ?? serviceWidgets.set(m.id, () => <ServiceWidget id={m.id} path={path} />).get(m.id)!,
+    });
+  }
   const visible = editing ? widgets : widgets.filter((w) => !hidden.has(w.key));
 
   const toggleWidget = (key: string) => {

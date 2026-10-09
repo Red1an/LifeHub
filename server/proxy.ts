@@ -1,3 +1,4 @@
+import zlib from "node:zlib";
 import type { Context } from "hono";
 import { servicePort } from "./services.ts";
 
@@ -78,9 +79,26 @@ export async function proxyService(c: Context, id: string): Promise<Response> {
     const html = await upstream.text();
     const inject = patchScript(prefix);
     const body = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + inject) : inject + html;
-    return new Response(body, { status: upstream.status, headers: out });
+    return compressed(c, Buffer.from(body), out, upstream.status);
+  }
+  // Ответ целиком (известна длина) и сжимаемый — сжимаем: через ngrok и мобильную сеть это заметно.
+  // Потоковые ответы (без длины, например ответ нейронки по частям) идут как есть, без задержки.
+  const len = Number(upstream.headers.get("content-length") ?? NaN);
+  if (len > 1024 && len < 8_000_000 && COMPRESSIBLE.test(upstream.headers.get("content-type") ?? "")) {
+    return compressed(c, Buffer.from(await upstream.arrayBuffer()), out, upstream.status);
   }
   return new Response(upstream.body, { status: upstream.status, headers: out });
+}
+
+const COMPRESSIBLE = /^(text\/|application\/(json|javascript|xml|manifest\+json)|image\/svg)/;
+
+function compressed(c: Context, body: Buffer, headers: Headers, status: number) {
+  headers.append("vary", "accept-encoding");
+  if (body.length > 1024 && /\bgzip\b/.test(c.req.header("accept-encoding") ?? "")) {
+    headers.set("content-encoding", "gzip");
+    return new Response(new Uint8Array(zlib.gzipSync(body, { level: 6 })), { status, headers });
+  }
+  return new Response(new Uint8Array(body), { status, headers });
 }
 
 /** Сервис ещё запускается: страница сама обновится. */

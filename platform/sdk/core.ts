@@ -107,8 +107,10 @@ export interface ModuleManifest {
   deps: Record<string, string>;
   uses: Record<string, string>;
   forkedFrom?: string;
+  /** Путь в модуле, куда хаб передаёт «Поделиться» (?title=&text=&url=). */
+  share?: string;
   /** Модуль-сервис: как хаб его запускает (только для type: "service"). */
-  service?: { start: string; port: number; build?: string; path: string; health?: string; env: Record<string, string> };
+  service?: { start: string; port: number; build?: string; path: string; health?: string; widget?: string; env: Record<string, string> };
 }
 
 let host: HostServices = {
