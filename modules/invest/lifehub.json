@@ -1,0 +1,13 @@
+{
+  "id": "invest",
+  "name": "Инвестиции",
+  "version": "1.2.0",
+  "description": "Все счета Т-Банка и БКС в одном портфеле: доход и дивиденды, что не так с портфелем, ошибки прошлого и идеи, куда вложить",
+  "icon": "📈",
+  "author": "Red1an",
+  "type": "app",
+  "sdk": "^1",
+  "entry": "src/index.tsx",
+  "deps": { "fflate": "^0.8" },
+  "permissions": ["network", "ai"]
+}
