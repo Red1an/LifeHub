@@ -576,7 +576,7 @@ function addTx(ctx: Ctx, kind: "expense" | "income"): Reply {
   const budget = data.monthlyBudget();
   if (kind === "expense" && budget > 0) {
     const month = dayKey(ctx.now).slice(0, 7);
-    const spent = data.transactions().filter((t) => t.kind === "expense" && t.date.startsWith(month)).reduce((s, t) => s + t.amount, 0);
+    const spent = data.expenses().filter((t) => t.date.startsWith(month)).reduce((s, t) => s + t.amount, 0);
     const left = money(Math.abs(budget - spent));
     parts.push(budget >= spent ? { text: `В бюджете месяца осталось ${left.text}.`, tts: `В бюджете месяца осталось ${left.tts}.` } : { text: `Бюджет месяца превышен на ${left.text}.`, tts: `Бюджет месяца превышен на ${left.tts}.` });
   }
@@ -600,7 +600,7 @@ function spending(ctx: Ctx): Reply {
     from = today.slice(0, 7) + "-01";
     label = "в этом месяце";
   }
-  const list = data.transactions().filter((x) => x.kind === "expense" && x.date >= from && x.date <= to);
+  const list = data.expenses().filter((x) => x.date >= from && x.date <= to);
   if (!list.length) return reply(`${label.charAt(0).toUpperCase() + label.slice(1)} трат нет.`);
   const total = list.reduce((s, x) => s + x.amount, 0);
   const by = new Map<string, number>();
@@ -774,7 +774,7 @@ async function evening(ctx: Ctx): Promise<Reply> {
     const left = habits.filter((h) => !h.done);
     parts.push(left.length ? `Привычки: ${habits.length - left.length} из ${habits.length}, не отмечены ${listing(left.map((h) => h.name))}.` : `Все привычки выполнены.`);
   }
-  const spent = !ev.spending ? 0 : data.transactions().filter((t) => t.kind === "expense" && t.date === today).reduce((s, t) => s + t.amount, 0);
+  const spent = !ev.spending ? 0 : data.expenses().filter((t) => t.date === today).reduce((s, t) => s + t.amount, 0);
   if (spent) {
     const m = money(spent);
     parts.push({ text: `Потрачено ${m.text}.`, tts: `Потрачено ${m.tts}.` });

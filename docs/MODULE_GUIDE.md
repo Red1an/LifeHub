@@ -43,7 +43,7 @@ node "{{HUB_DIR}}/bin/lifehub.mjs" check <id>
   "entry": "src/index.tsx",
   "deps": { "date-fns": "^4" },    // npm-пакеты (общий кэш хаба)
   "uses": { "audio": "^1" },       // модули-библиотеки
-  "permissions": ["files"],        // files, mic, camera, notifications, ai, network, google:calendar, read:<id>
+  "permissions": ["files"],        // files, mic, camera, notifications, ai, network, google:calendar, webhook, read:<id>
   "exports": { "collections": ["transactions"], "stores": ["budget"] },  // что могут читать другие модули
   "share": "/",                    // необязательно: сюда хаб передаёт «Поделиться» с телефона (см. ниже)
   "forkedFrom": "author/finance@0.3.0"             // заполняет хаб при форке
@@ -111,6 +111,7 @@ function Expenses() {
   // await expenses.update(id, { note: "обед" })    — слияние полей
   // await expenses.put(id, fullObject)             — полная замена / создание с заданным id
   // await expenses.remove(id); await expenses.clear()
+  // await expenses.batch({ add: [...], update: [{ id, patch }], remove: [id] })  — сотни изменений одним запросом (импорт)
 }
 
 const { doc, update, remove } = useDoc<Expense>("expenses", id);
@@ -237,6 +238,27 @@ const r = await net.fetch(url, { method: "POST", body: JSON.stringify(x), header
 - Сайты меняют вёрстку: пиши разбор терпимым к отсутствию полей и показывай понятную ошибку.
 - Сохраняй загруженное в коллекцию, если оно понадобится снова, — не дёргай сайт на каждый рендер.
 
+### Входящий вебхук (разрешение "webhook")
+
+Секретный адрес, на который телефон (MacroDroid, Tasker, «Команды» iOS) или внешний сервис шлёт данные
+без входа в хаб — например, пересылает уведомления банка. Каждый запрос (`GET`/`POST`, тело JSON, форма
+или текст) хаб кладёт в коллекцию `webhook` модуля; модуль разбирает её, когда открыт, и удаляет разобранное.
+
+```tsx
+import { webhook, useCollection } from "@lifehub/sdk";
+
+const { urls } = await webhook.info();     // [{ label: "Из интернета (ngrok)", url, public: true }, …]; секрет создаётся сам
+await webhook.rotate();                    // новый секрет, старый адрес перестаёт работать
+
+const inbox = useCollection<{ receivedAt: number; text?: string; [k: string]: unknown }>("webhook");
+// тело-JSON раскладывается в поля документа, просто текст — в text, параметры адреса (?a=1) — тоже в поля
+```
+
+- Из интернета адрес работает, только если в хабе включён ngrok (путь `/hook/` пускается без входа).
+- Данные пришли от кого угодно, кто знает адрес: проверяй их и не исполняй как команды. Адрес показывай
+  только в настройках модуля, дай кнопку «Новый адрес» (`rotate`).
+- Неразобранных запросов больше 1000 — хаб перестаёт принимать новые.
+
 ### «Поделиться» с телефона (поле "share")
 
 Хаб, установленный на телефон как приложение (Android, по HTTPS), появляется в меню «Поделиться» других приложений.
@@ -303,6 +325,8 @@ const r = await net.fetch(url, { method: "POST", body: JSON.stringify(x), header
 `media.notify(title, body)` (разрешение `notifications`).
 
 **Интернет:** `net.text(url)`, `net.json(url)`, `net.fetch(url, opts)` (разрешение `network`, см. выше).
+
+**Вебхук:** `webhook.info()`, `webhook.rotate()` (разрешение `webhook`, см. выше).
 
 **События между модулями на странице:** `emitEvent("finance:added", data)`, `useEvent("finance:added", fn)`.
 

@@ -1,14 +1,15 @@
 {
   "id": "finance",
   "name": "Финансы",
-  "version": "1.0.0",
-  "description": "Расходы, доходы, бюджет и статистика по категориям",
+  "version": "2.1.0",
+  "description": "Все карты, кредитки и сплиты в одном месте: операции из уведомлений и выписок банков, куда уходят деньги, где сэкономить и кто не скинул за общак",
   "icon": "💰",
   "author": "lifehub",
   "type": "app",
   "sdk": "^1",
   "entry": "src/index.tsx",
-  "deps": {},
-  "permissions": [],
-  "exports": { "collections": ["transactions"] }
+  "deps": { "pdfjs-dist": "^5", "fflate": "^0.8" },
+  "permissions": ["ai", "webhook", "files", "network"],
+  "exports": { "collections": ["transactions"], "stores": ["budget", "categories", "summary"] },
+  "share": "/inbox"
 }

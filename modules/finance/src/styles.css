@@ -1,0 +1,92 @@
+@import url("https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap");
+
+/* Все классы модуля начинаются с fin- */
+.fin-root {
+  --fin-green: #10b981;
+  --fin-green-soft: color-mix(in oklab, #10b981 14%, transparent);
+  --fin-red: #f05252;
+  --fin-red-soft: color-mix(in oklab, #f05252 13%, transparent);
+  --fin-amber: #f59e0b;
+  --fin-amber-soft: color-mix(in oklab, #f59e0b 15%, transparent);
+  --fin-blue: #3b82f6;
+  --fin-blue-soft: color-mix(in oklab, #3b82f6 13%, transparent);
+  --fin-violet: #8b5cf6;
+  --lh-accent: #0f9f6e;
+  --lh-accent-fg: #ffffff;
+  --lh-accent-soft: color-mix(in oklab, #0f9f6e 13%, transparent);
+  font-family: Onest, system-ui, sans-serif;
+  font-feature-settings: "tnum" 1;
+  min-height: 100%;
+}
+[data-theme="dark"] .fin-root {
+  --lh-accent: #34d399;
+  --lh-accent-fg: #052e1f;
+}
+
+.fin-num { font-variant-numeric: tabular-nums; white-space: nowrap; letter-spacing: -0.01em; }
+.fin-up { color: var(--fin-green); }
+.fin-down { color: var(--fin-red); }
+.fin-label { font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--lh-muted); }
+
+.fin-card {
+  background: var(--lh-surface);
+  border: 1px solid var(--lh-line);
+  border-radius: 20px;
+}
+.fin-soft { background: var(--lh-surface-2); border-radius: 14px; }
+
+.fin-hero {
+  border-radius: 24px;
+  color: #f2fff9;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(52, 211, 153, 0.35), transparent 55%),
+    radial-gradient(90% 120% at 0% 100%, rgba(16, 185, 129, 0.25), transparent 60%),
+    linear-gradient(140deg, #0b3b2e, #0c5a43 55%, #0f7a5a);
+  box-shadow: 0 18px 40px -22px rgba(6, 78, 59, 0.7);
+}
+.fin-hero .fin-label { color: rgba(236, 253, 245, 0.72); }
+.fin-hero-track { background: rgba(255, 255, 255, 0.16); border-radius: 999px; height: 8px; overflow: hidden; }
+.fin-hero-bar { height: 100%; border-radius: 999px; background: #a7f3d0; transition: width 0.5s ease; }
+.fin-hero-bar.over { background: #fca5a5; }
+.fin-hero-mark { position: absolute; top: -3px; bottom: -3px; width: 2px; background: rgba(255, 255, 255, 0.85); border-radius: 2px; }
+
+.fin-chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px;
+  border-radius: 999px; border: 1px solid var(--lh-line); background: var(--lh-surface);
+  font-size: 13.5px; font-weight: 500; white-space: nowrap; transition: background 0.15s, border-color 0.15s;
+}
+.fin-chip:hover { background: var(--lh-surface-2); }
+.fin-chip.on { border-color: var(--lh-accent); background: var(--lh-accent-soft); color: var(--lh-fg); }
+
+.fin-icon {
+  display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 14px;
+  background: var(--lh-surface-2); font-size: 20px; line-height: 1;
+}
+.fin-bank {
+  display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 13px;
+  color: #fff; font-weight: 800; font-size: 17px; letter-spacing: -0.02em;
+}
+
+.fin-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; width: 100%; text-align: left; transition: background 0.12s; }
+.fin-row:hover { background: var(--lh-surface-2); }
+
+.fin-bar { height: 6px; border-radius: 99px; background: var(--lh-surface-2); overflow: hidden; }
+.fin-bar > div { height: 100%; border-radius: 99px; transition: width 0.4s ease; }
+
+.fin-tone-save { background: var(--fin-green-soft); }
+.fin-tone-warn { background: var(--fin-amber-soft); }
+.fin-tone-info { background: var(--fin-blue-soft); }
+.fin-tone-good { background: var(--fin-green-soft); }
+
+.fin-scroll-x { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.fin-scroll-x::-webkit-scrollbar { display: none; }
+
+.fin-amount-input {
+  font-size: 36px; font-weight: 700; letter-spacing: -0.02em; text-align: center; width: 100%;
+  background: transparent; outline: none; border: none; color: inherit;
+}
+
+.fin-dot { width: 8px; height: 8px; border-radius: 99px; flex: none; }
+
+.fin-pulse { animation: fin-pulse 1.6s ease-in-out infinite; }
+@keyframes fin-pulse { 50% { opacity: 0.45; } }

@@ -79,6 +79,27 @@ export function putDoc(module: string, collection: string, id: string | undefine
   return getDoc(module, collection, docId)!;
 }
 
+/** Пакет изменений одной транзакцией: добавить, обновить (слиянием), удалить. */
+export function batchDocs(
+  module: string,
+  collection: string,
+  ops: { add?: Record<string, unknown>[]; update?: { id: string; patch: Record<string, unknown> }[]; remove?: string[] },
+): { added: Doc[]; updated: Doc[] } {
+  const added: Doc[] = [];
+  const updated: Doc[] = [];
+  db.exec("BEGIN");
+  try {
+    for (const d of ops.add ?? []) added.push(putDoc(module, collection, undefined, d, false));
+    for (const u of ops.update ?? []) if (getDoc(module, collection, u.id)) updated.push(putDoc(module, collection, u.id, u.patch, true));
+    for (const id of ops.remove ?? []) deleteDoc(module, collection, id);
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+  return { added, updated };
+}
+
 export function deleteDoc(module: string, collection: string, id: string) {
   db.prepare("DELETE FROM records WHERE module = ? AND collection = ? AND id = ?").run(module, collection, id);
 }

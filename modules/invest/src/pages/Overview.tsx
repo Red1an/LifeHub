@@ -21,7 +21,7 @@ export function Overview() {
 }
 
 function Dashboard() {
-  const { report: r, income: inc, health, settings, market, portfolio, previousVisit, actions, done, setDone, other, lastMonth, thisMonth, advice } = useInvest();
+  const { report: r, income: inc, health, settings, market, portfolio, previousVisit, actions, done, setDone, otherAll: other, lastMonth, thisMonth, advice } = useInvest();
   const [range, setRange] = useState<"1y" | "3y" | "all">("all");
   const [guide, setGuide] = useStore<boolean>("guideSeen", false);
   const [monthMode, setMonthMode] = useState<"last" | "this">("last");

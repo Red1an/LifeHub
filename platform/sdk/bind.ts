@@ -6,6 +6,7 @@ import { getHost, type ModuleManifest } from "./core.ts";
 import { createAi, makeUseAi } from "./ai.ts";
 import { createGoogle, makeUseGoogle } from "./google.ts";
 import { createNet } from "./net.ts";
+import { createWebhook } from "./webhook.ts";
 
 /**
  * Всё, что зависит от того, какой модуль вызывает SDK. Хаб подставляет
@@ -24,6 +25,7 @@ export function bind(id: string) {
     google,
     useGoogle: makeUseGoogle(google),
     net: createNet(id),
+    webhook: createWebhook(id),
     db: {
       collection: <T = Record<string, unknown>>(name: string, opts?: CollectionOptions): Collection<T> => createCollection<T>(id, name, opts),
     },

@@ -68,6 +68,13 @@ class Store<T> {
     this.set({ items });
   }
 
+  applyBatchLocal(docs: WithDoc<T>[], removed: string[]) {
+    const byId = new Map(this.state.items.map((x) => [x.id, x]));
+    for (const id of removed) byId.delete(id);
+    for (const d of docs) byId.set(d.id, d);
+    this.set({ items: [...byId.values()] });
+  }
+
   removeLocal(id: string) {
     this.set({ items: this.state.items.filter((x) => x.id !== id) });
   }
@@ -124,6 +131,11 @@ export interface Collection<T> {
   put(id: string, data: T): Promise<WithDoc<T>>;
   remove(id: string): Promise<void>;
   clear(): Promise<void>;
+  /**
+   * Много изменений одним запросом и одной транзакцией (импорт, чистка): до 5000 за раз.
+   * Возвращает добавленные записи в том же порядке и обновлённые.
+   */
+  batch(ops: { add?: (T & { id?: string })[]; update?: { id: string; patch: Partial<T> }[]; remove?: string[] }): Promise<{ added: WithDoc<T>[]; updated: WithDoc<T>[] }>;
 }
 
 export function createCollection<T>(caller: string, name: string, opts: CollectionOptions = {}): Collection<T> {
@@ -169,6 +181,12 @@ export function createCollection<T>(caller: string, name: string, opts: Collecti
       await request("DELETE", `${base}/${encodeURIComponent(id)}`, { module: caller });
       store().removeLocal(id);
     },
+    async batch(ops) {
+      readonly();
+      const r = await request<{ added: WithDoc<T>[]; updated: WithDoc<T>[] }>("POST", `${base}/batch`, { module: caller, body: ops });
+      store().applyBatchLocal([...r.added, ...r.updated], ops.remove ?? []);
+      return r;
+    },
     async clear() {
       readonly();
       await request("DELETE", base, { module: caller });
@@ -203,6 +221,7 @@ export function makeUseCollection(caller: string) {
       update: withToast(api.update),
       put: withToast(api.put),
       remove: withToast(api.remove),
+      batch: withToast(api.batch),
       clear: withToast(api.clear),
       reload: () => store.refresh(),
     };

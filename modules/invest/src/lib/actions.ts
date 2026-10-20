@@ -56,6 +56,10 @@ export function buildActions(input: {
   watch: WatchItem[];
   keyRate: number;
   today?: number;
+  /** Долги по кредиткам и сплитам («Финансы») — вычитаются из подушки. */
+  debts?: number;
+  /** Расходы и остатки взяты из «Финансов». */
+  fromFinance?: boolean;
 }): Action[] {
   const { p, r, inc, health, mistakes, tax, advice, settings, other, watch } = input;
   const today = input.today ?? Date.now();
@@ -67,7 +71,8 @@ export function buildActions(input: {
   }
 
   // Подушка безопасности
-  const liquid = other.filter((a) => a.kind === "deposit" || a.kind === "cash").reduce((a, x) => a + x.amount, 0) + Math.max(0, r.cashRUB);
+  const debts = input.debts ?? 0;
+  const liquid = Math.max(0, other.filter((a) => a.kind === "deposit" || a.kind === "cash").reduce((a, x) => a + x.amount, 0) + Math.max(0, r.cashRUB) - debts);
   if (settings.monthlyExpenses > 0) {
     const months = liquid / settings.monthlyExpenses;
     if (months < 3) {
@@ -76,7 +81,7 @@ export function buildActions(input: {
         priority: 1,
         icon: "🛟",
         title: `Подушка безопасности — всего ${months.toFixed(1).replace(".", ",")} мес. расходов`,
-        why: `Вклады, наличные и свободные деньги на счетах — ${shortRub(liquid)}. Если внезапно понадобятся деньги (болезнь, потеря работы), придётся продавать бумаги — возможно, в минус.`,
+        why: `Вклады, деньги на картах и свободные деньги на брокерских счетах${debts > 0 ? ` минус долги по кредиткам (${shortRub(debts)})` : ""} — ${shortRub(liquid)}${input.fromFinance ? `, а тратите в среднем ${shortRub(settings.monthlyExpenses)} в месяц (по «Финансам»)` : ""}. Если внезапно понадобятся деньги (болезнь, потеря работы), придётся продавать бумаги — возможно, в минус.`,
         steps: [`Соберите 3–6 месяцев расходов: ${shortRub(settings.monthlyExpenses * 3)}–${shortRub(settings.monthlyExpenses * 6)} на вкладе или накопительном счёте.`, "Пока подушки нет, пополнения лучше направлять туда, а не в акции."],
         link: { to: "/settings", label: "Мои сбережения" },
       });

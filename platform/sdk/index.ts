@@ -22,6 +22,7 @@ export type { GoogleStatus, GoogleFetchOptions } from "./google.ts";
 export { GoogleRequestError } from "./google.ts";
 export type { NetFetchOptions, NetResponse } from "./net.ts";
 export { NetRequestError } from "./net.ts";
+export type { WebhookInfo } from "./webhook.ts";
 
 /** Всплывающее уведомление. */
 export const toast = (message: string, tone?: "info" | "success" | "error") => getHost().toast(message, tone);
@@ -46,6 +47,8 @@ export const google = hub.google;
 export const useGoogle = hub.useGoogle;
 /** Запросы в интернет через хаб (разрешение "network"): net.text(url), net.json(url), net.fetch(url). */
 export const net = hub.net;
+/** Входящий вебхук (разрешение "webhook"): webhook.info() → секретные адреса; запросы попадают в коллекцию "webhook". */
+export const webhook = hub.webhook;
 /** Коллекции документов модуля: db.collection<T>("name"). */
 export const db = hub.db;
 /** Хранилище ключ-значение модуля. */

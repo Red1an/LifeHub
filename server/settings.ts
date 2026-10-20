@@ -40,6 +40,8 @@ export interface Settings {
     lastAt?: number;
     aiUsed?: { date: string; n: number };
   };
+  /** Секреты входящих вебхуков модулей (server/hooks.ts): id модуля → секрет в адресе. */
+  hooks?: Record<string, string>;
 }
 
 const DEFAULTS: Settings = {

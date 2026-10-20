@@ -290,11 +290,15 @@ export function checkHabit(habitId: string, date: string) {
 
 export interface Tx {
   id: string;
-  kind: "expense" | "income";
+  kind: "expense" | "income" | "transfer";
   amount: number;
   category: string;
   date: string;
   note?: string;
+  /** Моя доля, если трату делили с друзьями (иначе вся сумма). */
+  share?: number;
+  /** Не учитывать в доходах и расходах (возврат долга и т.п.). */
+  excluded?: boolean;
 }
 
 const DEFAULT_FINANCE_CATEGORIES = [
@@ -309,6 +313,8 @@ export function financeCategories(): { name: string; kind: string }[] {
 }
 
 export const transactions = () => (enabled("finance") ? (db.listDocs("finance", "transactions") as unknown as Tx[]) : []);
+/** Траты для подсчёта: без исключённых, с учётом моей доли в общих. */
+export const expenses = () => transactions().filter((t) => t.kind === "expense" && !t.excluded).map((t) => ({ ...t, amount: t.share ?? t.amount }));
 export const monthlyBudget = () => Number(db.getKv("finance", "budget") ?? 0);
 
 /* Заметки */

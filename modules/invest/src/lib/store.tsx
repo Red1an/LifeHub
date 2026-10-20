@@ -11,6 +11,7 @@ import type { OfzRow } from "./moex.ts";
 import type { ScreenerData } from "./screener.ts";
 import { KEYS } from "./sync.ts";
 import { buildTax, type TaxYear } from "./tax.ts";
+import { useFinanceLink, type FinanceLink } from "./finance.ts";
 import { defaultSettings, emptyMarket, emptyPortfolio, type Market, type OtherAsset, type Portfolio, type Settings, type Snapshot, type WatchItem } from "./types.ts";
 
 /*
@@ -59,8 +60,19 @@ interface Ctx {
   tax: TaxYear;
   advice: Map<string, Advice>;
   actions: Action[];
+  /** Сбережения, вписанные вручную (редактируются в настройках). */
   other: OtherAsset[];
   setOther: (next: OtherAsset[]) => void;
+  /** Все сбережения вне брокеров: вписанные + счета из «Финансов» (если включено). */
+  otherAll: OtherAsset[];
+  /** Сводка «Финансов»: null — модуля нет или он ещё ничего не посчитал. */
+  finance: FinanceLink | null;
+  /** Берём ли расходы и остатки из «Финансов» сейчас. */
+  fromFinance: boolean;
+  /** Долги по кредиткам и сплитам из «Финансов» — уменьшают подушку. */
+  debts: number;
+  /** Расходы, вписанные вручную (для поля ввода; settings.monthlyExpenses — то, по чему считаем). */
+  manualExpenses: number;
   watch: WatchItem[];
   setWatch: (next: WatchItem[] | ((prev: WatchItem[]) => WatchItem[])) => void;
   done: Record<string, number>;
@@ -93,7 +105,16 @@ export function InvestProvider({ children }: { children: ReactNode }) {
     if (!visit.last || now - visit.last > 3_600_000) setVisit({ prev: visit.last, last: now });
   }, [vl.loading, visit.last, setVisit]);
 
-  const settings = useMemo(() => ({ ...defaultSettings(), ...raw, targets: { ...(raw.targets ?? {}) } }), [raw]);
+  const finance = useFinanceLink();
+  const base = useMemo(() => ({ ...defaultSettings(), ...raw, targets: { ...(raw.targets ?? {}) } }), [raw]);
+  // «Финансы» знают реальные траты и остатки — по умолчанию берём оттуда; можно переключить на ручной ввод.
+  const fromFinance = !!finance && base.savingsSource !== "manual";
+  const settings = useMemo(
+    () => (fromFinance && finance!.expenses > 0 ? { ...base, monthlyExpenses: finance!.expenses } : base),
+    [base, fromFinance, finance],
+  );
+  const otherAll = useMemo(() => (fromFinance ? [...other, ...finance!.assets] : other), [other, fromFinance, finance]);
+  const debts = fromFinance ? finance!.debts : 0;
   const setSettings = useCallback((patch: Partial<Settings>) => setRaw((prev) => ({ ...defaultSettings(), ...prev, ...patch })), [setRaw]);
   const p = useMemo(() => ({ ...emptyPortfolio(), ...portfolio }), [portfolio]);
   const m = useMemo(() => ({ ...emptyMarket(), ...market }), [market]);
@@ -111,8 +132,8 @@ export function InvestProvider({ children }: { children: ReactNode }) {
     [p, m, report, settings, screener, bonds, keyRate],
   );
   const actions = useMemo(
-    () => buildActions({ p, r: report, inc: income, health, mistakes, tax, advice, settings, other, watch, keyRate }),
-    [p, report, income, health, mistakes, tax, advice, settings, other, watch, keyRate],
+    () => buildActions({ p, r: report, inc: income, health, mistakes, tax, advice, settings, other: otherAll, watch, keyRate, debts, fromFinance }),
+    [p, report, income, health, mistakes, tax, advice, settings, otherAll, watch, keyRate, debts, fromFinance],
   );
   const lastMonth = useMemo(() => monthSummary(p, m, report, -1), [p, m, report]);
   const thisMonth = useMemo(() => monthSummary(p, m, report, 0), [p, m, report]);
@@ -137,6 +158,11 @@ export function InvestProvider({ children }: { children: ReactNode }) {
     actions,
     other,
     setOther,
+    otherAll,
+    finance,
+    fromFinance,
+    debts,
+    manualExpenses: base.monthlyExpenses,
     watch,
     setWatch,
     done,

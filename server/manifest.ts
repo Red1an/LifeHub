@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { MODULE_ID_RE } from "./paths.ts";
 
-export const KNOWN_PERMISSIONS = ["files", "mic", "camera", "notifications", "network", "ai", "google:calendar"] as const;
+export const KNOWN_PERMISSIONS = ["files", "mic", "camera", "notifications", "network", "ai", "google:calendar", "webhook"] as const;
 
 export interface Manifest {
   id: string;

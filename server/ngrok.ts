@@ -129,16 +129,16 @@ function onLine(raw: string) {
 const PWA_PATHS = ["/manifest.webmanifest", "/icon.svg", ...Object.keys(PNG_ICONS)];
 
 /**
- * Вебхук Джарвиса (навык Алисы): Яндекс не умеет входить через Google. Доступ к нему
- * закрыт секретом в адресе — см. server/jarvis.
+ * Вебхуки: Джарвиса (навык Алисы — Яндекс не умеет входить через Google, см. server/jarvis)
+ * и модулей (телефон пересылает уведомления, см. server/hooks.ts). Доступ — по секрету в адресе.
  */
-const PUBLIC_PREFIX = "/alice/";
+const PUBLIC_PREFIXES = ["/alice/", "/hook/"];
 
 function policy(email: string) {
-  const pub = `!(req.url.path in [${PWA_PATHS.map((p) => `'${p}'`).join(", ")}]) && !req.url.path.startsWith('${PUBLIC_PREFIX}')`;
+  const pub = `!(req.url.path in [${PWA_PATHS.map((p) => `'${p}'`).join(", ")}])${PUBLIC_PREFIXES.map((p) => ` && !req.url.path.startsWith('${p}')`).join("")}`;
   return `# Создаётся хабом при запуске ngrok — правки вручную будут перезаписаны.
 # Вход через Google; пускается только ${email}, остальным — отказ.
-# Без входа доступны только манифест, иконки приложения и вебхук Алисы (${PUBLIC_PREFIX}<секрет>).
+# Без входа доступны только манифест, иконки приложения и вебхуки: Алисы (/alice/<секрет>) и модулей (/hook/<модуль>/<секрет>).
 on_http_request:
   - expressions:
       - "${pub}"
@@ -158,7 +158,7 @@ function writePolicy(email: string) {
   fs.writeFileSync(POLICY_FILE, policy(email));
 }
 
-/** Туннель запущен со старой политикой (без вебхука Алисы) — перезапустить. */
+/** Туннель запущен со старой политикой (без нужных вебхуков) — перезапустить. */
 export async function ensureNgrokPolicy() {
   const cfg = getSettings().ngrok;
   if (!cfg?.enabled || !tunnel.child) return;

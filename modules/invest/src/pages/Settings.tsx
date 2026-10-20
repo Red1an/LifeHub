@@ -287,22 +287,68 @@ function LogCard() {
 
 /** Сбережения вне брокеров — для «всего капитала» и подушки безопасности. */
 function Savings() {
-  const { other, setOther, settings, setSettings, report } = useInvest();
+  const { other, otherAll, setOther, settings, setSettings, report, finance, fromFinance, debts, manualExpenses } = useInvest();
   const [name, setName] = useState("");
   const [kind, setKind] = useState<OtherKind>("deposit");
   const [amount, setAmount] = useState(0);
   const [rate, setRate] = useState(0);
-  const total = other.reduce((a, x) => a + x.amount, 0);
-  const liquid = other.filter((x) => x.kind === "deposit" || x.kind === "cash").reduce((a, x) => a + x.amount, 0) + Math.max(0, report.cashRUB);
+  const total = otherAll.reduce((a, x) => a + x.amount, 0);
+  const liquid = Math.max(0, otherAll.filter((x) => x.kind === "deposit" || x.kind === "cash").reduce((a, x) => a + x.amount, 0) + Math.max(0, report.cashRUB) - debts);
   const months = settings.monthlyExpenses > 0 ? liquid / settings.monthlyExpenses : null;
+  const fs = finance?.summary;
+  const cushion =
+    months != null ? `Подушка: ${months.toFixed(1).replace(".", ",")} мес. расходов (вклады, деньги на картах и свободные деньги на счетах${debts > 0 ? " минус долги по кредиткам" : ""}) — ${months >= 3 ? "достаточно" : "мало, нужно 3–6"}` : "необязательно, но очень полезно";
   return (
     <Panel
       title="Мои сбережения и расходы"
-      info="Вклады, наличные и недвижимость не видны брокеру, но это тоже ваш капитал. Расходы в месяц нужны, чтобы проверить подушку безопасности (3–6 месяцев расходов в доступных деньгах) и показать, какую часть расходов уже покрывают выплаты."
+      info="Вклады, наличные и недвижимость не видны брокеру, но это тоже ваш капитал. Расходы в месяц нужны, чтобы проверить подушку безопасности (3–6 месяцев расходов в доступных деньгах) и показать, какую часть расходов уже покрывают выплаты. Если установлены «Финансы», расходы и остатки на картах берутся оттуда — по реальным операциям."
     >
-      <Field label="Расходы семьи в месяц" hint={months != null ? `Подушка: ${months.toFixed(1).replace(".", ",")} мес. расходов (вклады, наличные и свободные деньги на счетах) — ${months >= 3 ? "достаточно" : "мало, нужно 3–6"}` : "необязательно, но очень полезно"}>
-        <NumInput value={settings.monthlyExpenses} onChange={(v) => setSettings({ monthlyExpenses: v })} suffix="₽" min={0} />
-      </Field>
+      {finance && (
+        <div className="inv-soft mb-3 p-3">
+          <Toggle checked={fromFinance} onChange={(v) => setSettings({ savingsSource: v ? "finance" : "manual" })} label="Брать расходы и остатки из «Финансов»" />
+          {fromFinance && (
+            <div className="mt-2 space-y-1 text-[13px]">
+              <div className="flex justify-between gap-2">
+                <span className="inv-muted">Тратите в месяц{fs?.monthsCounted ? ` (среднее за ${fs.monthsCounted} мес.)` : ""}</span>
+                <b className="inv-num">{finance.expenses > 0 ? shortRub(finance.expenses) : "мало данных"}</b>
+              </div>
+              {fs?.monthlyFixed ? (
+                <div className="flex justify-between gap-2">
+                  <span className="inv-muted">из них обязательные</span>
+                  <span className="inv-num">{shortRub(fs.monthlyFixed)}</span>
+                </div>
+              ) : null}
+              {fs?.monthlyIncome ? (
+                <div className="flex justify-between gap-2">
+                  <span className="inv-muted">Доход в месяц</span>
+                  <span className="inv-num">{shortRub(fs.monthlyIncome)}</span>
+                </div>
+              ) : null}
+              {finance.assets.map((a) => (
+                <div key={a.id} className="flex justify-between gap-2">
+                  <span className="inv-muted truncate">💳 {a.name}</span>
+                  <span className="inv-num">{shortRub(a.amount)}</span>
+                </div>
+              ))}
+              {(fs?.debts ?? []).filter((d) => (d.debt ?? 0) > 0).map((d) => (
+                <div key={d.id} className="flex justify-between gap-2">
+                  <span className="inv-muted truncate">💳 {d.name} — долг</span>
+                  <span className="inv-num inv-down">−{shortRub(d.debt ?? 0)}</span>
+                </div>
+              ))}
+              {fs?.updatedAt && <div className="inv-faint pt-1 text-xs">Обновлено {fmtDate(fs.updatedAt)} · счета без известного остатка не учитываются</div>}
+            </div>
+          )}
+        </div>
+      )}
+      {fromFinance && finance!.expenses > 0 ? (
+        <div className="mb-1 text-[13px]">{cushion}</div>
+      ) : (
+        <Field label="Расходы семьи в месяц" hint={cushion}>
+          <NumInput value={manualExpenses} onChange={(v) => setSettings({ monthlyExpenses: v })} suffix="₽" min={0} />
+        </Field>
+      )}
+      {fromFinance && <div className="mb-1 mt-3 text-[13px] font-bold">Ещё сбережения, которых нет в «Финансах» (вклады, недвижимость)</div>}
       {other.length > 0 && (
         <div className="mt-3">
           {other.map((a) => (
@@ -332,7 +378,7 @@ function Savings() {
               </Btn>
             </div>
           ))}
-          <div className="inv-muted mt-1 text-xs">Всего вне брокеров: {shortRub(total)} · весь капитал: {shortRub(total + report.totalValue)}</div>
+          <div className="inv-muted mt-1 text-xs">Всего вне брокеров{fromFinance ? " (с «Финансами»)" : ""}: {shortRub(total)} · весь капитал: {shortRub(total + report.totalValue - debts)}</div>
         </div>
       )}
       <div className="inv-hr mt-4 pt-4">

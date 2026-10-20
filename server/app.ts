@@ -24,6 +24,7 @@ import { PNG_ICONS, pngIcon } from "./icons.ts";
 import { proxyService } from "./proxy.ts";
 import { netFetch } from "./net.ts";
 import { handleAlice } from "./jarvis/index.ts";
+import { acceptHook, hookInfo, rotateHook } from "./hooks.ts";
 import { SDK_VERSION, type PlatformBuild } from "./compiler.ts";
 import { FILES_DIR, MODULES_DIR, MODULE_ID_RE, HOME, CHECK_COMMAND } from "./paths.ts";
 import type { Manifest } from "./manifest.ts";
@@ -73,6 +74,19 @@ export function createApp(opts: AppOptions) {
     const body = await c.req.json().catch(() => null);
     const r = await handleAlice(c.req.param("secret"), body);
     return r ? c.json(r) : c.notFound();
+  });
+  // Входящие вебхуки модулей (разрешение "webhook"): без входа, доступ — по секрету в адресе (server/hooks.ts).
+  app.on(["GET", "POST", "PUT"], "/hook/:module/:secret", async (c) => {
+    const module = c.req.param("module");
+    const m = MODULE_ID_RE.test(module) ? manifestOf(module) : undefined;
+    if (!m?.permissions.includes("webhook") || getSettings().disabled.includes(module)) return c.notFound();
+    const r = acceptHook(module, c.req.param("secret"), {
+      contentType: c.req.header("content-type") ?? "",
+      raw: c.req.method === "GET" ? "" : await c.req.text(),
+      query: c.req.query(),
+    });
+    if (!r) return c.notFound();
+    return "error" in r ? c.json({ error: r.error }, r.status as any) : c.json(r);
   });
   app.use("*", authMiddleware);
 
@@ -419,6 +433,19 @@ export function createApp(opts: AppOptions) {
     changed(c, module, collection);
     return c.json(doc);
   });
+  /** Пакет: { add?: [...], update?: [{ id, patch }], remove?: [id] } — одна транзакция и одно событие вместо сотен. */
+  app.post("/api/data/:module/:collection/batch", async (c) => {
+    const { module, collection } = access(c, true);
+    const b = await c.req.json();
+    const arr = (x: unknown) => (Array.isArray(x) ? x : []);
+    const add = arr(b.add).filter((d) => d && typeof d === "object") as Record<string, unknown>[];
+    const update = arr(b.update).filter((u) => u && typeof u.id === "string" && ID_RE.test(u.id) && u.patch && typeof u.patch === "object");
+    const remove = arr(b.remove).filter((id) => typeof id === "string" && ID_RE.test(id)) as string[];
+    if (add.length + update.length + remove.length > 5000) throw new HubError("Не больше 5000 изменений за раз");
+    const r = db.batchDocs(module, collection, { add, update, remove });
+    changed(c, module, collection);
+    return c.json(r);
+  });
   app.delete("/api/data/:module/:collection", (c) => {
     const { module, collection } = access(c, true);
     db.clearCollection(module, collection);
@@ -625,6 +652,23 @@ export function createApp(opts: AppOptions) {
         body: typeof b.body === "string" ? b.body : undefined,
       }),
     );
+  });
+
+  /** Адреса входящего вебхука модуля (разрешение "webhook"); rotate — новый секрет, старый адрес перестаёт работать. */
+  const hookModule = (c: Context) => {
+    const caller = c.req.header("x-lifehub-module") ?? c.req.param("module")!;
+    if (caller !== c.req.param("module")) throw new HubError("Вебхук доступен только самому модулю", 403);
+    const m = manifestOf(caller);
+    if (!m) throw new HubError("Неизвестный модуль", 404);
+    if (!m.permissions.includes("webhook")) throw new HubError(`Модулю "${caller}" нужно разрешение "webhook"`, 403);
+    return caller;
+  };
+  const hookOpts = () => ({ port: opts.port, https: opts.https, lan: lanAddresses() });
+  app.get("/api/hooks/:module", async (c) => c.json(await hookInfo(hookModule(c), hookOpts())));
+  app.post("/api/hooks/:module/rotate", async (c) => {
+    const module = hookModule(c);
+    rotateHook(module);
+    return c.json(await hookInfo(module, hookOpts()));
   });
 
   /* ─────────────── работа в фоне и автозапуск ─────────────── */
