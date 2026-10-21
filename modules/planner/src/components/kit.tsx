@@ -1,6 +1,7 @@
 import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { Link, Modal, Spinner, confirm, cn, toast } from "@lifehub/sdk";
-import { CATEGORIES, type CalEvent, type CalendarInfo } from "../lib/types.ts";
+import { Link, Modal, Spinner, confirm, cn, toast, useCollection } from "@lifehub/sdk";
+import { CATEGORIES, type CalEvent, type CalendarInfo, type NoteLink } from "../lib/types.ts";
+import { markNoteDone } from "../lib/notes.ts";
 import { createLifehubCalendar, deleteEvent, usePrefs } from "../lib/gcal.ts";
 import { markBlock } from "../lib/tasks.ts";
 import { dayLabel, hhmm } from "../lib/time.ts";
@@ -107,7 +108,9 @@ export function EventRow({ e, onClick }: { e: CalEvent; onClick: () => void }) {
 
 export function EventModal({ e, onClose, onMove }: { e: CalEvent | null; onClose: () => void; onMove?: (e: CalEvent) => void }) {
   const [busy, setBusy] = useState(false);
+  const links = useCollection<NoteLink>("links");
   if (!e) return <Modal open={false} onClose={onClose} />;
+  const noteDone = !!e.noteId && !!links.items.find((l) => l.id === e.noteId)?.done;
   const remove = async (series: boolean) => {
     const what = series ? "всю серию повторов" : e.recurringEventId ? "только этот день" : "событие";
     if (!(await confirm(`Удалить ${what} «${e.title}» из Google Календаря?`, { danger: true, confirmText: "Удалить" }))) return;
@@ -139,6 +142,11 @@ export function EventModal({ e, onClose, onMove }: { e: CalEvent | null; onClose
         {e.location && <div>📍 {e.location}</div>}
         {e.description && <div className="whitespace-pre-wrap text-muted">{e.description}</div>}
         {e.ours && <div className="text-muted">✨ Поставлено модулем «Расписание»</div>}
+        {e.noteId && (
+          <Link to={`~/m/notes/n/${e.noteId}`} className="block text-muted underline">
+            📝 Из заметки{noteDone ? " · ✅ сделано" : ""}
+          </Link>
+        )}
         <div className="flex flex-wrap gap-2 pt-2">
           {e.taskId && (
             <Btn
@@ -149,6 +157,26 @@ export function EventModal({ e, onClose, onMove }: { e: CalEvent | null; onClose
                 try {
                   const r = await markBlock(e.taskId!, e.id);
                   toast(r?.finished ? "Задача выполнена целиком 🎉" : "Отмечено: сделал", "success");
+                  onClose();
+                } catch (err) {
+                  toast((err as Error).message, "error");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              ✅ Сделал
+            </Btn>
+          )}
+          {e.noteId && !e.taskId && !noteDone && (
+            <Btn
+              main
+              loading={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await markNoteDone(e.noteId!, e.title);
+                  toast("Отмечено: сделал — дело закроется и в «Заметках»", "success");
                   onClose();
                 } catch (err) {
                   toast((err as Error).message, "error");

@@ -1,8 +1,10 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Modal, Progress, cn, confirm, dayKey, plural, toast, useCollection, useGoogle, useNavigate, useStore } from "@lifehub/sdk";
+import { Modal, Progress, cn, confirm, dayKey, plural, toast, useCollection, useGoogle, useNavigate, useSearchParams, useStore } from "@lifehub/sdk";
 import { Btn, ConnectCard, Panel, Skeleton } from "../components/kit.tsx";
 import { MoveModal, type MoveTarget } from "../components/move.tsx";
 import { AutoTextarea } from "../components/input.tsx";
+import { NoteTodos, useNoteTodos } from "../components/notetodos.tsx";
+import { categoryOf, markNoteDone, type NoteTodo } from "../lib/notes.ts";
 import { deleteById, eventsChanged, loadBusy, usePrefs } from "../lib/gcal.ts";
 import { deadlineLabel, doneMinutes, draftsForTasks, markBlock, newPending, remainingToPlan } from "../lib/tasks.ts";
 import { CATEGORIES, type Category, type Plan, type Task, type TaskBlock } from "../lib/types.ts";
@@ -29,6 +31,8 @@ export function TasksPage() {
   const [moving, setMoving] = useState<MoveTarget | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const { doneInNotes } = useNoteTodos();
 
   const open = useMemo(() => tasks.items.filter((t) => !t.done).sort((a, b) => a.deadline.localeCompare(b.deadline)), [tasks.items]);
   const done = tasks.items.filter((t) => t.done);
@@ -46,6 +50,16 @@ export function TasksPage() {
     }
     setPlan({ request, summary: "Разложил работу по свободному времени до срока — проверьте и добавьте в календарь.", questions: [], drafts: r.drafts, tasks: r.tasks, images: [], sources: [], createdAt: Date.now() });
     navigate("/ask");
+  };
+
+  /** Дело из заметки со сроком → задача с блоками до срока. */
+  const fromNote = async (n: NoteTodo) => {
+    try {
+      const p = newPending({ title: n.title, deadline: n.due!, estimate: (n.effort ?? 2) * 60, chunk: n.effort && n.effort <= 1 ? 60 : 90, category: categoryOf(n.area), notes: n.body && n.body !== n.title ? n.body.slice(0, 500) : undefined, source: "notes", noteId: n.id });
+      await planDraft([p], {}, `Дело из заметок «${n.title}» до ${deadlineLabel(p)}`);
+    } catch (e) {
+      toast((e as Error).message, "error");
+    }
   };
 
   const replan = async (t: TaskDoc) => {
@@ -72,6 +86,7 @@ export function TasksPage() {
       for (const b of future) await deleteById(b.calendarId, b.eventId).catch(() => {});
       if (t.deadlineEvent) await deleteById(t.deadlineEvent.calendarId, t.deadlineEvent.eventId).catch(() => {});
       await tasks.update(t.id, { done: true, blocks: t.blocks.filter((b) => !future.includes(b)) });
+      if (t.noteId) await markNoteDone(t.noteId, t.title).catch(() => {});
       eventsChanged();
       toast("Задача выполнена 🎉", "success");
     } finally {
@@ -98,11 +113,13 @@ export function TasksPage() {
   return (
     <Wrap>
       <div className="mb-4 flex items-center justify-between gap-2">
-        <h1 className="pl-title text-2xl sm:text-3xl">Дедлайны</h1>
+        <h1 className="pl-title text-2xl sm:text-3xl">Дела и дедлайны</h1>
         <Btn main onClick={() => setAdding(true)}>
           + Задача
         </Btn>
       </div>
+
+      <NoteTodos onDeadline={fromNote} openId={params.get("note")} onOpened={() => setParams({ note: null })} />
 
       {toMark.length > 0 && (
         <Panel className="mb-4 space-y-2">
@@ -173,6 +190,7 @@ export function TasksPage() {
                     )}
                   </div>
                 </div>
+                {t.noteId && doneInNotes.has(t.noteId) && <div className="text-sm text-[#7ee2a8]">✅ В «Заметках» дело отмечено сделанным — можно нажать «Выполнено»</div>}
                 {rest > 0 && <div className="text-sm text-[#ffd166]">⚠ Не распланировано {hours(rest)} работы</div>}
                 {t.notes && <div className="pl-muted whitespace-pre-wrap text-sm">{t.notes}</div>}
                 <div className="flex flex-wrap gap-2">

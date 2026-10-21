@@ -2,6 +2,7 @@ import { Link, dayKey, plural, useCollection } from "@lifehub/sdk";
 import { usePrefs } from "../lib/gcal.ts";
 import { blocksTime, busyFromEvents, freeSlots } from "../lib/slots.ts";
 import { deadlineLabel } from "../lib/tasks.ts";
+import { useNoteTodos } from "./notetodos.tsx";
 import type { CalEvent, Task } from "../lib/types.ts";
 import { fromKey, fromMinutes, hhmm, shiftKey } from "../lib/time.ts";
 
@@ -9,6 +10,7 @@ import { fromKey, fromMinutes, hhmm, shiftKey } from "../lib/time.ts";
 export function DaySummary({ k, events }: { k: string; events: CalEvent[] }) {
   const { prefs } = usePrefs();
   const tasks = useCollection<Task>("tasks");
+  const { unplanned } = useNoteTodos();
   const today = dayKey();
   if (k < today) return null;
 
@@ -44,6 +46,11 @@ export function DaySummary({ k, events }: { k: string; events: CalEvent[] }) {
       {soon.length > 0 && (
         <Link to="/tasks" className="block text-[#ffd166]">
           ⏰ {soon.map((t) => `${t.title} — ${deadlineLabel(t)}`).join("; ")}
+        </Link>
+      )}
+      {k === today && unplanned.length > 0 && (
+        <Link to="/tasks" className="block text-[var(--pl-pink)]">
+          📝 {unplanned.length} {plural(unplanned.length, ["дело", "дела", "дел"])} из заметок без времени — найти окно →
         </Link>
       )}
       {tomorrow && (

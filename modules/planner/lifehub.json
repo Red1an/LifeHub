@@ -1,13 +1,14 @@
 {
   "id": "planner",
   "name": "Расписание",
-  "version": "0.4.1",
-  "description": "Ставит события и напоминания в Google Календарь по просьбам, голосом и по фото, раскладывает дедлайны по свободному времени, загружает расписание ГУАП, считает статистику недели",
+  "version": "0.5.0",
+  "description": "Ставит события и напоминания в Google Календарь по просьбам, голосом и по фото, раскладывает дедлайны и дела из заметок по свободному времени, загружает расписание ГУАП, считает статистику недели",
   "icon": "🗓️",
   "author": "Red1an",
   "type": "app",
   "sdk": "^1",
   "entry": "src/index.tsx",
   "deps": {},
-  "permissions": ["google:calendar", "ai", "files", "mic", "network", "read:fit", "read:devpath", "read:habits"]
+  "permissions": ["google:calendar", "ai", "files", "mic", "network", "read:fit", "read:devpath", "read:habits", "read:notes"],
+  "exports": { "collections": ["links"] }
 }

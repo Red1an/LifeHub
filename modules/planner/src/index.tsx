@@ -62,7 +62,7 @@ export default defineModule({
   nav: [
     { to: "/", label: "Неделя", icon: "🗓️" },
     { to: "/ask", label: "Запланировать", icon: "✨" },
-    { to: "/tasks", label: "Дедлайны", icon: "🎯" },
+    { to: "/tasks", label: "Дела", icon: "🎯" },
     { to: "/stats", label: "Статистика", icon: "📊" },
     { to: "/settings", label: "Настройки", icon: "⚙️" },
   ],

@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from "react";
-import { Link, Modal, cn, db, files, formatRelative, useNavigate, useStore } from "@lifehub/sdk";
+import { Link, Modal, cn, dayKey, db, files, formatRelative, useNavigate, useStore } from "@lifehub/sdk";
 import { contextById, isSnoozed, kindById, kindOf, withNames } from "../lib/kinds.ts";
 import { KIND_LABEL } from "../lib/links.ts";
 import { eventWhen, hostOf, preview, shortDate, titleOf } from "../lib/text.ts";
+import { askUrl, planned, usePlanLinks } from "../lib/planner.ts";
 import { DEFAULT_PREFS, type AreaId, type LinkCard, type Note, type NoteDoc, type NoteEvent, type Prefs, type TopicDoc } from "../lib/types.ts";
 
 export function usePrefs() {
@@ -96,6 +97,8 @@ export function NoteCard({ note, topic, onDone, compact }: { note: NoteDoc; topi
   const text = preview(note.body, compact ? 90 : 160);
   const props = propsLine(note);
   const cover = !compact && (note.cover ?? (note.images?.[0] ? files.url(note.images[0]) : link?.image));
+  const planLinks = usePlanLinks();
+  const inCalendar = !note.event && !note.done ? planned(planLinks.get(note.id), dayKey()) : null;
   return (
     <div
       role="link"
@@ -145,6 +148,7 @@ export function NoteCard({ note, topic, onDone, compact }: { note: NoteDoc; topi
           <TopicTag topic={topic} />
           {note.event && <span className="nt-accent text-xs font-medium">📅 {eventWhen(note.event)}</span>}
           {note.due && !note.done && <span className="nt-accent text-xs font-medium">🎯 до {shortDate(note.due)}</span>}
+          {inCalendar && <span className="nt-accent text-xs font-medium">🗓️ {eventWhen(inCalendar)}</span>}
           {note.context?.map((c) => (
             <span key={c} className="text-xs" title={contextById(c)?.name}>
               {contextById(c)?.emoji}
@@ -206,15 +210,13 @@ export function deadlineRequest(n: Note) {
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
-const PLANNER_ASK = "~/m/planner/ask?text=";
-
 /** Отправить событие заметки в «Расписание»: откроется его страница с заполненным запросом. */
 export function useSendToCalendar() {
   const navigate = useNavigate();
   return async (note: NoteDoc) => {
     if (!note.event) return;
     await db.collection<Note>("notes").update(note.id, { event: { ...note.event, sentAt: Date.now() } });
-    navigate(PLANNER_ASK + encodeURIComponent(eventRequest(note.event, note)));
+    navigate(askUrl(note.id, eventRequest(note.event, note)));
   };
 }
 
@@ -224,11 +226,11 @@ export function useSendDeadline() {
   return async (note: NoteDoc) => {
     if (!note.due) return;
     await db.collection<Note>("notes").update(note.id, { dueSentAt: Date.now() });
-    navigate(PLANNER_ASK + encodeURIComponent(deadlineRequest(note)));
+    navigate(askUrl(note.id, deadlineRequest(note)));
   };
 }
 
-export function EventBox({ event, onSend, compact }: { event: NoteEvent; onSend: () => void; compact?: boolean }) {
+export function EventBox({ event, onSend, compact, placed }: { event: NoteEvent; onSend: () => void; compact?: boolean; placed?: boolean }) {
   return (
     <div className={cn("nt-soft flex items-center gap-3", compact ? "p-2.5" : "p-3.5")}>
       <div className="text-2xl">📅</div>
@@ -237,9 +239,10 @@ export function EventBox({ event, onSend, compact }: { event: NoteEvent; onSend:
         <div className="nt-muted text-sm">
           {eventWhen(event)}
           {event.place && ` · ${event.place}`}
+          {placed && " · ✓ в календаре"}
         </div>
       </div>
-      <button type="button" className={cn("nt-btn nt-btn-sm", !!event.sentAt && "nt-btn-ghost")} onClick={onSend}>
+      <button type="button" className={cn("nt-btn nt-btn-sm", (placed || !!event.sentAt) && "nt-btn-ghost")} onClick={onSend}>
         {event.sentAt ? "Ещё раз" : "В календарь"}
       </button>
     </div>

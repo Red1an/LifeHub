@@ -62,6 +62,8 @@ export interface Draft {
   /** Блок работы над задачей (block) или напоминание о её дедлайне (deadline); taskId — id в коллекции tasks. */
   taskId?: string;
   taskRole?: "block" | "deadline";
+  /** Из заметки «Заметок» — её id (событие помечается private.note, см. lib/notes.ts). */
+  noteId?: string;
 }
 
 /** Задача с дедлайном: программа сама раскладывает её на блоки по свободному времени. */
@@ -81,6 +83,8 @@ export interface Task {
   deadlineEvent?: { eventId: string; calendarId: string };
   source?: string;
   createdAt?: number;
+  /** Задача из заметки «Заметок»: выполнена — заметка закроется. */
+  noteId?: string;
 }
 
 export interface TaskBlock {
@@ -115,6 +119,8 @@ export interface Plan {
   images: string[];
   sources: string[];
   createdAt: number;
+  /** Запрос пришёл из заметки: созданные события привяжутся к ней. */
+  noteId?: string;
 }
 
 export interface Prefs {
@@ -178,6 +184,22 @@ export interface HistoryEntry {
   failed: number;
 }
 
+/**
+ * Коллекция links (открыта «Заметкам»): что из заметки стоит в календаре. id = id заметки.
+ * Писать в чужие данные нельзя — «Заметки» сами читают links и закрывают дело, если done.
+ */
+export interface NoteLink {
+  title: string;
+  /** Ближайшее событие или блок. */
+  date: string;
+  start?: string;
+  events: { eventId: string; calendarId: string }[];
+  taskId?: string;
+  done?: boolean;
+  doneAt?: number;
+  updatedAt: number;
+}
+
 export interface CalendarInfo {
   id: string;
   summary: string;
@@ -208,6 +230,8 @@ export interface CalEvent {
   kind?: "event" | "reminder";
   /** Блок задачи: id в коллекции tasks. */
   taskId?: string;
+  /** Из заметки: id в «Заметках». */
+  noteId?: string;
   source?: string;
   /** Не занимает время (transparency: transparent). */
   free?: boolean;

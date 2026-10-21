@@ -5,6 +5,7 @@ import { DraftCard, DraftEditor } from "../components/drafts.tsx";
 import { AutoTextarea, MicButton, useDictation } from "../components/input.tsx";
 import { applyDraft, eventsChanged, loadBusy as loadBusyEvents, useCalendars, usePrefs } from "../lib/gcal.ts";
 import { deadlineLabel, saveTasks } from "../lib/tasks.ts";
+import { linkNote } from "../lib/notes.ts";
 import { makePlan } from "../lib/planner.ts";
 import { SOURCES, loadSource, type SourceState } from "../lib/sources.ts";
 import type { CalEvent, Draft, HistoryEntry, Plan } from "../lib/types.ts";
@@ -36,6 +37,8 @@ export function AskPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [uploading, setUploading] = useState(0);
   const [picked, setPicked] = useState<string[]>([]);
+  /** Запрос из заметки: её id — события привяжутся к ней. */
+  const [noteId, setNoteId] = useState<string | null>(null);
   const [sources, setSources] = useState<Record<string, SourceState>>({});
   const [thinking, setThinking] = useState(false);
   const [step, setStep] = useState(0);
@@ -53,12 +56,15 @@ export function AskPage() {
   }, []);
 
   // ?text=… — запрос от другого модуля (например, событие из «Заметок»): подставляем в поле.
+  // ?note=… — id заметки, к которой привязать созданные события.
   const [params, setParams] = useSearchParams();
   const incoming = params.get("text");
+  const incomingNote = params.get("note");
   useEffect(() => {
     if (!incoming) return;
     setText(incoming);
-    setParams({ text: null });
+    setNoteId(incomingNote);
+    setParams({ text: null, note: null });
     if (plan) toast("Запрос подставлен в поле — он появится, когда примените или сбросите текущий черновик");
   }, [incoming]);
 
@@ -117,12 +123,14 @@ export function AskPage() {
         refine: refineText && plan ? { drafts: plan.drafts, tasks: plan.tasks, feedback: refineText } : undefined,
       });
       if (!r.drafts.length && !r.questions.length) throw new Error(r.summary || "Нейронка не предложила изменений — попробуйте сформулировать иначе");
-      setPlan({ request, summary: r.summary, questions: r.questions, drafts: r.drafts, tasks: r.tasks, images, sources: used, createdAt: Date.now() });
+      const fromNote = (refineText && plan ? plan.noteId : noteId) ?? undefined;
+      setPlan({ request, summary: r.summary, questions: r.questions, drafts: r.drafts, tasks: r.tasks, images, sources: used, createdAt: Date.now(), noteId: fromNote });
       setRefine("");
       if (!refineText) {
         setText("");
         setPhotos([]);
         setPicked([]);
+        setNoteId(null);
       }
     } catch (e) {
       setError((e as Error).message);
@@ -133,7 +141,9 @@ export function AskPage() {
 
   const apply = async () => {
     if (!plan) return;
-    const todo = plan.drafts.filter((d) => !d.skip);
+    // Всё созданное по запросу из заметки привязываем к ней.
+    const todo = plan.drafts.filter((d) => !d.skip).map((d) => (plan.noteId && d.op === "create" && !d.noteId ? { ...d, noteId: plan.noteId } : d));
+    const tasks = plan.tasks?.map((t) => (plan.noteId && !t.noteId ? { ...t, noteId: plan.noteId } : t));
     setApplying({ done: 0, total: todo.length });
     const counts = { created: 0, updated: 0, deleted: 0, failed: 0 };
     const failed: Draft[] = [];
@@ -152,7 +162,13 @@ export function AskPage() {
       setApplying((a) => a && { ...a, done: a.done + 1 });
     }
     setApplying(null);
-    if (plan.tasks?.length) await saveTasks(plan.tasks, applied).catch((e) => toast(`Задачи не сохранились: ${(e as Error).message}`, "error"));
+    if (tasks?.length) await saveTasks(tasks, applied).catch((e) => toast(`Задачи не сохранились: ${(e as Error).message}`, "error"));
+    const byNote = new Map<string, typeof applied>();
+    for (const a of applied) if (a.draft.noteId) byNote.set(a.draft.noteId, [...(byNote.get(a.draft.noteId) ?? []), a]);
+    for (const [id, list] of byNote) {
+      const title = tasks?.find((t) => t.noteId === id)?.title ?? list[0].draft.title;
+      await linkNote(id, title, list).catch(() => {});
+    }
     eventsChanged();
     await history.add({ request: plan.request, summary: plan.summary, images: plan.images, sources: plan.sources, ...counts }).catch(() => {});
     if (failed.length) {
@@ -327,6 +343,15 @@ export function AskPage() {
             {Array.from({ length: uploading }, (_, i) => (
               <div key={i} className="pl-thumb pl-shimmer" />
             ))}
+          </div>
+        )}
+
+        {noteId && (
+          <div className="pl-soft flex items-center gap-2 px-3 py-2 text-sm">
+            <span className="flex-1">📝 Из заметки — события привяжутся к ней, «сделал» закроет дело в «Заметках»</span>
+            <button className="pl-muted" aria-label="Не привязывать к заметке" onClick={() => setNoteId(null)}>
+              ✕
+            </button>
           </div>
         )}
 

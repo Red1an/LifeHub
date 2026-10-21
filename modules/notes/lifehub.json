@@ -1,7 +1,7 @@
 {
   "id": "notes",
   "name": "Заметки",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Воронка для мыслей: кидай текстом, голосом, фото или через «Поделиться» — нейронка разложит по типам, проектам и сферам, найдёт связи и события, ответит на вопросы по заметкам",
   "icon": "📝",
   "author": "lifehub",
@@ -9,7 +9,7 @@
   "sdk": "^1",
   "entry": "src/index.tsx",
   "deps": { "marked": "^16" },
-  "permissions": ["ai", "mic", "network", "files"],
+  "permissions": ["ai", "mic", "network", "files", "read:planner"],
   "exports": { "collections": ["notes", "topics", "topic_log"] },
   "share": "/"
 }

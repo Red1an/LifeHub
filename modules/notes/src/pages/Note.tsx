@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { marked } from "marked";
-import { Link, Modal, cn, confirm, db, files, formatDate, toast, useCollection, useNavigate, useParams, useSearchParams } from "@lifehub/sdk";
+import { Link, Modal, cn, confirm, dayKey, db, files, formatDate, toast, useCollection, useNavigate, useParams, useSearchParams } from "@lifehub/sdk";
 import { EventBox, Gallery, Head, LinkPreview, NoteCard, Stars, Wrap, propsLine, topicMap, useAreas, useDone, useSendDeadline, useSendToCalendar } from "../components/kit.tsx";
 import { canEnrich, enrichNote } from "../lib/enrich.ts";
 import { CONTEXTS, KINDS, isSnoozed, kindOf, snoozeOptions } from "../lib/kinds.ts";
 import { similar } from "../lib/related.ts";
-import { noteText, preview, shortDate, titleOf } from "../lib/text.ts";
+import { eventWhen, noteText, preview, shortDate, titleOf } from "../lib/text.ts";
+import { findTimeUrl, planned, usePlanLinks, type PlanLink } from "../lib/planner.ts";
 import { backlinks, normName, titleIndex, wikiToMarkdown } from "../lib/wikilinks.ts";
 import type { ContextId, Note, NoteDoc, Topic } from "../lib/types.ts";
 
@@ -35,6 +36,7 @@ export function NotePage() {
   const tmap = useMemo(() => topicMap(topics.items), [topics.items]);
   const byId = useMemo(() => new Map(notes.items.map((n) => [n.id, n])), [notes.items]);
   const edit = !!params.get("edit");
+  const planLinks = usePlanLinks();
 
   if (notes.loading) return null;
   if (!note) {
@@ -155,7 +157,7 @@ export function NotePage() {
       <div className="mt-5 space-y-5">
         {!!note.images?.length && <Gallery ids={note.images} />}
 
-        {note.event && <EventBox event={note.event} onSend={() => send(note)} />}
+        {note.event && <EventBox event={note.event} onSend={() => send(note)} placed={planLinks.has(note.id)} />}
 
         {!!note.links?.length && (
           <div className="space-y-2">
@@ -243,6 +245,7 @@ export function NotePage() {
               )}
             </div>
             <p className="nt-muted mt-1 text-xs">«Расписание» разложит дело по свободным окнам до срока.</p>
+            <PlanRow note={note} link={planLinks.get(note.id)} onFind={() => navigate(findTimeUrl(note.id))} />
           </section>
         )}
 
@@ -565,5 +568,19 @@ function LinkPicker({ open, onClose, note, pool, onPick }: { open: boolean; onCl
         {!candidates.length && <div className="py-4 text-center text-sm text-muted">{q ? "Ничего не нашлось" : "Похожих не нашлось — поищи по словам"}</div>}
       </div>
     </Modal>
+  );
+}
+
+/** Дело и календарь: когда стоит, «найти время», отметка из «Расписания». */
+function PlanRow({ note, link, onFind }: { note: NoteDoc; link?: PlanLink; onFind: () => void }) {
+  const when = planned(link, dayKey());
+  if (note.done) return link?.done ? <p className="nt-muted mt-2 text-sm">✅ Отмечено «сделал» в «Расписании»</p> : null;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      {when && <span className="nt-accent text-sm font-medium">🗓️ В календаре: {eventWhen(when)}</span>}
+      <button type="button" className={cn("nt-btn nt-btn-sm", !!when && "nt-btn-ghost")} onClick={onFind}>
+        ⏱ {when ? "Ещё время" : "Найти время"}
+      </button>
+    </div>
   );
 }

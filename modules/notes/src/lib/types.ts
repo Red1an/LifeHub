@@ -65,6 +65,8 @@ export interface Note {
   effort?: number;
   /** Когда дело отправили в «Дедлайны». */
   dueSentAt?: number;
+  /** Отметка «сделал» из «Расписания» уже перенесена (её doneAt) — см. lib/planner.ts. */
+  planDoneSeen?: number;
   context?: ContextId[];
   /** Отложено до YYYY-MM-DD: до этого дня не видно на полках, потом всплывает. */
   snoozeUntil?: string;

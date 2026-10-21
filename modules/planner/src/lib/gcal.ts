@@ -115,6 +115,7 @@ function toEvent(e: GEvent, cal: CalendarInfo): CalEvent {
     category: priv.category as Category | undefined,
     kind: priv.kind === "reminder" ? "reminder" : "event",
     taskId: priv.task || undefined,
+    noteId: priv.note || undefined,
     source: priv.source,
     free: e.transparency === "transparent",
     canEdit: cal.accessRole === "owner" || cal.accessRole === "writer",
@@ -210,7 +211,7 @@ function body(d: Draft, prefs: Prefs, tz: string) {
     // Напоминание не занимает время: его не видно как «занято» в календаре и у других людей.
     transparency: d.kind === "reminder" ? "transparent" : "opaque",
     extendedProperties: {
-      private: { lifehub: "planner", category: d.category, kind: d.kind ?? "event", source: d.source ?? "text", ...(d.taskId ? { task: d.taskId, role: d.taskRole ?? "block" } : {}) },
+      private: { lifehub: "planner", category: d.category, kind: d.kind ?? "event", source: d.source ?? "text", ...(d.taskId ? { task: d.taskId, role: d.taskRole ?? "block" } : {}), ...(d.noteId ? { note: d.noteId } : {}) },
     },
   };
 }

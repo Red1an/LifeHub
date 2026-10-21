@@ -14,9 +14,13 @@ import { AllPage } from "./pages/All.tsx";
 import { DaysPage } from "./pages/Days.tsx";
 import { MicButton, useDictation } from "./components/input.tsx";
 import { localReview, type ReviewCache } from "./lib/review.ts";
+import { useSyncPlanDone } from "./lib/planner.ts";
 import type { Note, Topic } from "./lib/types.ts";
 
 function Layout({ children }: { children: ReactNode }) {
+  const notes = useCollection<Note>("notes");
+  // «Сделал» в Расписании закрывает дело и здесь.
+  useSyncPlanDone(notes.items);
   return <div className="nt-root flex min-h-full flex-1 flex-col">{children}</div>;
 }
 

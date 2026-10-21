@@ -2,6 +2,7 @@ import { db, uid } from "@lifehub/sdk";
 import { busyFromDrafts, busyFromEvents, planTask } from "./slots.ts";
 import type { CalEvent, Draft, PendingTask, Prefs, Task, TaskBlock } from "./types.ts";
 import { dayLabel } from "./time.ts";
+import { markNoteDone } from "./notes.ts";
 
 /*
  * Задачи с дедлайном. Нейронка (или форма) описывает задачу, а блоки работы
@@ -50,6 +51,7 @@ export function draftsForTasks(tasks: PendingTask[], remaining: Record<string, n
         source: "task",
         taskId: t.id,
         taskRole: "block",
+        noteId: t.noteId,
       });
       const day0 = new Date(`${b.date}T00:00:00`).getTime();
       const [sh, sm] = b.start.split(":").map(Number);
@@ -69,6 +71,7 @@ export function draftsForTasks(tasks: PendingTask[], remaining: Record<string, n
         source: "task",
         taskId: t.id,
         taskRole: "deadline",
+        noteId: t.noteId,
       });
     }
     out.push({ ...t, unplaced: plan.unplaced });
@@ -128,6 +131,7 @@ export function newPending(fields: Partial<PendingTask> & { title: string; deadl
     category: fields.category ?? "study",
     notes: fields.notes,
     source: fields.source,
+    noteId: fields.noteId,
   };
 }
 
@@ -140,5 +144,6 @@ export async function markBlock(taskId: string, eventId: string, done = true) {
   const next = { ...t, blocks };
   const finished = doneMinutes(next) >= t.estimate;
   await col.update(taskId, { blocks, ...(finished ? { done: true } : {}) });
+  if (finished && t.noteId) await markNoteDone(t.noteId).catch(() => {});
   return { task: next, finished };
 }
