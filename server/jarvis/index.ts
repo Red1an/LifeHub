@@ -4,14 +4,25 @@ import * as db from "../db.ts";
 import { emit, subscribe } from "../events.ts";
 import { getSettings, updateSettings, type Settings } from "../settings.ts";
 import { ensureNgrokPolicy, ngrokStatus } from "../ngrok.ts";
-import { dayKey, normalize, plural, type AliceEntity } from "./nlu.ts";
+import { dayKey, normalize, plural, wordsToDigits, type AliceEntity } from "./nlu.ts";
 import { MODULE, prefs } from "./prefs.ts";
 import { aiContext, handle, type Ctx, type Reply, type SessionState } from "./skills.ts";
-import { join, type Part } from "./speech.ts";
+import { join, type Part, type Say } from "./speech.ts";
+import { handlePc } from "./pcskills.ts";
+import { PcError, warmUp } from "./pc.ts";
+import { makePlan, runDirect, type Exchange } from "./agent.ts";
+import { applyVoiceConfig, installVoice, restartVoice, startVoice, testVoice, voiceControl } from "./voice.ts";
 
 /*
- * Джарвис — приватный навык Алисы, подключённый к хабу.
+ * Джарвис — голосовой помощник хаба. Говорить с ним можно:
+ *  - голосом на компьютере (voice.ts → converse("voice")) — основной способ;
+ *  - текстом в модуле «Джарвис» (коллекция "chat" → converse("text"));
+ *  - через колонку с Алисой (вебхук ниже → respond()).
  *
+ * Разбор фразы: свои команды → компьютер (pcskills.ts) → хаб (skills.ts) → нейронка с планом
+ * действий (agent.ts). Для Алисы — без компьютера и с лимитом 3 секунды.
+ *
+ * Навык Алисы:
  * Яндекс присылает каждую фразу POST-запросом на https://<домен ngrok>/alice/<секрет>.
  * Путь /alice/ ngrok пропускает без входа через Google (иначе Яндекс не достучится),
  * поэтому доступ держится на секрете в адресе и привязке к одному навыку (skill_id).
@@ -92,8 +103,9 @@ async function writeStatus() {
   changed("kv:status");
 }
 
-/** Включение из модуля: секрет, политика ngrok. */
+/** Включение из модуля: секрет, политика ngrok, голос. */
 async function applyConfig() {
+  applyVoiceConfig();
   const p = prefs();
   if (p.enabled) {
     if (!secrets().secret) saveSecrets({ secret: newSecret(), skillId: undefined });
@@ -108,6 +120,11 @@ async function applyAction() {
   db.setKv(MODULE, "action", null);
   if (a.kind === "rotate") saveSecrets({ secret: newSecret(), skillId: undefined });
   if (a.kind === "unlink") saveSecrets({ skillId: undefined });
+  if (a.kind === "voice.install") void installVoice();
+  if (a.kind === "voice.restart") restartVoice();
+  if (a.kind === "voice.test") testVoice();
+  if (a.kind === "voice.mute") voiceControl({ mute: true });
+  if (a.kind === "voice.unmute") voiceControl({ mute: false, sleep: false });
   await writeStatus();
 }
 
@@ -117,33 +134,35 @@ let chatBusy: Promise<void> = Promise.resolve();
 function answerChat() {
   chatBusy = chatBusy.then(async () => {
     const docs = db.listDocs(MODULE, "chat");
-    let state: SessionState = {};
     for (const d of docs) {
-      if (d.source !== "hub") continue;
-      if (typeof d.a === "string") {
-        state = (d.state as SessionState) ?? {};
-        continue;
-      }
-      const q = String(d.q ?? "");
-      const t0 = Date.now();
-      const r = await respond({ command: q, original: q, state }).catch((e) => fallback((e as Error).message));
-      state = r.session_state;
-      db.putDoc(MODULE, "chat", d.id, { a: r.response.text, buttons: r.response.buttons?.map((b) => b.title) ?? [], state, ms: Date.now() - t0 }, true);
+      if (d.source !== "hub" || typeof d.a === "string") continue;
+      const turn = await converse("text", String(d.q ?? ""));
+      db.putDoc(MODULE, "chat", d.id, { a: turn.text, buttons: turn.buttons, ms: turn.ms, ai: turn.ai }, true);
       changed("chat");
     }
   });
 }
 
 function logAlice(q: string, r: AliceResponse) {
-  if (!prefs().history || !q) return;
-  db.putDoc(MODULE, "chat", undefined, { q, a: r.response.text, source: "alice", at: Date.now() }, false);
+  if (!q) return;
+  logTurn({ q, a: r.response.text, source: "alice" });
+}
+
+function logTurn(doc: { q: string; a: string; source: "alice" | "voice"; ms?: number; ai?: boolean }) {
+  if (!prefs().history) return;
+  db.putDoc(MODULE, "chat", undefined, { ...doc, at: Date.now() }, false);
   const all = db.listDocs(MODULE, "chat");
   for (const d of all.slice(0, Math.max(0, all.length - HISTORY_LIMIT))) db.deleteDoc(MODULE, "chat", d.id);
   changed("chat");
 }
 
-/** Вызывается при старте хаба: слушает модуль и держит статус свежим. */
-export function startJarvis() {
+let hubUrl = "http://localhost:4200";
+
+/** Вызывается при старте хаба: слушает модуль, держит статус свежим, запускает голос. */
+export function startJarvis(opts: { port: number; https: boolean } = { port: 4200, https: false }) {
+  hubUrl = `${opts.https ? "https" : "http"}://localhost:${opts.port}`;
+  startVoice(opts);
+  warmUp();
   subscribe((e) => {
     if (e.type !== "data" || e.module !== MODULE || e.origin === "jarvis") return;
     if (e.collection === "kv:config") void applyConfig().catch((err) => console.error("[jarvis]", err));
@@ -331,6 +350,185 @@ function voice(tts: string): string {
     })
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/* ───────────── голос и текст на компьютере ───────────── */
+
+export interface Turn {
+  /** Для экрана. */
+  text: string;
+  /** Для голоса: время словами, паузы sil <[мс]>. */
+  tts: string;
+  buttons: string[];
+  /** Джарвис ждёт ответа — слушать без слова активации. */
+  expectReply: boolean;
+  /** Не проговаривать, хватит сигнала. */
+  quiet: boolean;
+  /** Ответ составила нейронка. */
+  ai: boolean;
+  ms: number;
+}
+
+interface Channel {
+  state: SessionState;
+  history: Exchange[];
+  last?: Say;
+  at: number;
+}
+
+const channels = new Map<string, Channel>();
+/** Разговор забывается через 10 минут тишины. */
+const CHANNEL_TTL = 10 * 60_000;
+
+const say = (s: string): Say => ({ text: s, tts: s });
+
+/** «Джарвис, открой телеграм» → «открой телеграм». */
+function stripWake(text: string): string {
+  const words = new Set(["джарвис", "jarvis", ...prefs().voice.wakeWords.map((w) => normalize(w))]);
+  const list = text.split(" ");
+  while (list.length && (words.has(list[0]) || /^(эй|окей|ок|слушай|хей)$/.test(list[0]) && words.has(list[1] ?? ""))) list.shift();
+  return list.join(" ");
+}
+
+/** Текст после этих слов — свободный (заметка, поиск, ввод), «и» в нём не делит просьбу. */
+const FREE_TEXT = /^(напечатай|набери|введи|впиши|найди|поищи|загугли|погугли|запомни|запиши|заметка|идея|напомни|таймер|засеки|поставь таймер)(\s|$)/;
+
+/** «Сделай тише и открой ютуб» — несколько просьб сразу: правила такое не разберут, нужна нейронка. */
+function compound(ctx: Ctx): boolean {
+  if (!ctx.prefs.ai || ctx.state.pending || ctx.state.pc || FREE_TEXT.test(ctx.text)) return false;
+  return ctx.text.split(" ").length >= 4 && /\s(и|а потом|потом|затем|а также|и еще|плюс)\s/.test(ctx.text);
+}
+
+/**
+ * Одна фраза через правила: свои команды, компьютер, затем хаб. Нейронки здесь нет.
+ * top — фраза пользователя (а не команда из плана нейронки): составные отдаём нейронке.
+ */
+async function rules(ctx: Ctx, allowCustom: boolean, top = false): Promise<Reply | null> {
+  if (allowCustom && !ctx.state.pending && !ctx.state.pc) {
+    const c = await customFull(ctx);
+    if (c) return c;
+  }
+  if (top && compound(ctx) && aiAllowed()) return null;
+  const r = await handlePc({ text: ctx.text, raw: ctx.raw, address: ctx.address, state: ctx.state, hubUrl });
+  return r ?? (await handle(ctx));
+}
+
+/** Своя команда: что сказать и какие команды выполнить следом — в том числе для компьютера. */
+async function customFull(ctx: Ctx): Promise<Reply | null> {
+  const cmd = prefs().commands.find((c) => c.phrases.some((p) => {
+    const n = wordsToDigits(normalize(p));
+    return n && (ctx.text === n || ctx.text.startsWith(n + " ") || ctx.text.endsWith(" " + n));
+  }));
+  if (!cmd) return null;
+  const parts: Part[] = cmd.say.trim() ? [cmd.say.trim()] : [];
+  let state: SessionState | undefined;
+  for (const run of cmd.run.filter((r) => r.trim()).slice(0, 8)) {
+    const r = await rules({ ...ctx, text: wordsToDigits(normalize(run)), raw: run, state: {} }, false).catch((e) => ({ say: say(`Не получилось: ${(e as Error).message}`) }) as Reply);
+    if (r && !r.quiet && !cmd.say.trim()) parts.push(r.say);
+    if (r?.state?.pending || r?.state?.pc) {
+      state = r.state;
+      parts.push(r.say);
+    }
+  }
+  const s = join(parts, 400);
+  return { say: s.text ? s : say("Готово."), state, quiet: !s.text };
+}
+
+function aiUse() {
+  const s = secrets();
+  const today = dayKey();
+  saveSecrets({ aiUsed: { date: today, n: (s.aiUsed?.date === today ? s.aiUsed.n : 0) + 1 } });
+  void writeStatus().catch(() => {});
+}
+
+/** Свободная просьба: Claude составляет план, команды плана идут через обычные правила. */
+async function think(ctx: Ctx, ch: Channel): Promise<Reply> {
+  aiUse();
+  const plan = await makePlan(ctx.raw, {
+    prefs: ctx.prefs,
+    dayContext: await aiContext(ctx.now),
+    history: ch.history,
+    custom: ctx.prefs.commands.flatMap((c) => c.phrases.slice(0, 1)),
+  });
+  const parts: Part[] = plan.say.trim() ? [plan.say.trim()] : [];
+  let state: SessionState | undefined;
+  for (const a of plan.actions) {
+    try {
+      if (a.do === "command") {
+        const text = wordsToDigits(normalize(String(a.text ?? "")));
+        if (!text) continue;
+        const r = await rules({ ...ctx, text, raw: String(a.text), state: {} }, true);
+        if (!r) continue;
+        const asks = !!(r.state?.pending || r.state?.pc);
+        if (asks) state = r.state;
+        // Ответ команды озвучиваем, если он нужен (данные) или если Claude ничего не сказал сам.
+        if (asks || a.speak || (!plan.say.trim() && !r.quiet)) parts.push(r.say);
+      } else await runDirect(a, hubUrl);
+    } catch (e) {
+      parts.push(`Не получилось: ${(e as Error).message}`);
+    }
+  }
+  const s = join(parts, 300);
+  return { say: s.text ? s : say("Готово."), state };
+}
+
+/** Ответ на фразу с компьютера: голос ("voice") или текст в модуле ("text"). */
+export async function converse(channel: "voice" | "text", phrase: string): Promise<Turn> {
+  const t0 = Date.now();
+  const p = prefs();
+  let ch = channels.get(channel);
+  if (!ch || Date.now() - ch.at > CHANNEL_TTL) ch = { state: {}, history: [], at: Date.now() };
+  channels.set(channel, ch);
+  ch.at = Date.now();
+
+  const raw = phrase.trim();
+  const text = stripWake(wordsToDigits(normalize(raw)));
+  const ctx: Ctx = { text, raw, entities: [], state: ch.state, address: p.address, prefs: p, now: new Date() };
+  let r: Reply | null = null;
+  let ai = false;
+
+  try {
+    if (/^(повтори|повтори пожалуйста|что ты сказал|еще раз|не расслышал)$/.test(text) && ch.last) r = { say: ch.last, state: ch.state };
+    else r = await rules(ctx, true, true);
+    if (!r && text) {
+      const question = text.split(" ").length >= 2;
+      if (p.ai && aiAllowed() && question) {
+        ai = true;
+        r = await think(ctx, ch);
+      } else {
+        const why = p.ai && question ? " Лимит вопросов к нейронке на сегодня исчерпан." : "";
+        r = { say: say(`Этого я пока не умею.${why} Скажите «что ты умеешь».`) };
+      }
+    }
+    if (!r) r = handleEmpty(p.address);
+  } catch (e) {
+    const msg = e instanceof PcError ? e.message : (e as Error).message;
+    r = { say: { text: `Не получилось: ${msg}`, tts: `Не получилось. ${msg.length < 90 ? msg : "Подробности на экране."}` } };
+  }
+
+  const nextState: SessionState = r.state ?? (ch.state.undo ? { undo: ch.state.undo } : {});
+  ch.state = nextState;
+  ch.last = r.say;
+  ch.history.push({ q: raw, a: r.say.text });
+  if (ch.history.length > 12) ch.history.shift();
+
+  const turn: Turn = {
+    text: r.say.text,
+    tts: voice(r.say.tts),
+    buttons: r.buttons ?? [],
+    expectReply: !!(nextState.pending || nextState.pc) || /\?\s*$/.test(r.say.text),
+    quiet: !!r.quiet,
+    ai,
+    ms: Date.now() - t0,
+  };
+  if (channel === "voice") {
+    logTurn({ q: raw, a: turn.text, source: "voice", ms: turn.ms, ai });
+  }
+  return turn;
+}
+
+function handleEmpty(address: string): Reply {
+  return { say: say(`Слушаю${address ? ", " + address : ""}.`) };
 }
 
 /* ───────────── вебхук ───────────── */

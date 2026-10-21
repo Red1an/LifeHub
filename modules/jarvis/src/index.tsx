@@ -1,22 +1,23 @@
 import { Link, defineModule } from "@lifehub/sdk";
 import "./styles.css";
-import { Orb, statusLine } from "./components/hud.tsx";
-import { useChat, useStatus } from "./lib/store.ts";
+import { Orb, voiceLine } from "./components/hud.tsx";
+import { useChat, useVoice } from "./lib/store.ts";
 import { Brief } from "./pages/Brief.tsx";
 import { Chat } from "./pages/Chat.tsx";
 import { Commands } from "./pages/Commands.tsx";
 import { Settings } from "./pages/Settings.tsx";
 import { Setup } from "./pages/Setup.tsx";
+import { Voice } from "./pages/Voice.tsx";
 
-/** Виджет на главной: состояние и последняя фраза колонке. */
+/** Виджет на главной: состояние голоса и последняя фраза. */
 function StatusWidget() {
-  const { status } = useStatus();
+  const { voice } = useVoice();
   const chat = useChat();
-  const last = [...chat.items].reverse().find((m) => m.source === "alice");
-  const l = statusLine(status);
+  const last = [...chat.items].reverse().find((m) => m.q && m.source !== "hub");
+  const l = voiceLine(voice);
   return (
     <Link to="/" className="jarvis-root flex h-full items-center gap-3 rounded-[inherit] p-3">
-      <Orb size={40} state={l.tone === "off" ? "off" : "on"} />
+      <Orb size={40} state={l.busy ? "busy" : l.tone === "off" ? "off" : "on"} />
       <div className="min-w-0">
         <div className="jarvis-title font-semibold text-white">Джарвис</div>
         <div className="truncate text-xs text-[#8fb3c7]">{l.text}</div>
@@ -29,6 +30,7 @@ function StatusWidget() {
 export default defineModule({
   routes: {
     "/": Chat,
+    "/voice": Voice,
     "/setup": Setup,
     "/brief": Brief,
     "/commands": Commands,
@@ -37,7 +39,7 @@ export default defineModule({
   },
   nav: [
     { to: "/", label: "Разговор", icon: "💬" },
-    { to: "/setup", label: "Подключение", icon: "🔌" },
+    { to: "/voice", label: "Голос", icon: "🎙️" },
     { to: "/brief", label: "Сводки", icon: "☀️" },
     { to: "/commands", label: "Команды", icon: "⚡" },
     { to: "/settings", label: "Настройки", icon: "⚙️" },

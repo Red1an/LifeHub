@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Джарвис</title>
+<style>
+  :root {
+    --cyan: #5ad1ff;
+    --ink: #e6f6ff;
+    --muted: #8fb3c7;
+    --glass: rgba(6, 14, 22, 0.78);
+    --line: rgba(120, 215, 255, 0.22);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; user-select: none; }
+  html { background: #04080d; }
+  body {
+    background:
+      radial-gradient(120% 70% at 50% 34%, rgba(40, 120, 180, 0.16), transparent 60%),
+      linear-gradient(180deg, #050b12 0%, #03070b 100%);
+    box-shadow: inset 0 0 0 1px rgba(120, 215, 255, 0.16);
+  }
+  body { font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; color: var(--ink); }
+
+  #root {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    padding: 6px 12px 12px; opacity: 0; transform: translateY(10px) scale(0.98);
+    transition: opacity 0.28s ease, transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  }
+  #root.on { opacity: 1; transform: none; }
+
+  #orb { width: 240px; height: 240px; cursor: pointer; flex: none; }
+
+  #card {
+    width: 100%; margin-top: -10px; padding: 10px 12px 12px; border-radius: 14px; flex: 1; min-height: 0;
+    background: rgba(10, 22, 32, 0.55); border: 1px solid var(--line);
+    transition: border-color 0.3s;
+  }
+  #root[data-state="hearing"] #card { border-color: rgba(90, 209, 255, 0.55); }
+  #root[data-state="thinking"] #card { border-color: rgba(150, 140, 255, 0.5); }
+  #root[data-state="error"] #card { border-color: rgba(255, 120, 100, 0.5); }
+
+  #bar { display: flex; align-items: center; gap: 8px; height: 18px; }
+  #dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); flex: none; }
+  #root[data-state="thinking"] #dot { background: #9a8cff; box-shadow: 0 0 10px #9a8cff; animation: blink 0.8s infinite; }
+  #root[data-state="speaking"] #dot { background: #fff; box-shadow: 0 0 12px #bfefff; }
+  #root[data-state="sleeping"] #dot, #root[data-state="muted"] #dot { background: #4b5b66; box-shadow: none; }
+  #root[data-state="error"] #dot { background: #ff7a64; box-shadow: 0 0 10px #ff7a64; }
+  #status {
+    font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #7cc8ec; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; flex: 1;
+  }
+  #grip { width: 26px; height: 18px; flex: none; display: grid; place-items: center; cursor: move; opacity: 0.35; }
+  #grip:hover { opacity: 0.8; }
+  #grip i { display: block; width: 14px; height: 6px; border-top: 2px dotted #9bd; border-bottom: 2px dotted #9bd; }
+  #close { width: 18px; height: 18px; flex: none; border: 0; background: none; color: #6f8a9a; font-size: 14px; cursor: pointer; line-height: 18px; }
+  #close:hover { color: #fff; }
+
+  #heard { margin-top: 6px; font-size: 13px; color: var(--muted); line-height: 1.35; max-height: 2.7em; overflow: hidden; }
+  #heard:empty { display: none; }
+  #answer {
+    margin-top: 4px; font-size: 15px; line-height: 1.4; color: var(--ink); max-height: 8.4em; overflow: hidden;
+    text-shadow: 0 0 18px rgba(90, 209, 255, 0.15);
+  }
+  #answer:empty { display: none; }
+  #answer .w { opacity: 0; transition: opacity 0.25s; }
+  #answer .w.v { opacity: 1; }
+
+  #drag { position: fixed; left: 0; right: 0; top: 0; height: 14px; z-index: 5; cursor: move; }
+  @keyframes blink { 50% { opacity: 0.35; } }
+</style>
+</head>
+<body>
+<div id="drag" class="pywebview-drag-region"></div>
+<div id="root" data-state="listening">
+  <canvas id="orb" title="Открыть панель Джарвиса"></canvas>
+  <div id="card">
+    <div id="bar">
+      <span id="dot"></span>
+      <span id="status">Джарвис</span>
+      <span id="grip" class="pywebview-drag-region" title="Перетащить"><i class="pywebview-drag-region"></i></span>
+      <button id="close" title="Скрыть">✕</button>
+    </div>
+    <div id="heard"></div>
+    <div id="answer"></div>
+  </div>
+</div>
+<script>
+(() => {
+  const root = document.getElementById("root");
+  const canvas = document.getElementById("orb");
+  const ctx = canvas.getContext("2d");
+  const $status = document.getElementById("status");
+  const $heard = document.getElementById("heard");
+  const $answer = document.getElementById("answer");
+
+  /* ───────────── сфера из частиц ───────────── */
+
+  const N = 820;
+  const pts = [];
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < N; i++) {
+    const y = 1 - (i / (N - 1)) * 2;
+    const r = Math.sqrt(1 - y * y);
+    const t = golden * i;
+    pts.push({ x: Math.cos(t) * r, y, z: Math.sin(t) * r, seed: Math.random() * 1000, lat: Math.asin(y) });
+  }
+
+  // Параметры состояний: скорость вращения, размер, яркость, цвет, «закрутка» по широтам, «дрожание».
+  const STATES = {
+    listening: { speed: 0.18, scale: 0.84, glow: 0.35, hue: [90, 209, 255], swirl: 0, jitter: 0 },
+    hearing:   { speed: 0.45, scale: 0.95, glow: 0.75, hue: [150, 230, 255], swirl: 0, jitter: 1 },
+    thinking:  { speed: 1.5,  scale: 0.9,  glow: 0.65, hue: [150, 140, 255], swirl: 1, jitter: 0.2 },
+    speaking:  { speed: 0.35, scale: 0.92, glow: 0.85, hue: [210, 245, 255], swirl: 0, jitter: 0.6 },
+    loading:   { speed: 0.9,  scale: 0.8,  glow: 0.3,  hue: [90, 170, 220], swirl: 0.6, jitter: 0 },
+    sleeping:  { speed: 0.06, scale: 0.78, glow: 0.12, hue: [80, 110, 130], swirl: 0, jitter: 0 },
+    muted:     { speed: 0.06, scale: 0.78, glow: 0.1,  hue: [90, 100, 110], swirl: 0, jitter: 0 },
+    error:     { speed: 0.3,  scale: 0.84, glow: 0.4,  hue: [255, 120, 100], swirl: 0, jitter: 0.3 },
+  };
+  const cur = { ...STATES.listening, hue: [...STATES.listening.hue] };
+  let target = STATES.listening;
+  let level = 0, levelTarget = 0, rot = 0, tilt = 0.35, swirlPhase = 0, last = performance.now();
+  let running = true;
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.clientWidth * dpr;
+    canvas.height = canvas.clientHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resize();
+  addEventListener("resize", resize);
+
+  const lerp = (a, b, k) => a + (b - a) * k;
+
+  function frame(now) {
+    if (!running) return;
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    const k = 1 - Math.pow(0.002, dt);
+    for (const key of ["speed", "scale", "glow", "swirl", "jitter"]) cur[key] = lerp(cur[key], target[key], k);
+    for (let i = 0; i < 3; i++) cur.hue[i] = lerp(cur.hue[i], target.hue[i], k);
+    level = lerp(level, levelTarget, 1 - Math.pow(0.0005, dt));
+    rot += dt * cur.speed * (1 + level * 0.8);
+    swirlPhase += dt * 2.2;
+
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    const cx = w / 2, cy = h / 2;
+    const R = Math.min(w, h) * 0.36 * (cur.scale + level * 0.18);
+    ctx.clearRect(0, 0, w, h);
+
+    // Свечение ядра.
+    const [r, g, b] = cur.hue.map(Math.round);
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.45);
+    glow.addColorStop(0, `rgba(${r},${g},${b},${0.20 * cur.glow + level * 0.25})`);
+    glow.addColorStop(0.45, `rgba(${r},${g},${b},${0.07 * cur.glow})`);
+    glow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, w, h);
+
+    // HUD-кольца.
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = `rgba(${r},${g},${b},${0.18 + cur.glow * 0.2})`;
+    ctx.setLineDash([2, 6]);
+    ctx.beginPath(); ctx.arc(cx, cy, R * 1.22, rot * 0.6, rot * 0.6 + Math.PI * 1.6); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = `rgba(${r},${g},${b},${0.10 + cur.glow * 0.25})`;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 1.34, -rot * 1.3, -rot * 1.3 + Math.PI * 0.5); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, R * 1.34, -rot * 1.3 + Math.PI, -rot * 1.3 + Math.PI * 1.35); ctx.stroke();
+
+    // Частицы.
+    ctx.globalCompositeOperation = "lighter";
+    const cosT = Math.cos(tilt), sinT = Math.sin(tilt);
+    const t = now / 1000;
+    for (const p of pts) {
+      // Закрутка: широты вращаются с разной скоростью («думаю»).
+      const a = rot + cur.swirl * Math.sin(p.lat * 3 + swirlPhase) * 0.9;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      let x = p.x * ca - p.z * sa;
+      let z = p.x * sa + p.z * ca;
+      let y = p.y * cosT - z * sinT;
+      z = p.y * sinT + z * cosT;
+      // Дрожание от голоса: точка «отталкивается» от центра.
+      const n = Math.sin(p.seed + t * 6) * Math.cos(p.seed * 1.7 + t * 4.3);
+      const push = 1 + cur.jitter * level * 0.35 * n + level * 0.06;
+      x *= push; y *= push;
+      const depth = (z + 1) / 2; // 0 — дальний, 1 — ближний
+      const px = cx + x * R, py = cy + y * R;
+      const size = 0.6 + depth * 1.5 + level * 0.8;
+      const alpha = (0.12 + depth * 0.75) * (0.55 + cur.glow * 0.6);
+      ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+      ctx.fillRect(px - size / 2, py - size / 2, size, size);
+    }
+    ctx.globalCompositeOperation = "source-over";
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  /* ───────────── текст ───────────── */
+
+  const LABELS = {
+    listening: "Слушаю", hearing: "Слышу вас", thinking: "Думаю", speaking: "Джарвис",
+    loading: "Запускаюсь", sleeping: "Режим ожидания", muted: "Микрофон выключен", error: "Ошибка",
+  };
+
+  let typing = null;
+  function typeAnswer(text) {
+    clearInterval(typing);
+    $answer.innerHTML = "";
+    const words = text.split(/(\s+)/);
+    const spans = words.map((w) => {
+      const s = document.createElement("span");
+      s.className = "w";
+      s.textContent = w;
+      $answer.appendChild(s);
+      return s;
+    });
+    let i = 0;
+    typing = setInterval(() => {
+      if (i >= spans.length) return clearInterval(typing);
+      spans[i++].classList.add("v");
+    }, 45);
+  }
+
+  window.jv = {
+    state(s, label) {
+      target = STATES[s] || STATES.listening;
+      root.dataset.state = s;
+      $status.textContent = label || LABELS[s] || s;
+      if (s !== "speaking" && s !== "hearing") levelTarget = 0;
+    },
+    level(x) { levelTarget = Math.max(0, Math.min(1, x)); },
+    heard(t) { $heard.textContent = t ? `«${t}»` : ""; },
+    answer(t) { t ? typeAnswer(t) : ($answer.innerHTML = ""); },
+    clear() { $heard.textContent = ""; $answer.innerHTML = ""; },
+    visible(on) {
+      root.classList.toggle("on", !!on);
+      if (on && !running) { running = true; last = performance.now(); requestAnimationFrame(frame); }
+      if (!on) setTimeout(() => { if (!root.classList.contains("on")) running = false; }, 400);
+    },
+  };
+
+  const api = () => window.pywebview && window.pywebview.api;
+  canvas.addEventListener("click", () => api() && api().open_panel());
+  document.getElementById("close").addEventListener("click", () => api() && api().hide_orb());
+})();
+</script>
+</body>
+</html>

@@ -12,9 +12,14 @@
   - `libs.ts` — общий кэш npm-пакетов и сборка их в ESM.
   - `css.ts` — Tailwind v4 по исходникам платформы и всех модулей.
   - `app.ts` — HTTP (Hono); `auth.ts` — доступ с других устройств; `db.ts` — SQLite (`node:sqlite`).
-  - `jarvis/` — Джарвис, приватный навык Алисы: вебхук `/alice/<секрет>` (ngrok пропускает его без входа Google),
-    команды правилами в `skills.ts` (ответ < 3 с, без нейронки), данные встроенных модулей — `data.ts`.
-    Интерфейс — модуль `modules/jarvis`; связь с ним через его данные (kv `config`/`status`/`action`, коллекция `chat`).
+  - `jarvis/` — Джарвис, голосовой помощник. `index.ts` — разбор фразы (`converse` для голоса и текста, `respond` для Алисы):
+    свои команды → компьютер (`pcskills.ts`, через PowerShell-процесс `pc.ts`/`pc.ps1`) → хаб (`skills.ts`, данные модулей —
+    `data.ts`) → Claude с планом действий (`agent.ts`). `voice.ts` ставит, запускает и перезапускает голосовой процесс
+    (`voice/`, Python: Vosk → Whisper → Silero), связь с ним — `/api/jarvis/voice/*` (только localhost, токен процесса).
+    Навык Алисы — вебхук `/alice/<секрет>` (ngrok пропускает его без входа Google), ответ < 3 с.
+    Интерфейс — модуль `modules/jarvis`; связь с ним через его данные (kv `config`/`status`/`voice`/`action`, коллекция `chat`).
+- `voice/` — голос Джарвиса на Python (`.venv` ставит хаб): `main.py` — цикл, `stt.py` GigaAM/Whisper, `tts.py` Piper/Silero,
+  `ui.py` + `ui/orb.html` — орб, панель и трей (pywebview). Модели — в `~/.lifehub/voice/models`.
 - `platform/` — браузерный код, собирается сервером в `platform.js`.
   - `sdk/` — `@lifehub/sdk`. Всё, что зависит от модуля (данные, файлы, роутинг), создаётся в `bind.ts`:
     каждый модуль получает свою привязанную копию через `sdkFor(id)`.

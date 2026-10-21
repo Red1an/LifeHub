@@ -24,6 +24,61 @@ export function normalize(s: string): string {
     .trim();
 }
 
+/* ───────────── числа словами ───────────── */
+
+const UNITS: Record<string, number> = {
+  ноль: 0, один: 1, одна: 1, одно: 1, одну: 1, одного: 1, два: 2, две: 2, двух: 2, три: 3, трех: 3, четыре: 4, четырех: 4,
+  пять: 5, пяти: 5, шесть: 6, шести: 6, семь: 7, семи: 7, восемь: 8, восьми: 8, девять: 9, девяти: 9, десять: 10, десяти: 10,
+  одиннадцать: 11, одиннадцати: 11, двенадцать: 12, двенадцати: 12, тринадцать: 13, четырнадцать: 14, пятнадцать: 15, пятнадцати: 15,
+  шестнадцать: 16, семнадцать: 17, восемнадцать: 18, девятнадцать: 19,
+};
+const TENS: Record<string, number> = {
+  двадцать: 20, двадцати: 20, тридцать: 30, тридцати: 30, сорок: 40, сорока: 40, пятьдесят: 50, пятидесяти: 50,
+  шестьдесят: 60, семьдесят: 70, восемьдесят: 80, девяносто: 90,
+};
+const HUNDREDS: Record<string, number> = { сто: 100, двести: 200, триста: 300, четыреста: 400, пятьсот: 500, шестьсот: 600, семьсот: 700, восемьсот: 800, девятьсот: 900 };
+
+/**
+ * «громкость тридцать пять» → «громкость 35». Голос распознаётся Whisper'ом, который пишет
+ * числа то цифрами, то словами, а разбор дальше (время, суммы) ждёт цифры.
+ * Работает по нормализованному тексту.
+ */
+export function wordsToDigits(text: string): string {
+  const words = text.split(" ");
+  const out: string[] = [];
+  const val = (map: Record<string, number>, w: string | undefined) => (w !== undefined && Object.hasOwn(map, w) ? map[w] : null);
+  for (let i = 0; i < words.length; ) {
+    let n = 0;
+    let used = 0;
+    const h = val(HUNDREDS, words[i]);
+    if (h !== null) {
+      n += h;
+      used++;
+    }
+    const t = val(TENS, words[i + used]);
+    const u = val(UNITS, words[i + used]);
+    if (t !== null) {
+      n += t;
+      used++;
+      const u2 = val(UNITS, words[i + used]);
+      if (u2 !== null && u2 > 0 && u2 < 10) {
+        n += u2;
+        used++;
+      }
+    } else if (u !== null) {
+      n += u;
+      used++;
+    }
+    if (!used) {
+      out.push(words[i++]);
+      continue;
+    }
+    out.push(String(n));
+    i += used;
+  }
+  return out.join(" ");
+}
+
 export const pad = (n: number) => String(n).padStart(2, "0");
 export const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 export const fromKey = (k: string) => new Date(k + "T00:00:00");

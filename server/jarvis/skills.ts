@@ -1,5 +1,6 @@
 import * as data from "./data.ts";
 import type { Prefs } from "./prefs.ts";
+import type { PcPending } from "./pcskills.ts";
 import type { CalEvent, NewEvent } from "./data.ts";
 import {
   cleanTitle, dayKey, entityDateTime, findAmount, findDate, findDuration, findTime, has, hhmm, shiftKey, similarity, toMinutes,
@@ -43,6 +44,8 @@ export interface SessionState {
   pending?: Pending;
   /** Последняя запись, которую можно отменить словом «отмени». */
   undo?: { module: string; collection: string; id: string; what: string };
+  /** Команда компьютера ждёт «да» (pcskills.ts). */
+  pc?: PcPending;
 }
 
 export interface Reply {
@@ -51,6 +54,8 @@ export interface Reply {
   end?: boolean;
   buttons?: string[];
   state?: SessionState;
+  /** Голосом не проговаривать — хватит короткого сигнала (пауза музыки, свернуть окно). */
+  quiet?: boolean;
 }
 
 const reply = (say: Say | string, extra: Omit<Reply, "say"> = {}): Reply => ({ say: typeof say === "string" ? { text: say, tts: say } : say, ...extra });
@@ -206,7 +211,9 @@ const revive = (e: StoredEvent): CalEvent => ({ ...e, start: new Date(e.start), 
 function help(): Reply {
   return reply(
     join([
-      "Я знаю ваш календарь и модули хаба. Например:",
+      "Я управляю компьютером и знаю ваш календарь и модули хаба. Например:",
+      "«Открой телеграм», «Найди на ютубе лофи», «Громкость 30», «Пауза», «Следующий трек», «Переключись на хром», «Сверни всё».",
+      "«Таймер на 10 минут», «Напечатай привет и отправь», «Сделай скриншот», «Заблокируй компьютер», «Игровой режим».",
       "«Доброе утро» — сводка дня.",
       "«Что у меня завтра?», «Что дальше?», «Когда я свободен в пятницу?»",
       "«Поставь тренировку завтра в 7 вечера на час», «Напомни через 20 минут выключить плиту», «Перенеси тренировку на час позже».",

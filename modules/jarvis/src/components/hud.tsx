@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cn, formatRelative } from "@lifehub/sdk";
-import type { Status } from "../lib/types.ts";
+import type { Status, VoiceStatus } from "../lib/types.ts";
 import { copy } from "../lib/store.ts";
 
 /** Страница модуля: свой фон на всю высоту и узкая колонка (сначала телефон). */
@@ -50,8 +50,37 @@ export function statusLine(s: Status | null): { tone: "ok" | "wait" | "off"; tex
   return { tone: "ok", text: s.lastAt ? `В сети · ${formatRelative(s.lastAt)}` : "В сети" };
 }
 
+/** Голос на компьютере одной строкой. */
+export function voiceLine(v: VoiceStatus | null): { tone: "ok" | "wait" | "off"; text: string; busy: boolean } {
+  if (!v) return { tone: "wait", text: "Хаб не прислал состояние — перезапустите хаб", busy: false };
+  if (v.process === "missing") return { tone: "off", text: "Голос не установлен", busy: false };
+  if (v.process === "installing") return { tone: "wait", text: "Устанавливаю голос…", busy: true };
+  if (v.process === "off") return { tone: "off", text: "Голос выключен", busy: false };
+  if (v.process === "crashed" || v.state === "error") return { tone: "wait", text: v.error ? `Ошибка: ${v.error}` : "Голос упал, перезапускаю", busy: false };
+  if (v.process === "starting" || v.state === "loading" || !v.state) return { tone: "wait", text: v.detail || "Запускаюсь…", busy: true };
+  const text: Record<string, string> = {
+    listening: v.detail || "Слушаю",
+    hearing: "Слышу вас…",
+    thinking: "Думаю…",
+    speaking: "Говорю",
+    sleeping: "Режим ожидания",
+    muted: "Микрофон выключен",
+  };
+  return { tone: v.state === "sleeping" || v.state === "muted" ? "off" : "ok", text: text[v.state] ?? v.state, busy: ["hearing", "thinking", "speaking"].includes(v.state) };
+}
+
+export function VoicePill({ voice }: { voice: VoiceStatus | null }) {
+  const l = voiceLine(voice);
+  return <Pill tone={l.tone} text={l.text} />;
+}
+
 export function StatusPill({ status }: { status: Status | null }) {
   const l = statusLine(status);
+  return <Pill tone={l.tone} text={l.text} />;
+}
+
+function Pill({ tone, text }: { tone: "ok" | "wait" | "off"; text: string }) {
+  const l = { tone, text };
   const color = l.tone === "ok" ? "bg-[#3ee08f]" : l.tone === "wait" ? "bg-[var(--jv-amber)]" : "bg-[#5b6b77]";
   return (
     <span className="inline-flex items-center gap-2 rounded-full border border-[var(--jv-line)] bg-black/30 px-3 py-1 text-xs text-[#bfe2f3]">

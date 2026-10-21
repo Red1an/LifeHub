@@ -93,7 +93,7 @@ async function start(args: string[]) {
       console.log(`\n  Модули:  ${MODULES_DIR}`);
       console.log(`  Данные:  ${HOME}\n`);
       startNgrok(port, useHttps);
-      startJarvis();
+      startJarvis({ port, https: useHttps });
     },
   );
   // Порт занят: либо хаб уже работает (в фоне), либо предыдущий процесс ещё не освободил порт.

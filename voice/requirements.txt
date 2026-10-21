@@ -1,0 +1,12 @@
+# Голос Джарвиса. Хаб ставит всё сам: модуль «Джарвис» → Голос → «Установить».
+# Основное (~600 МБ памяти в работе): имя — Vosk, речь — GigaAM (ONNX), голос — Piper, окна — WebView2.
+onnx-asr[cpu,hub]>=0.12
+piper-tts>=1.3
+vosk>=0.3.45
+sounddevice>=0.5
+numpy
+webrtcvad-wheels
+num2words
+pywebview>=5
+pystray
+pillow

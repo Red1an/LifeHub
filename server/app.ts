@@ -23,7 +23,8 @@ import { googleStatus, configureGoogle, authUrl, finishAuth, disconnectGoogle, g
 import { PNG_ICONS, pngIcon } from "./icons.ts";
 import { proxyService } from "./proxy.ts";
 import { netFetch } from "./net.ts";
-import { handleAlice } from "./jarvis/index.ts";
+import { converse, handleAlice } from "./jarvis/index.ts";
+import { acceptClient, reportState, type VoiceEvent } from "./jarvis/voice.ts";
 import { acceptHook, hookInfo, rotateHook } from "./hooks.ts";
 import { SDK_VERSION, type PlatformBuild } from "./compiler.ts";
 import { FILES_DIR, MODULES_DIR, MODULE_ID_RE, HOME, CHECK_COMMAND } from "./paths.ts";
@@ -669,6 +670,51 @@ export function createApp(opts: AppOptions) {
     const module = hookModule(c);
     rotateHook(module);
     return c.json(await hookInfo(module, hookOpts()));
+  });
+
+  /* ─────────────── голос Джарвиса (процесс voice/, только с этого компьютера) ─────────────── */
+
+  const voiceToken = (c: Context) => {
+    requireLocal(c);
+    return c.req.header("x-voice-token") ?? "";
+  };
+  app.get("/api/jarvis/voice/stream", (c) => {
+    const token = voiceToken(c);
+    const queue: VoiceEvent[] = [];
+    let wake: (() => void) | null = null;
+    const off = acceptClient(token, (e) => {
+      queue.push(e);
+      wake?.();
+    });
+    if (!off) return c.json({ error: "Чужой процесс голоса" }, 409);
+    return streamSSE(c, async (stream) => {
+      let open = true;
+      stream.onAbort(() => {
+        open = false;
+        off();
+        wake?.();
+      });
+      while (open) {
+        while (queue.length) await stream.writeSSE({ data: JSON.stringify(queue.shift()) });
+        await new Promise<void>((r) => {
+          wake = r;
+          setTimeout(r, 15_000);
+        });
+        wake = null;
+        if (open && !queue.length) await stream.writeSSE({ event: "ping", data: "" });
+      }
+    });
+  });
+  app.post("/api/jarvis/voice/state", async (c) => {
+    const token = voiceToken(c);
+    return reportState(token, await c.req.json().catch(() => ({}))) ? c.json({ ok: true }) : c.json({ error: "Чужой процесс голоса" }, 409);
+  });
+  app.post("/api/jarvis/voice/ask", async (c) => {
+    const token = voiceToken(c);
+    if (!reportState(token, {})) return c.json({ error: "Чужой процесс голоса" }, 409);
+    const body = await c.req.json().catch(() => ({}));
+    const text = String(body?.text ?? "").slice(0, 2000);
+    return c.json(await converse("voice", text));
   });
 
   /* ─────────────── работа в фоне и автозапуск ─────────────── */

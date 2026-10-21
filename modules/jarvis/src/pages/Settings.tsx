@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Progress, confirm, toast } from "@lifehub/sdk";
+import { Link, Progress, cn, confirm, toast } from "@lifehub/sdk";
 import { Panel, Screen, StatusPill, Toggle } from "../components/hud.tsx";
 import { action, useChat, usePrefs, useStatus } from "../lib/store.ts";
 
@@ -36,10 +36,30 @@ export function Settings() {
           checked={prefs.ai}
           onChange={(ai) => update({ ai })}
           label="Отвечать на свободные вопросы"
-          hint="Только то, что Джарвис не понял сам. Claude Haiku через Claude Code хаба"
+          hint="И просьбы в несколько шагов: «сделай потише и включи что-нибудь для работы». Claude через Claude Code хаба"
         />
         {prefs.ai && (
           <div className="mt-2 space-y-2">
+            <div className="flex gap-2">
+              {(
+                [
+                  ["fast", "Быстрее", "Haiku, 2–4 с"],
+                  ["smart", "Умнее", "основная модель, 5–10 с"],
+                ] as const
+              ).map(([id, label, hint]) => (
+                <button
+                  key={id}
+                  className={cn(
+                    "flex-1 rounded-lg border px-3 py-2 text-left transition-colors",
+                    prefs.brain === id ? "border-[var(--jv-cyan)] bg-[var(--jv-cyan)]/10 text-white" : "border-[var(--jv-line)] text-[#bfe2f3]",
+                  )}
+                  onClick={() => update({ brain: id })}
+                >
+                  <span className="block text-sm">{label}</span>
+                  <span className="block text-[11px] opacity-70">{hint}</span>
+                </button>
+              ))}
+            </div>
             <label className="block">
               <span className="mb-1 block text-sm text-[#c3dcea]">Вопросов в день, не больше</span>
               <input
@@ -61,7 +81,7 @@ export function Settings() {
       </Panel>
 
       <Panel title="История">
-        <Toggle checked={prefs.history} onChange={(history) => update({ history })} label="Сохранять разговоры с колонкой" hint="Последние 300 фраз — во вкладке «Разговор»" />
+        <Toggle checked={prefs.history} onChange={(history) => update({ history })} label="Сохранять разговоры" hint="Последние 300 фраз — во вкладке «Разговор»" />
         <button
           className="jarvis-chip mt-2"
           disabled={!chat.items.length}
@@ -75,7 +95,16 @@ export function Settings() {
         </button>
       </Panel>
 
-      <Panel title="Безопасность">
+      <Panel title="Колонка с Алисой">
+        <p className="mb-3 text-sm text-[#c3dcea]">
+          С Джарвисом можно говорить и через Яндекс Станцию — приватным навыком Алисы. Команды для компьютера через колонку не работают.
+        </p>
+        <Link to="/setup" className="jarvis-chip inline-flex">
+          Подключение колонки →
+        </Link>
+      </Panel>
+
+      <Panel title="Колонка: безопасность">
         <div className="space-y-3 text-sm text-[#c3dcea]">
           <p>
             Адрес навыка секретный: кто его знает, может говорить с Джарвисом от вашего имени. Хаб отвечает только навыку, который подключился
