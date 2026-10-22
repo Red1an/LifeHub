@@ -492,16 +492,17 @@ class Voice:
 
     # ───────────── запись фразы ─────────────
 
-    def capture(self, wait_start: float, on_pause=None) -> bytes | None:
+    def capture(self, wait_start: float, on_pause=None, talking: bool = False) -> bytes | None:
         """
         Пишем до паузы после речи. Речь не началась за wait_start секунд — None.
         on_pause — вызвать, если сразу после начала записи тишина (сказали только имя и ждут).
+        talking — речь уже идёт (фразу говорят без паузы после имени): ждём только её конца.
         """
         frames = []
         quiet_start = 0
         voiced = 0
         silence = 0
-        started = False
+        started = talking
         t0 = time.time()
         end_frames = END_SILENCE_MS // FRAME_MS
         while True:
@@ -556,6 +557,30 @@ class Voice:
         log(f"Голос: {sc:.2f} — {'владелец' if ok else 'не владелец'}")
         self.hub.state(speaker={"enrolled": True, "score": round(sc, 2), "owner": ok, "at": int(time.time() * 1000)})
         return ok, sc
+
+    def name_heard(self, pre: bytes) -> bool:
+        """
+        Прозвучало ли имя на самом деле: распознаём последние ~1.8 с (там, где Vosk его услышал).
+        Не нашли имени — пропускаем, только если голос точно владельца (распознавание иногда коверкает имя).
+        """
+        tail = pre[-int(RATE * 1.8) * 2 :]
+        try:
+            text = self.stt.transcribe(tail, self.hotwords())
+        except Exception:
+            return True
+        found, _ = self.strip_wake(text)
+        if found:
+            return True
+        if self.speaker and self.speaker.enrolled:
+            try:
+                sc = self.speaker.score(pre, min_sec=0.5, keep=False)
+            except Exception:
+                sc = None
+            if sc is not None and sc >= float(self.cfg.get("speakerThreshold", 0.45)):
+                log(f"Имени не расслышал ({text!r}), но голос ваш ({sc:.2f})")
+                return True
+        log(f"Имени не было: {text!r} — молчу")
+        return False
 
     def stranger(self, pre: bytes) -> bool:
         """
@@ -669,7 +694,15 @@ class Voice:
             expect = self.ask(text, owner, score)
 
     def on_wake(self):
-        pre = b"".join(self.ring)
+        # Vosk срабатывает, когда имя ещё не договорено, — дослушиваем полсекунды, прежде чем проверять.
+        extra = []
+        for _ in range(17):  # 17 × 30 мс
+            f = self.mic.read(0.2)
+            if f and len(f) == FRAME_BYTES:
+                extra.append(f)
+        pre = b"".join(self.ring) + b"".join(extra)
+        # Речь ещё идёт в конце дослушанного — фразу говорят слитно, начала ждать не нужно.
+        talking = sum(1 for f in extra[-8:] if self.vad.is_speech(f, RATE)) >= 4
         # «Джарвис» прозвучал из своих же колонок (видео, музыка) — это не к нам.
         if self.sysaudio and self.cfg.get("echoGuard", True):
             echo, c = self.sysaudio.is_echo(pre)
@@ -679,6 +712,9 @@ class Voice:
         # Имя сказал явно не владелец (видео, гости) — молчим сразу, без сигнала и орба.
         if self.stranger(pre):
             return
+        # Второе ухо: Vosk часто «слышит» имя в любой речи. GigaAM на последних секундах точнее.
+        if not self.name_heard(pre):
+            return
         if self.ui and not self.sleeping:
             self.ui.clear()
             self.ui.show()
@@ -687,7 +723,7 @@ class Voice:
         # Микрофон в это время продолжает писать в очередь — фраза не теряется.
         if self.cfg.get("chime", True) and not self.sleeping:
             self.play(self.chime)
-        pcm = self.capture(WAIT_COMMAND_SEC)
+        pcm = self.capture(WAIT_COMMAND_SEC, talking=talking)
         if pcm and self.cfg.get("chime", True) and not self.sleeping:
             self.play(self.ack)
         audio = pre + (pcm or b"")
