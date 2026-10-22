@@ -97,3 +97,50 @@ body {
 
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 .pt-safe { padding-top: env(safe-area-inset-top); }
+
+/* ───────────── главная: плитки модулей (--h — оттенок модуля, см. shell/hue.ts) ───────────── */
+
+/* Цвет модуля — только на подложке иконки и едва заметно в углу; сама плитка спокойная. */
+.lh-tile {
+  --tint: hsl(var(--h, 0) 70% 50%);
+  background:
+    radial-gradient(80% 70% at 0% 0%, color-mix(in oklab, var(--tint) 6%, transparent), transparent 70%),
+    var(--lh-surface);
+  border: 1px solid var(--lh-line);
+  transition: transform 0.15s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+.lh-tile:hover { border-color: color-mix(in oklab, var(--tint) 35%, var(--lh-line)); }
+.lh-tile:active { transform: scale(0.98); }
+.lh-tile-icon { background: color-mix(in oklab, var(--tint) 14%, transparent); }
+.lh-tile:not([style*="--h"]) { --tint: var(--lh-muted); }
+[data-theme="dark"] .lh-tile { --tint: hsl(var(--h, 0) 70% 60%); }
+
+/* Шапка главной: мягкое «сияние» из цветов модулей (--h1…--h3). */
+.lh-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid var(--lh-line);
+  background: var(--lh-surface);
+}
+.lh-hero::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  z-index: -1;
+  background:
+    radial-gradient(40% 50% at 15% 30%, hsl(var(--h1) 70% 60% / 0.14), transparent 70%),
+    radial-gradient(40% 50% at 85% 70%, hsl(var(--h3) 70% 60% / 0.12), transparent 70%);
+  filter: blur(20px);
+  animation: lh-aurora 18s ease-in-out infinite alternate;
+}
+@keyframes lh-aurora {
+  to { transform: translate3d(6%, -4%, 0) rotate(8deg) scale(1.08); }
+}
+
+@keyframes lh-rise { from { opacity: 0; transform: translateY(8px); } }
+.lh-rise { animation: lh-rise 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lh-hero::before, .lh-rise { animation: none; }
+}

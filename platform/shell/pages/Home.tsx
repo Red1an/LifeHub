@@ -1,4 +1,4 @@
-import { Component, useEffect, useState, type ReactNode } from "react";
+import { Component, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Page, Button, EmptyState } from "../../sdk/ui.tsx";
 import { cn, formatDate, plural } from "../../sdk/format.ts";
 import type { ModuleDefinition, ModuleSummary } from "../../sdk/define.ts";
@@ -8,6 +8,7 @@ import { loadModule } from "../loader.ts";
 import { Link } from "../nav.ts";
 import { ModuleIcon } from "../ModuleIcon.tsx";
 import { PlusIcon, ChevronRight, AlertIcon, RefreshIcon } from "../icons.tsx";
+import { useModuleHues } from "../hue.ts";
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -22,6 +23,7 @@ export function HomePage() {
   const [summaries, setSummaries] = useState<Record<string, ModuleSummary | null>>({});
   const now = useNow();
   const apps = state ? appModules(state) : [];
+  const hues = useModuleHues(apps);
   // Сервисы не грузятся бандлом — у них сводки нет.
   const ready = apps.filter((m) => m.status === "ok" && m.manifest?.type !== "service");
   const hashes = ready.map((m) => m.id + m.hash).join();
@@ -52,10 +54,7 @@ export function HomePage() {
         ) : null;
       })}
 
-      <header className="mb-5">
-        <h1 className="text-xl font-semibold leading-8 sm:text-2xl">{capitalize(formatDate(now, "weekday"))}</h1>
-        <p className="text-sm text-muted tabular-nums">{formatDate(now, "time")}</p>
-      </header>
+      <Hero now={now} name={state.settings.userName} hues={apps.map((m) => hues[m.id]).filter((h) => h !== undefined)} />
 
       {apps.length === 0 ? (
         <EmptyState
@@ -91,12 +90,12 @@ export function HomePage() {
           )}
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {apps.map((m) => (
-              <ModuleTile key={m.id} m={m} summary={summaries[m.id]} />
+            {apps.map((m, i) => (
+              <ModuleTile key={m.id} m={m} hue={hues[m.id]} index={i} summary={summaries[m.id]} />
             ))}
             <Link
               to="/modules/add"
-              className="flex min-h-[104px] flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line text-muted transition-colors hover:border-muted hover:text-fg"
+              className="lh-rise flex min-h-[112px] flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line text-muted transition-colors hover:border-muted hover:text-fg"
             >
               <PlusIcon className="size-5" />
               <span className="text-xs">Добавить модуль</span>
@@ -109,7 +108,7 @@ export function HomePage() {
 }
 
 /** Плитка модуля: иконка, название и главное из сводки. */
-function ModuleTile({ m, summary }: { m: ModuleInfo; summary?: ModuleSummary | null }) {
+function ModuleTile({ m, hue, index, summary }: { m: ModuleInfo; hue?: number; index: number; summary?: ModuleSummary | null }) {
   const name = m.manifest?.name ?? m.id;
   let value = summary?.value;
   let text = summary?.text;
@@ -121,23 +120,50 @@ function ModuleTile({ m, summary }: { m: ModuleInfo; summary?: ModuleSummary | n
   return (
     <Link
       to={`/m/${m.id}`}
-      className={cn(
-        "flex min-h-[104px] flex-col rounded-xl border border-line bg-surface p-3 transition-colors hover:border-muted/60 hover:bg-surface-2/40 active:scale-[0.98]",
-        m.status === "error" && "border-danger/50",
-      )}
+      style={{ ...(hue !== undefined && { "--h": hue }), animationDelay: `${Math.min(index, 12) * 30}ms` } as CSSProperties}
+      className={cn("lh-tile lh-rise flex min-h-[112px] flex-col rounded-2xl p-3", m.status === "error" && "!border-danger/60")}
     >
-      <div className="flex items-center gap-2">
-        <ModuleIcon m={m} className="size-7 shrink-0 text-2xl" />
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">{name}</span>
+      <div className="flex items-center gap-2.5">
+        <span className="lh-tile-icon grid size-9 shrink-0 place-items-center rounded-xl">
+          <ModuleIcon m={m} className="size-6 text-[22px]" />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{name}</span>
       </div>
-      <div className="mt-auto pt-2">
-        {value && <div className="truncate text-lg font-semibold leading-6 tabular-nums">{value}</div>}
+      <div className="mt-auto pt-2.5">
+        {value && <div className="truncate text-xl font-semibold leading-7 tracking-tight tabular-nums">{value}</div>}
         {text && (
           <div className={cn("text-xs leading-snug", m.status === "error" ? "text-danger" : "text-muted", value ? "truncate" : "line-clamp-2")}>{text}</div>
         )}
       </div>
     </Link>
   );
+}
+
+/** Шапка: дата, время, приветствие — на фоне «сияния» из цветов модулей. */
+function Hero({ now, name, hues }: { now: Date; name: string; hues: number[] }) {
+  const [h1 = 210, h3 = 30] = [hues[0], hues[hues.length - 1]];
+  return (
+    <header className="lh-hero lh-rise mb-4 rounded-2xl px-4 py-5 sm:px-6" style={{ "--h1": h1, "--h3": h3 } as CSSProperties}>
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm text-fg/70">
+            {greeting(now)}
+            {name ? `, ${name}` : ""}
+          </p>
+          <h1 className="mt-0.5 text-2xl font-bold leading-tight tracking-tight sm:text-3xl">{capitalize(formatDate(now, "weekday"))}</h1>
+        </div>
+        <div className="shrink-0 text-3xl font-light leading-none tracking-tight tabular-nums sm:text-4xl">{formatDate(now, "time")}</div>
+      </div>
+    </header>
+  );
+}
+
+function greeting(d: Date) {
+  const h = d.getHours();
+  if (h < 5) return "Доброй ночи";
+  if (h < 12) return "Доброе утро";
+  if (h < 18) return "Добрый день";
+  return "Добрый вечер";
 }
 
 function SummaryProbe({ id, use, onChange }: { id: string; use: () => ModuleSummary | null; onChange: (id: string, s: ModuleSummary | null) => void }) {
