@@ -1,10 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "Джарвис — вкладки",
-  "version": "1.0.0",
-  "description": "Связь браузера с Джарвисом из LifeHub: он видит вкладки во всех пространствах и переключает на нужную по голосу. Работает только с хабом на этом компьютере.",
-  "permissions": ["tabs", "alarms"],
+  "name": "Джарвис — вкладки и фокус",
+  "version": "1.2.0",
+  "description": "Связь браузера с Джарвисом из LifeHub: он видит вкладки во всех пространствах и переключает на нужную по голосу. Фокус: перед YouTube и Инстаграмом спрашивает, зачем пришёл, и ставит таймер, а пока ждёшь — задачка из «Кругозора». Работает только с хабом на этом компьютере.",
+  "permissions": ["tabs", "alarms", "storage", "webNavigation"],
   "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
   "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://*.youtube.com/*", "https://*.instagram.com/*"],
+      "js": ["focus/clean.js"],
+      "run_at": "document_start"
+    }
+  ],
   "icons": { "128": "icon.png" }
 }

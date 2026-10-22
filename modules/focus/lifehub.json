@@ -1,0 +1,14 @@
+{
+  "id": "focus",
+  "name": "Фокус",
+  "version": "1.0.0",
+  "description": "Осознанный YouTube и Инстаграм: перед входом — «Зачем пришёл?» и таймер, без рекомендаций и Shorts. Сколько времени уходит и на что. Своя лента полезного: обучение, научпоп, путешествия — только с выбранных каналов",
+  "icon": "🎯",
+  "author": "Red1an",
+  "type": "app",
+  "sdk": "^1",
+  "entry": "src/index.tsx",
+  "deps": {},
+  "permissions": ["network"],
+  "exports": { "collections": ["sessions"] }
+}

@@ -14,6 +14,7 @@ import { SCREEN_RE, makePlan, runDirect, screenshot, searchStep, type Exchange }
 import { closeApp, tabCommand } from "./pcskills.ts";
 import { launch, writeLibrary } from "./library.ts";
 import { browserConnected, splitWorkspace, startBrowser } from "./browser.ts";
+import { startFocus } from "../focus.ts";
 import { pc } from "./pc.ts";
 import type { CustomCommand, Step } from "./prefs.ts";
 import { addOwnerSample, applyVoiceConfig, enrollVoice, installVoice, resetVoiceprint, restartVoice, startVoice, testVoice, voiceControl } from "./voice.ts";
@@ -177,6 +178,7 @@ export function startJarvis(opts: { port: number; https: boolean } = { port: 420
   hubUrl = `${opts.https ? "https" : "http"}://localhost:${opts.port}`;
   startVoice(opts);
   startBrowser();
+  startFocus(); // расширение у Джарвиса и «Фокуса» общее
   warmUp();
   setTimeout(() => void writeLibrary().catch(() => {}), 15_000);
   setInterval(() => void writeLibrary().catch(() => {}), 60 * 60_000).unref();

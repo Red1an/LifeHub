@@ -26,6 +26,7 @@ import { netFetch } from "./net.ts";
 import { converse, handleAlice } from "./jarvis/index.ts";
 import { acceptClient, reportState, type VoiceEvent } from "./jarvis/voice.ts";
 import { acceptTabs, nextCommand } from "./jarvis/browser.ts";
+import { acceptSessions, focusConfig } from "./focus.ts";
 import { acceptHook, hookInfo, rotateHook } from "./hooks.ts";
 import { SDK_VERSION, type PlatformBuild } from "./compiler.ts";
 import { FILES_DIR, MODULES_DIR, MODULE_ID_RE, HOME, CHECK_COMMAND } from "./paths.ts";
@@ -729,6 +730,15 @@ export function createApp(opts: AppOptions) {
   app.get("/api/jarvis/browser/next", async (c) => {
     fromExtension(c);
     return c.json((await nextCommand()) ?? {});
+  });
+  // «Фокус» (modules/focus) через то же расширение: настройки и журнал сеансов.
+  app.get("/api/focus/config", (c) => {
+    fromExtension(c);
+    return c.json(focusConfig(c.req.query("v") ?? ""));
+  });
+  app.post("/api/focus/sessions", async (c) => {
+    fromExtension(c);
+    return c.json({ saved: acceptSessions(await c.req.json().catch(() => ({}))) });
   });
   app.post("/api/jarvis/voice/ask", async (c) => {
     const token = voiceToken(c);

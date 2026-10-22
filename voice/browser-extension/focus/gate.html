@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Зачем пришёл?</title>
+    <link rel="stylesheet" href="gate.css" />
+  </head>
+  <body>
+    <main id="app">
+      <section id="gate" hidden>
+        <p class="kicker" id="site"></p>
+        <h1>Зачем пришёл?</h1>
+        <p class="today" id="today"></p>
+        <form id="form" autocomplete="off">
+          <input id="purpose" maxlength="300" placeholder="Например: ролик про RAG для работы" autofocus />
+          <p class="hint" id="hint">Одной фразой: что конкретно хочешь найти или посмотреть.</p>
+          <div class="label">Сколько времени</div>
+          <div class="chips" id="minutes"></div>
+          <button type="submit" id="go" disabled></button>
+        </form>
+        <div class="puzzle" id="puzzle" hidden>
+          <div class="label">🧩 Пока ждёшь — задачка из «Кругозора»</div>
+          <p id="pq"></p>
+          <div class="popts" id="popts"></div>
+          <p class="pwhy" id="pwhy" hidden></p>
+        </div>
+        <div class="bottom">
+          <button type="button" class="ghost" id="close">Передумал — закрыть</button>
+          <a class="ghost" id="feed" hidden>Лента полезного в хабе →</a>
+        </div>
+      </section>
+
+      <section id="done" hidden>
+        <p class="kicker" id="doneSite"></p>
+        <h1>Время вышло</h1>
+        <p class="today" id="doneText"></p>
+        <ul id="titles"></ul>
+        <div class="bottom">
+          <button type="button" id="doneClose">Закрыть вкладку</button>
+          <button type="button" class="ghost" id="again">Ещё сеанс</button>
+          <a class="ghost" id="doneFeed" hidden>Лента полезного в хабе →</a>
+        </div>
+      </section>
+    </main>
+    <script src="gate.js"></script>
+  </body>
+</html>

@@ -19,6 +19,8 @@
     `browser.ts` — вкладки через расширение `voice/browser-extension`; `selection.ts` — выделенный текст; `library.ts` — программы для «открой …» («Пуск», Steam, Epic, рабочий стол, свои названия); сценарии из конструктора — `runSteps`.
     Навык Алисы — вебхук `/alice/<секрет>` (ngrok пропускает его без входа Google), ответ < 3 с.
     Интерфейс — модуль `modules/jarvis`; связь с ним через его данные (kv `config`/`status`/`voice`/`action`, коллекция `chat`).
+  - `focus.ts` — «Фокус» (модуль `modules/focus`): настройки и журнал сеансов для того же расширения
+    (`voice/browser-extension/focus/` — «Зачем пришёл?», таймер, YouTube без рекомендаций).
 - `voice/` — голос Джарвиса на Python (`.venv` ставит хаб): `main.py` — цикл, `stt.py` GigaAM/Whisper, `tts.py` Piper/Silero,
   `speaker.py` — голос владельца (WeSpeaker), `echo.py` — не просыпаться от своих колонок,
   `ui.py` + `ui/orb.html` — орб, панель и трей (pywebview). Модели — в `~/.lifehub/voice/models`.
