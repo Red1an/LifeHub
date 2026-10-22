@@ -9,23 +9,24 @@ import { CLASS_SHORT, CLASS_TITLE, RISK_HINT, RISK_TITLE } from "../lib/health.t
 import { buildIdeas } from "../lib/ideas.ts";
 import { corpList, ofzList } from "../lib/moex.ts";
 import { BondsAdvisor } from "./Bonds.tsx";
+import { BestTab } from "./Best.tsx";
 import { WatchTab } from "./Watch.tsx";
 import { loadScreener } from "../lib/screener.ts";
 import { saveBonds, saveScreener, useInvest } from "../lib/store.tsx";
 import { ASSET_TITLE, type AssetType } from "../lib/types.ts";
 
-const TABS = ["plan", "bonds", "stocks", "watch", "targets"] as const;
+const TABS = ["best", "plan", "bonds", "stocks", "watch", "targets"] as const;
 
 export function IdeasPage() {
   const { loading } = useInvest();
-  const [tab, setTab] = useTab<(typeof TABS)[number]>("plan", TABS);
+  const [tab, setTab] = useTab<(typeof TABS)[number]>("best", TABS);
   if (loading) return <Loading />;
   return (
     <Screen>
       <Header title="Идеи" question="Во что сейчас разумно вложить следующие деньги">
-        <Seg value={tab} onChange={setTab} options={[["plan", "Куда вложить"], ["bonds", "Облигации"], ["stocks", "Акции"], ["watch", "Наблюдаю"], ["targets", "Свои доли"]]} />
+        <Seg value={tab} onChange={setTab} options={[["best", "Лучшее сейчас"], ["plan", "Под мой портфель"], ["bonds", "Облигации"], ["stocks", "Дивиденды"], ["watch", "Наблюдаю"], ["targets", "Свои доли"]]} />
       </Header>
-      {tab === "plan" ? <PlanTab /> : tab === "stocks" ? <StocksTab /> : tab === "bonds" ? <BondsAdvisor /> : tab === "watch" ? <WatchTab /> : <TargetsTab />}
+      {tab === "best" ? <BestTab /> : tab === "plan" ? <PlanTab /> : tab === "stocks" ? <StocksTab /> : tab === "bonds" ? <BondsAdvisor /> : tab === "watch" ? <WatchTab /> : <TargetsTab />}
       <p className="inv-faint mt-6 text-center text-xs leading-relaxed">
         Это расчёт по вашим целям и открытым данным биржи, а не индивидуальная инвестиционная рекомендация. Перед покупкой проверьте свежие новости компании.
       </p>

@@ -93,7 +93,7 @@ const AVATAR_COLORS = ["#1f6f5c", "#2b4c7e", "#6b4c9a", "#7a5a1e", "#7d3434", "#
 export function Avatar({ ticker, type }: { ticker: string; type?: string }) {
   const h = [...ticker].reduce((a, c) => a + c.charCodeAt(0), 0);
   const ofz = /^SU\d{5}/.test(ticker);
-  const label = ofz ? ticker.slice(2, 7) : type === "bond" ? "ОБЛ" : ticker.slice(0, 4);
+  const label = ofz ? ticker.slice(2, 7) : type === "bond" ? "ОБЛ" : ticker.slice(0, 5);
   return (
     <span className="inv-avatar" style={{ background: type === "bond" || ofz ? "#26354a" : AVATAR_COLORS[h % AVATAR_COLORS.length] }}>
       {label}

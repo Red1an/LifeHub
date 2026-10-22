@@ -10,6 +10,7 @@ import { IncomePage } from "./pages/Income.tsx";
 import { PortfolioPage } from "./pages/Portfolio.tsx";
 import { AssetPage } from "./pages/Asset.tsx";
 import { ActionsPage } from "./pages/Actions.tsx";
+import { CheckPage } from "./pages/Check.tsx";
 import { IdeasPage } from "./pages/Ideas.tsx";
 import { SettingsPage } from "./pages/Settings.tsx";
 import { OperationsPage } from "./pages/Operations.tsx";
@@ -73,6 +74,7 @@ export default defineModule({
     "/portfolio": PortfolioPage,
     "/asset/:id": AssetPage,
     "/actions": ActionsPage,
+    "/check": CheckPage,
     "/review": ActionsPage,
     "/ideas": IdeasPage,
     "/settings": SettingsPage,

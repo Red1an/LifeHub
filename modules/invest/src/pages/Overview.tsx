@@ -42,6 +42,15 @@ function Dashboard() {
     <Screen>
       <Header title="Инвестиции" question={portfolio.isDemo ? "Демо-портфель — подключите свои счета в ⚙︎" : undefined} />
 
+      <Link to="/check" className="inv-panel mb-4 flex items-center gap-3 border-[var(--inv-green-soft)] p-4 transition-colors hover:border-[var(--inv-green)]">
+        <span className="text-2xl">🛑</span>
+        <div className="min-w-0 flex-1">
+          <div className="font-extrabold">Хочу купить или продать</div>
+          <div className="inv-muted text-[13px]">Сначала проверьте: доля, налог, цена за год, ваши прошлые сделки — за 10 секунд</div>
+        </div>
+        <span className="text-lg font-bold text-[var(--inv-green)]">→</span>
+      </Link>
+
       {!guide && (
         <section className="inv-panel inv-fade-in mb-4 p-4 sm:p-5">
           <div className="flex items-start gap-3">

@@ -276,6 +276,27 @@ export async function corpList(): Promise<OfzRow[]> {
   return (await boardBonds("TQCB")).filter((r) => r.listLevel === 1 && r.kind === "fixed" && r.yield > 0 && (r.volume ?? 0) > 300_000);
 }
 
+/** Все корпоративные облигации с фиксированным купоном, которые торговались сегодня (для подборки по рейтингам). */
+export async function corpAll(): Promise<OfzRow[]> {
+  return (await boardBonds("TQCB")).filter((r) => r.yield > 0 && (r.volume ?? 0) > 50_000);
+}
+
+/** Цены и обороты всех акций основного режима торгов одним запросом. */
+export async function sharesBoard(): Promise<Record<string, { price: number; volume: number }>> {
+  const t = await tables("engines/stock/markets/shares/boards/TQBR/securities.json", {
+    "iss.only": "securities,marketdata",
+    "securities.columns": "SECID,PREVPRICE",
+    "marketdata.columns": "SECID,LAST,MARKETPRICE,VALTODAY",
+  });
+  const prev = new Map((t.securities ?? []).map((r) => [r.secid as string, Number(r.prevprice ?? 0)]));
+  const out: Record<string, { price: number; volume: number }> = {};
+  for (const m of t.marketdata ?? []) {
+    const price = Number(m.last ?? m.marketprice ?? prev.get(m.secid) ?? 0);
+    if (price > 0) out[m.secid] = { price, volume: Number(m.valtoday ?? 0) };
+  }
+  return out;
+}
+
 /** Курсы ЦБ: валюта → рублей за 1 единицу. */
 export async function cbrRates(): Promise<Record<string, number>> {
   const root = await getJSON<J>("https://www.cbr-xml-daily.ru/daily_json.js");

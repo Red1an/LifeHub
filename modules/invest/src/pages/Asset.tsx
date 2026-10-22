@@ -1,4 +1,4 @@
-import { Loading, cn, useNavigate, useParams } from "@lifehub/sdk";
+import { Link, Loading, cn, useNavigate, useParams } from "@lifehub/sdk";
 import { useMemo } from "react";
 import { Columns, TimeChart } from "../components/charts.tsx";
 import { Avatar, Btn, Empty, Panel, PctTone, Screen, Stat } from "../components/ui.tsx";
@@ -57,6 +57,15 @@ export function AssetPage() {
             {h && h.quantity > 0 && CLASS_SHORT[classOf(h)] !== ASSET_TITLE[inst.type] ? ` · ${CLASS_SHORT[classOf(h)]}` : ""}
           </div>
         </div>
+      </div>
+
+      <div className="mb-4 grid grid-cols-2 gap-2">
+        <Link to={`/check?side=buy&t=${encodeURIComponent(inst.ticker)}`} className="inv-btn">
+          Проверить покупку
+        </Link>
+        <Link to={`/check?side=sell&t=${encodeURIComponent(inst.ticker)}`} className={cn("inv-btn", !(h && h.quantity > 0) && "pointer-events-none opacity-40")}>
+          Проверить продажу
+        </Link>
       </div>
 
       {h && h.quantity > 0 && advice.get(id) && <VerdictCard a={advice.get(id)!} />}
