@@ -1,4 +1,4 @@
-import { Link, defineModule } from "@lifehub/sdk";
+import { Link, defineModule, type ModuleSummary } from "@lifehub/sdk";
 import "./styles.css";
 import { Orb, voiceLine } from "./components/hud.tsx";
 import { useChat, useVoice } from "./lib/store.ts";
@@ -29,6 +29,12 @@ function StatusWidget() {
   );
 }
 
+/** Сводка для главной хаба: состояние голоса. */
+function useSummary(): ModuleSummary | null {
+  const { voice } = useVoice();
+  return { text: voiceLine(voice).text };
+}
+
 export default defineModule({
   routes: {
     "/": Chat,
@@ -51,5 +57,6 @@ export default defineModule({
   widgets: {
     status: { title: "Джарвис", size: "sm", component: StatusWidget },
   },
+  summary: useSummary,
   theme: "dark",
 });

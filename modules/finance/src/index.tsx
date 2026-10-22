@@ -1,10 +1,11 @@
 import { useMemo, type ReactNode } from "react";
-import { Link, defineModule, monthKey } from "@lifehub/sdk";
+import { Link, defineModule, monthKey, useCollection, type ModuleSummary } from "@lifehub/sdk";
 import "./styles.css";
 import { FinanceProvider, useFinance } from "./lib/store.tsx";
 import { monthStats, pace } from "./lib/analytics.ts";
-import { upcomingPayments } from "./lib/accounts.ts";
+import { accountStates, upcomingPayments } from "./lib/accounts.ts";
 import { rub, short } from "./lib/money.ts";
+import type { AccountDoc, PlanDoc, TxDoc } from "./lib/types.ts";
 import { TxSheetProvider } from "./components/TxSheet.tsx";
 import { Overview } from "./pages/Overview.tsx";
 import { Operations } from "./pages/Operations.tsx";
@@ -84,6 +85,25 @@ function WidgetBody() {
   );
 }
 
+/** Сводка для главной хаба: потрачено за месяц и ближайший платёж (если в течение недели). */
+function useSummary(): ModuleSummary | null {
+  const txs = useCollection<TxDoc>("transactions");
+  const accounts = useCollection<AccountDoc>("accounts");
+  const plans = useCollection<PlanDoc>("plans");
+  const month = monthKey();
+  const ms = useMemo(() => monthStats(txs.items, month), [txs.items, month]);
+  const next = useMemo(
+    () => upcomingPayments(accountStates(accounts.items, txs.items, month), plans.items, 7)[0],
+    [accounts.items, txs.items, plans.items, month],
+  );
+  if (txs.loading || accounts.loading) return null;
+  const monthName = new Date().toLocaleString("ru-RU", { month: "long" });
+  return {
+    value: rub(ms.spent),
+    text: next ? `${next.days <= 0 ? "сегодня" : next.days === 1 ? "завтра" : `через ${next.days} дн.`} платёж ${short(next.amount)}` : `потрачено за ${monthName}`,
+  };
+}
+
 export default defineModule({
   routes: {
     "/": Overview,
@@ -107,5 +127,6 @@ export default defineModule({
   widgets: {
     month: { title: "Финансы", component: MonthWidget },
   },
+  summary: useSummary,
   layout: Layout,
 });

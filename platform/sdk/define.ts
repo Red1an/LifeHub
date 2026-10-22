@@ -15,6 +15,14 @@ export interface WidgetDefinition {
   component: ComponentType;
 }
 
+/** Короткая сводка модуля на его плитке на главной хаба. Только факты, не задания. */
+export interface ModuleSummary {
+  /** Главная цифра или слово: «19 360 ₽», «3/5», «15:10». */
+  value?: string;
+  /** Пояснение одной строкой: «потрачено в октябре», «Прикладные методы». */
+  text?: string;
+}
+
 export interface ModuleDefinition {
   /**
    * Страницы модуля: путь → компонент. Поддерживаются параметры (":id")
@@ -25,6 +33,11 @@ export interface ModuleDefinition {
   nav?: NavItem[];
   /** Виджеты для главной страницы хаба. */
   widgets?: Record<string, WidgetDefinition>;
+  /**
+   * Хук сводки для главной хаба. Вызывается в компоненте хаба (можно useCollection, useStore и т.п.,
+   * но не контекст из layout модуля). null — показывать описание из манифеста.
+   */
+  summary?: () => ModuleSummary | null;
   /** Обёртка вокруг всех страниц модуля. */
   layout?: ComponentType<{ children: ReactNode }>;
   /**

@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import { defineModule, Link, dayKey } from "@lifehub/sdk";
+import { defineModule, Link, dayKey, type ModuleSummary } from "@lifehub/sdk";
 import "./styles.css";
 import { WeekPage } from "./pages/Week.tsx";
 import { AskPage } from "./pages/Ask.tsx";
@@ -49,6 +49,22 @@ function TodayWidget() {
   );
 }
 
+/** Сводка для главной хаба: ближайшее событие. */
+function useSummary(): ModuleSummary | null {
+  const today = dayKey();
+  const from = useMemo(() => fromKey(today), [today]);
+  const to = useMemo(() => fromKey(shiftKey(today, 1)), [today]);
+  const { events, google } = useEvents(from, to);
+  if (google && !google.connected) return { text: "Подключите Google в настройках хаба" };
+  if (!events) return null;
+  const now = Date.now();
+  const next = events.filter((e) => !e.allDay && e.end.getTime() > now);
+  const e = next[0];
+  if (!e) return { value: "Свободно", text: "событий сегодня больше нет" };
+  const when = e.start.getTime() <= now ? "Сейчас" : hhmm(e.start);
+  return { value: when, text: next.length > 1 ? `${e.title} · ещё ${next.length - 1}` : e.title };
+}
+
 export default defineModule({
   routes: {
     "/": WeekPage,
@@ -69,6 +85,7 @@ export default defineModule({
   widgets: {
     today: { title: "Расписание", size: "sm", component: TodayWidget },
   },
+  summary: useSummary,
   layout: Layout,
   theme: "dark",
 });

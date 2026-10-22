@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { defineModule, Link, cn } from "@lifehub/sdk";
+import { defineModule, Link, cn, type ModuleSummary } from "@lifehub/sdk";
 import "./styles.css";
 import { Today } from "./pages/Today.tsx";
 import { MapPage, TrackPage } from "./pages/Map.tsx";
@@ -14,6 +14,7 @@ import { TestPage, MistakesPage, MixedPage, PlacementPage } from "./pages/Traini
 import { ProjectsPage, ProjectPage } from "./pages/Projects.tsx";
 import { GoalPage } from "./pages/Goal.tsx";
 import { useDev } from "./lib/store.ts";
+import { ALL_TOPICS, topicById } from "./data/curriculum.ts";
 
 function Layout({ children }: { children: ReactNode }) {
   useSound();
@@ -48,6 +49,17 @@ function Widget() {
       </div>
     </Link>
   );
+}
+
+/** Сводка для главной хаба: сколько тем пройдено и что изучается сейчас. */
+function useSummary(): ModuleSummary | null {
+  const dev = useDev();
+  if (dev.loading) return null;
+  const items = dev.topics.items;
+  const done = items.filter((t) => t.status === "done").length;
+  const current = items.filter((t) => t.status === "learning").sort((a, b) => b.updatedAt - a.updatedAt)[0];
+  const title = current && topicById(current.id)?.title;
+  return { value: `${done}/${ALL_TOPICS.length}`, text: title ? `сейчас: ${title}` : "тем пройдено" };
 }
 
 export default defineModule({
@@ -86,6 +98,7 @@ export default defineModule({
   widgets: {
     today: { title: "DevPath", size: "sm", component: Widget },
   },
+  summary: useSummary,
   layout: Layout,
   theme: "dark",
 });

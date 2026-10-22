@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Link, defineModule, toast, useCollection, useStore } from "@lifehub/sdk";
+import { Link, defineModule, toast, useCollection, useStore, plural, type ModuleSummary } from "@lifehub/sdk";
 import "./prose.css";
 import "./styles.css";
 import { InboxPage } from "./pages/Inbox.tsx";
@@ -77,6 +77,18 @@ function FunnelWidget() {
   );
 }
 
+/** Сводка для главной хаба: сколько неразобранного в воронке. */
+function useSummary(): ModuleSummary | null {
+  const notes = useCollection<Note>("notes");
+  if (notes.loading) return null;
+  const inbox = notes.items.filter((n) => n.status === "inbox").length;
+  const total = notes.items.filter((n) => n.status !== "inbox").length;
+  return {
+    value: `${notes.items.length}`,
+    text: inbox ? `${inbox} ${plural(inbox, ["новая", "новые", "новых"])} в воронке` : `${plural(total, ["заметка", "заметки", "заметок"])} · воронка пуста`,
+  };
+}
+
 export default defineModule({
   routes: {
     "/": InboxPage,
@@ -105,5 +117,6 @@ export default defineModule({
   widgets: {
     recent: { title: "Заметки", component: FunnelWidget },
   },
+  summary: useSummary,
   layout: Layout,
 });

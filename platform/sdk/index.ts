@@ -6,7 +6,7 @@ import { bind } from "./bind.ts";
 import { getHost } from "./core.ts";
 
 export { defineModule } from "./define.ts";
-export type { ModuleDefinition, NavItem, WidgetDefinition } from "./define.ts";
+export type { ModuleDefinition, ModuleSummary, NavItem, WidgetDefinition } from "./define.ts";
 
 export * from "./ui.tsx";
 export * from "./charts.tsx";

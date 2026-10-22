@@ -66,7 +66,7 @@ node "{{HUB_DIR}}/bin/lifehub.mjs" check <id>
 ## Точка входа
 
 ```tsx
-import { defineModule } from "@lifehub/sdk";
+import { defineModule, useCollection, type ModuleSummary } from "@lifehub/sdk";
 import { Home } from "./pages/Home";
 import { Stats } from "./pages/Stats";
 import { Item } from "./pages/Item";
@@ -83,12 +83,27 @@ export default defineModule({
     { to: "/", label: "Главная", icon: "🏠" },
     { to: "/stats", label: "Статистика", icon: "📊" },
   ],
-  widgets: {                 // карточки на главной хаба
+  widgets: {                 // карточки-виджеты (сейчас главная хаба их не показывает)
     summary: { title: "Финансы", size: "sm", component: SummaryWidget },  // size: sm | md | lg
   },
+  summary: useSummary,       // необязательно: что написать на плитке модуля на главной хаба (см. ниже)
   theme: "dark",             // необязательно: своя тема модуля
 });
+
+// Хук сводки: вызывается на главной хаба (useCollection, useStore — можно; контекст из layout — нет).
+function useSummary(): ModuleSummary | null {
+  const expenses = useCollection<Expense>("expenses");
+  if (expenses.loading) return null;
+  return {
+    value: "19 360 ₽",              // главная цифра на плитке
+    text: "потрачено за октябрь",    // строка пояснения
+  };
+}
 ```
+
+Главная хаба — плитки модулей для быстрого запуска. Сводка (`summary`) — то, что видно на плитке без открытия
+модуля: **факты** (сколько потрачено, что сейчас по расписанию), не задания, серии и очки. Без сводки на
+плитке — описание из манифеста.
 
 Пути в `Link`, `useNavigate` — **внутри модуля** (`"/stats"` → `/m/<id>/stats`).
 `"~/"` в начале — путь хаба (`"~/modules"`).

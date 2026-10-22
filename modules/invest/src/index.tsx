@@ -1,4 +1,5 @@
-import { Link, defineModule } from "@lifehub/sdk";
+import { Link, defineModule, useStore, type ModuleSummary } from "@lifehub/sdk";
+import type { Snapshot } from "./lib/types.ts";
 import type { ReactNode } from "react";
 import "./styles.css";
 import { InvestProvider, useInvest } from "./lib/store.tsx";
@@ -54,6 +55,17 @@ function WidgetBody() {
   );
 }
 
+const NO_SNAPS: Snapshot[] = [];
+
+/** Сводка для главной хаба: стоимость по последнему снимку (без пересчёта всего портфеля). */
+function useSummary(): ModuleSummary | null {
+  const [snaps] = useStore<Snapshot[]>("snapshots", NO_SNAPS);
+  const last = snaps[snaps.length - 1];
+  if (!last) return null;
+  const gain = last.value - last.invested;
+  return { value: shortRub(last.value), text: `${gain >= 0 ? "+" : "−"}${shortRub(Math.abs(gain))} к вложенному` };
+}
+
 export default defineModule({
   routes: {
     "/": Overview,
@@ -78,6 +90,7 @@ export default defineModule({
   widgets: {
     summary: { title: "Инвестиции", size: "sm", component: SummaryWidget },
   },
+  summary: useSummary,
   layout: Layout,
   theme: "dark",
 });
