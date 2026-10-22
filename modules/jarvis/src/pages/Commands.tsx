@@ -1,30 +1,29 @@
 import { useState } from "react";
-import { Button, Field, Input, Modal, Textarea, confirm, uid, useNavigate } from "@lifehub/sdk";
+import { Link, cn, toast, uid, useNavigate } from "@lifehub/sdk";
 import { Panel, Screen } from "../components/hud.tsx";
-import { say, usePrefs } from "../lib/store.ts";
-import { BUILTIN, RUNNABLE, type CustomCommand } from "../lib/types.ts";
+import { action, say, usePrefs } from "../lib/store.ts";
+import { PRESETS, STEPS, stepsOf, summary } from "../lib/steps.ts";
+import { BUILTIN, type CustomCommand } from "../lib/types.ts";
 
-const EXAMPLES: Omit<CustomCommand, "id">[] = [
-  { phrases: ["я ушел", "я ухожу"], say: "Хорошего пути.", run: ["что дальше"] },
-  { phrases: ["я дома"], say: "С возвращением.", run: ["итоги дня"] },
-  { phrases: ["как дела"], say: "Все системы в норме. Готов к работе.", run: [] },
-];
-
+/** Сценарии: фраза → цепочка шагов. Редактор — /commands/:id. */
 export function Commands() {
   const { prefs, update } = usePrefs();
   const navigate = useNavigate();
-  const [edit, setEdit] = useState<CustomCommand | null>(null);
+  const [showBuiltin, setShowBuiltin] = useState(false);
 
-  const save = (c: CustomCommand) => {
-    const list = prefs.commands.some((x) => x.id === c.id) ? prefs.commands.map((x) => (x.id === c.id ? c : x)) : [...prefs.commands, c];
-    update({ commands: list });
-    setEdit(null);
+  const create = (base?: Omit<CustomCommand, "id">) => {
+    const c: CustomCommand = base ? { ...structuredClone(base), id: uid() } : { id: uid(), phrases: [], say: "", run: [], steps: [] };
+    update({ commands: [...prefs.commands, c] });
+    navigate(`/commands/${c.id}`);
   };
-  const remove = async (c: CustomCommand) => {
-    if (!(await confirm(`Удалить команду «${c.phrases[0]}»?`, { danger: true }))) return;
-    update({ commands: prefs.commands.filter((x) => x.id !== c.id) });
-    setEdit(null);
+  const toggle = (c: CustomCommand) => update({ commands: prefs.commands.map((x) => (x.id === c.id ? { ...x, off: !x.off } : x)) });
+  const run = async (c: CustomCommand) => {
+    await action({ kind: "scenario", id: c.id });
+    toast(`Запускаю «${c.phrases[0] ?? "сценарий"}»`, "info");
   };
+  const own = prefs.commands.filter((c) => !c.learned);
+  const learned = prefs.commands.filter((c) => c.learned);
+  const forget = (c: CustomCommand) => update({ commands: prefs.commands.filter((x) => x.id !== c.id) });
   const tryIt = async (q: string) => {
     await say(q);
     navigate("/");
@@ -32,150 +31,129 @@ export function Commands() {
 
   return (
     <Screen
-      title="Команды"
-      subtitle="Свои фразы и всё, что Джарвис умеет"
+      title="Сценарии"
+      subtitle="Фраза → цепочка шагов. Скажите «Джарвис» и фразу"
       right={
-        <button className="jarvis-chip" onClick={() => setEdit({ id: uid(), phrases: [""], say: "", run: [] })}>
-          + Своя
+        <button className="jarvis-chip shrink-0" onClick={() => create()}>
+          + Новый
         </button>
       }
     >
-      <Panel title="Свои команды">
-        {prefs.commands.length === 0 ? (
-          <div className="space-y-3 text-sm text-[#8fb3c7]">
-            <p>Фраза → ответ и цепочка встроенных команд. Например:</p>
-            <div className="space-y-2">
-              {EXAMPLES.map((e) => (
-                <button
-                  key={e.phrases[0]}
-                  onClick={() => save({ ...e, id: uid() })}
-                  className="flex w-full items-center justify-between gap-2 rounded-lg bg-black/25 p-3 text-left hover:bg-black/40"
-                >
-                  <span>
-                    <span className="block text-white">«{e.phrases[0]}»</span>
-                    <span className="block text-xs">
-                      {e.say}
-                      {e.run.length ? ` + ${e.run.join(", ")}` : ""}
-                    </span>
-                  </span>
-                  <span className="jarvis-glow text-sm">добавить</span>
-                </button>
-              ))}
-            </div>
-          </div>
+      {own.length > 0 && (
+        <div className="space-y-2">
+          {own.map((c) => {
+            const steps = stepsOf(c);
+            return (
+              <div key={c.id} className={cn("jarvis-panel flex items-stretch gap-2 p-1.5 pl-3.5", c.off && "opacity-50")}>
+                <Link to={`/commands/${c.id}`} className="min-w-0 flex-1 py-2">
+                  <div className="truncate text-[15px] font-medium text-white">{c.phrases.length ? `«${c.phrases.join("», «")}»` : "Без фразы"}</div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                    {steps.length === 0 && <span className="text-xs text-[#7f9fb2]">пока ничего не делает</span>}
+                    {steps.slice(0, 6).map((s, i) => (
+                      <span key={i} className="inline-flex max-w-[11rem] items-center gap-1 truncate rounded-md border border-[var(--jv-line)] bg-black/25 px-1.5 py-0.5 text-[11px] text-[#bfe2f3]">
+                        <span>{STEPS[s.type].icon}</span>
+                        <span className="truncate">{summary(s)}</span>
+                      </span>
+                    ))}
+                    {steps.length > 6 && <span className="text-[11px] text-[#7f9fb2]">ещё {steps.length - 6}</span>}
+                  </div>
+                </Link>
+                <div className="flex shrink-0 flex-col justify-center gap-1">
+                  <button className="jarvis-chip !px-3 !py-1.5" disabled={c.off || !steps.length} onClick={() => run(c)} title="Запустить">
+                    ▶
+                  </button>
+                  <button className="rounded-full px-2 py-1 text-[11px] text-[#7f9fb2] hover:text-white" onClick={() => toggle(c)}>
+                    {c.off ? "вкл" : "выкл"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Panel
+        title={`Выучено${learned.length ? ` · ${learned.length}` : ""}`}
+        right={
+          <button className="text-xs text-[#7cc8ec]" onClick={() => update({ learn: !prefs.learn })}>
+            {prefs.learn ? "Не учиться" : "Учиться"}
+          </button>
+        }
+      >
+        {learned.length === 0 ? (
+          <p className="text-sm text-[#8fb3c7]">
+            {prefs.learn
+              ? "Когда нейронка разберёт новую просьбу («включи атаку титанов»), Джарвис запомнит её здесь — и в следующий раз выполнит мгновенно, без нейронки."
+              : "Обучение выключено."}
+          </p>
         ) : (
           <div className="divide-y divide-[var(--jv-line)]">
-            {prefs.commands.map((c) => (
-              <div key={c.id} className="flex items-center gap-2 py-2.5">
-                <button className="min-w-0 flex-1 text-left" onClick={() => setEdit(c)}>
-                  <div className="truncate text-[15px] text-white">«{c.phrases.filter(Boolean).join("», «")}»</div>
-                  <div className="truncate text-xs text-[#7f9fb2]">
-                    {[c.say, ...c.run.map((r) => `→ ${r}`)].filter(Boolean).join(" ") || "ничего не делает"}
-                  </div>
-                </button>
-                <button className="jarvis-chip shrink-0" onClick={() => tryIt(c.phrases[0])}>
-                  ▶
-                </button>
-              </div>
-            ))}
+            {learned.map((c) => {
+              const steps = stepsOf(c);
+              return (
+                <div key={c.id} className="flex items-center gap-2 py-2">
+                  <Link to={`/commands/${c.id}`} className="min-w-0 flex-1">
+                    <div className="truncate text-[15px] text-white">«{c.phrases[0]}»</div>
+                    <div className="truncate text-xs text-[#7f9fb2]">{steps.map((s) => `${STEPS[s.type].icon} ${summary(s)}`).join("  →  ")}</div>
+                  </Link>
+                  <button className="shrink-0 rounded-full px-2 py-1 text-[11px] text-[#7f9fb2] hover:text-[#ff9b8a]" onClick={() => forget(c)}>
+                    забыть
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
-        <p className="mt-3 text-xs text-[#7f9fb2]">
-          Скажите «Джарвис, я ушёл». Шаги — любые команды, в том числе для компьютера: «открой телеграм», «громкость 20», «сверни все».
-          Получается сценарий: «рабочий режим» → открыть редактор, браузер и музыку.
-        </p>
+        {learned.length > 0 && <p className="mt-2 text-xs text-[#7f9fb2]">Ошибся — нажмите «забыть» или откройте и поправьте шаги.</p>}
       </Panel>
 
-      {BUILTIN.map((g) => (
-        <Panel key={g.group} title={g.group}>
-          <div className="flex flex-wrap gap-2">
-            {g.items.map((i) => (
-              <button key={i} className="jarvis-chip" onClick={() => tryIt(i)}>
-                {i}
-              </button>
-            ))}
-          </div>
-        </Panel>
-      ))}
-      <p className="px-1 text-xs text-[#7f9fb2]">Нажмите на пример — Джарвис ответит во вкладке «Разговор». Всё остальное он передаст нейронке (если включена).</p>
-
-      {edit && <Editor cmd={edit} onSave={save} onRemove={prefs.commands.some((c) => c.id === edit.id) ? () => remove(edit) : undefined} onClose={() => setEdit(null)} />}
-    </Screen>
-  );
-}
-
-function Editor({ cmd, onSave, onRemove, onClose }: { cmd: CustomCommand; onSave: (c: CustomCommand) => void; onRemove?: () => void; onClose: () => void }) {
-  const [phrases, setPhrases] = useState(cmd.phrases.join("\n"));
-  const [text, setText] = useState(cmd.say);
-  const [run, setRun] = useState<string[]>(cmd.run);
-  const [custom, setCustom] = useState("");
-  const list = phrases.split("\n").map((p) => p.trim()).filter(Boolean);
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title="Своя команда"
-      footer={
-        <div className="flex w-full flex-wrap justify-between gap-2">
-          {onRemove ? (
-            <Button variant="ghost" onClick={onRemove}>
-              Удалить
-            </Button>
-          ) : (
-            <span />
-          )}
-          <Button variant="primary" disabled={!list.length} onClick={() => onSave({ id: cmd.id, phrases: list, say: text.trim(), run })}>
-            Сохранить
-          </Button>
-        </div>
-      }
-    >
-      <div className="space-y-4">
-        <Field label="Фразы" hint="Каждая с новой строки: «я ушёл», «я ухожу»">
-          <Textarea value={phrases} onChange={(e) => setPhrases(e.target.value)} placeholder="я ушёл" className="min-h-20" />
-        </Field>
-        <Field label="Что сказать" hint="Можно оставить пустым">
-          <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Хорошего пути, сэр." />
-        </Field>
-        <div>
-          <div className="mb-1.5 text-sm font-medium">Затем выполнить</div>
-          {run.length > 0 && (
-            <ol className="mb-2 space-y-1">
-              {run.map((r, i) => (
-                <li key={i} className="flex items-center justify-between gap-2 rounded-md bg-surface-2 px-3 py-1.5 text-sm">
-                  <span>
-                    {i + 1}. {r}
+      <Panel title={own.length ? "Заготовки" : "Начните с заготовки"}>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {PRESETS.map((p) => (
+            <button key={p.title} onClick={() => create(p.cmd)} className="rounded-xl border border-[var(--jv-line)] bg-black/25 p-3 text-left transition-colors hover:border-[var(--jv-cyan)]">
+              <div className="text-[15px] font-medium text-white">{p.title}</div>
+              <div className="text-xs text-[#8fb3c7]">«{p.cmd.phrases[0]}» · {p.hint}</div>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {(p.cmd.steps ?? []).map((s, i) => (
+                  <span key={i} className="rounded-md bg-white/5 px-1.5 py-0.5 text-[11px] text-[#9dbccc]">
+                    {STEPS[s.type].icon} {STEPS[s.type].label}
                   </span>
-                  <button className="text-muted hover:text-fg" aria-label="Убрать" onClick={() => setRun(run.filter((_, j) => j !== i))}>
-                    ✕
-                  </button>
-                </li>
-              ))}
-            </ol>
-          )}
-          <div className="flex flex-wrap gap-1.5">
-            {RUNNABLE.filter((r) => !run.includes(r)).map((r) => (
-              <button key={r} className="rounded-full border border-line px-2.5 py-1 text-xs hover:bg-surface-2" onClick={() => setRun([...run, r].slice(0, 5))}>
-                + {r}
-              </button>
-            ))}
-          </div>
-          <form
-            className="mt-2 flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (custom.trim()) setRun([...run, custom.trim()].slice(0, 5));
-              setCustom("");
-            }}
-          >
-            <Input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="или своя фраза: «что у меня в пятницу»" className="min-w-0 flex-1" />
-            <Button type="submit" disabled={!custom.trim()}>
-              Добавить
-            </Button>
-          </form>
+                ))}
+              </div>
+            </button>
+          ))}
         </div>
-      </div>
-    </Modal>
+        <p className="mt-3 text-xs text-[#7f9fb2]">Заготовка — только старт: откроется редактор, где можно поменять фразу, шаги и порядок.</p>
+      </Panel>
+
+      <Panel
+        title="Что Джарвис умеет сам"
+        right={
+          <button className="text-xs text-[#7cc8ec]" onClick={() => setShowBuiltin(!showBuiltin)}>
+            {showBuiltin ? "Свернуть" : "Показать"}
+          </button>
+        }
+      >
+        {showBuiltin ? (
+          <div className="space-y-3">
+            {BUILTIN.map((g) => (
+              <div key={g.group}>
+                <div className="mb-1.5 text-xs uppercase tracking-wider text-[#7f9fb2]">{g.group}</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {g.items.map((i) => (
+                    <button key={i} className="jarvis-chip !px-3 !py-1.5 !text-[13px]" onClick={() => tryIt(i)}>
+                      {i}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <p className="text-xs text-[#7f9fb2]">Нажатие выполняет команду по-настоящему. Остальное Джарвис передаст нейронке.</p>
+          </div>
+        ) : (
+          <p className="text-sm text-[#8fb3c7]">Программы, музыка, громкость, окна, таймеры, календарь, траты, заметки — и любые просьбы своими словами.</p>
+        )}
+      </Panel>
+    </Screen>
   );
 }

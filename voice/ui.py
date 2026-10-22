@@ -30,6 +30,8 @@ class Api:
         self._ui.open_panel()
 
     def hide_orb(self):
+        # Крестик: замолчать и спрятаться.
+        self._ui.on_tray("stop")
         self._ui.hide(now=True)
 
 
@@ -46,6 +48,7 @@ class Ui:
         self._hide_timer: threading.Timer | None = None
         self._last_level = 0.0
         self._tray = None
+        self.h = ORB_H
         self.tray_state = {"muted": False, "sleeping": False}
 
     # ───────────── запуск ─────────────
@@ -70,8 +73,32 @@ class Ui:
             background_color="#04080D",
         )
         self.orb.events.loaded += lambda: self._on_loaded()
+        # Панель создаём сразу, скрытой: из других потоков (трей, голос) создавать окна нельзя.
+        # Страница хаба грузится при первом открытии, крестик окно только прячет.
+        self.panel = webview.create_window(
+            "Джарвис",
+            html="<body style='background:#071019'></body>",
+            width=1120,
+            height=780,
+            min_size=(380, 520),
+            background_color="#071019",
+            hidden=True,
+        )
+        self.panel.events.closing += self._panel_closing
+        self._panel_loaded = False
         threading.Thread(target=self._tray_loop, daemon=True).start()
-        webview.start(worker, private_mode=False, storage_path=os.path.join(os.path.expanduser("~"), ".lifehub", "voice", "webview"))
+        base = os.path.join(os.path.expanduser("~"), ".lifehub", "voice")
+        icon = os.path.join(base, "jarvis.ico")
+        try:
+            import ctypes
+
+            # Своя группа на панели задач — «Джарвис» со своим значком, а не «Python».
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("LifeHub.Jarvis")
+            os.makedirs(base, exist_ok=True)
+            self._icon_image().save(icon, sizes=[(16, 16), (32, 32), (48, 48), (64, 64)])
+        except Exception as e:
+            print(f"Значок не создался: {e}", flush=True)
+        webview.start(worker, private_mode=False, storage_path=os.path.join(base, "webview"), icon=icon if os.path.exists(icon) else None)
 
     def _on_loaded(self):
         self._round()
@@ -81,15 +108,18 @@ class Ui:
             self.show()
 
     def _round(self):
-        """Скруглённые углы и тень Windows 11 для окна без рамки."""
+        """Скруглённые углы Windows 11; орб — служебное окно: без кнопки на панели задач и в Alt+Tab."""
         try:
             import ctypes
 
             hwnd = self.orb.native.Handle.ToInt32()
             pref = ctypes.c_int(2)  # DWMWCP_ROUND
             ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 33, ctypes.byref(pref), ctypes.sizeof(pref))
+            u = ctypes.windll.user32
+            ex = u.GetWindowLongW(hwnd, -20)
+            u.SetWindowLongW(hwnd, -20, (ex | 0x80) & ~0x40000)  # WS_EX_TOOLWINDOW, без WS_EX_APPWINDOW
         except Exception as e:
-            print(f"Углы окна не скруглились: {e}", flush=True)
+            print(f"Окно орба не настроилось: {e}", flush=True)
 
     def _place(self):
         try:
@@ -100,9 +130,9 @@ class Ui:
         if self.pos == "tc":
             x, y = (sw - ORB_W) // 2, 24
         elif self.pos == "bl":
-            x, y = 16, sh - ORB_H - 60
+            x, y = 16, sh - self.h - 60
         else:
-            x, y = sw - ORB_W - 16, sh - ORB_H - 60
+            x, y = sw - ORB_W - 16, sh - self.h - 60
         self.orb.move(x, y)
 
     def js(self, code: str):
@@ -158,8 +188,8 @@ class Ui:
     def heard(self, text: str):
         self.js(f"jv.heard({json.dumps(text)})")
 
-    def answer(self, text: str):
-        self.js(f"jv.answer({json.dumps(text)})")
+    def answer(self, text: str, duration: float = 0):
+        self.js(f"jv.answer({json.dumps(text)}, {duration:.1f})")
 
     def clear(self):
         self.js("jv.clear()")
@@ -167,25 +197,20 @@ class Ui:
     # ───────────── панель ─────────────
 
     def open_panel(self):
-        if self.panel is not None:
-            try:
-                self.panel.restore()
-                self.panel.show()
-                self._front(self.panel)
-                return
-            except Exception:
-                self.panel = None
-        self.panel = webview.create_window(
-            "Джарвис",
-            url=self.hub_url + "/m/jarvis",
-            width=1120,
-            height=780,
-            min_size=(380, 520),
-            background_color="#071019",
-        )
-        self.panel.events.closed += self._panel_closed
-        panel = self.panel
-        panel.events.shown += lambda: self._front(panel)
+        try:
+            if not self._panel_loaded:
+                self._panel_loaded = True
+                self.panel.load_url(self.hub_url + "/m/jarvis")
+            self.panel.show()
+            self.panel.restore()
+            self._front(self.panel)
+        except Exception as e:
+            print(f"Панель не открылась: {e}", flush=True)
+
+    def _panel_closing(self):
+        # Крестик прячет панель, а не закрывает: заново создать окно из другого потока нельзя.
+        threading.Thread(target=self.panel.hide, daemon=True).start()
+        return False
 
     @staticmethod
     def _front(w):
@@ -201,9 +226,6 @@ class Ui:
             u.SetForegroundWindow(hwnd)
         except Exception as e:
             print(f"Окно не вышло на передний план: {e}", flush=True)
-
-    def _panel_closed(self):
-        self.panel = None
 
     # ───────────── трей ─────────────
 

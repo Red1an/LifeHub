@@ -210,3 +210,40 @@ class Tts:
         if not pieces:
             return np.zeros(0, dtype=np.float32), sr
         return np.concatenate(pieces), sr
+
+
+def jarvis_fx(audio: np.ndarray, sr: int, amount: float) -> np.ndarray:
+    """
+    Голос «как у ИИ из фильма»: чуть ниже, с лёгким металлом и отзвуком. amount 0…1.
+    Тон понижается пересэмплированием (речь при этом замедляется — synth заранее ускоряет её на столько же).
+    """
+    if amount <= 0 or not len(audio):
+        return audio
+    x = audio.astype(np.float32)
+    # Ниже на 3–7%.
+    p = fx_pitch(amount)
+    n = int(len(x) / p)
+    x = np.interp(np.linspace(0, len(x) - 1, n), np.arange(len(x)), x).astype(np.float32)
+    # Убираем гул ниже ~90 Гц.
+    a = np.exp(-2 * np.pi * 90 / sr)
+    hp = np.empty_like(x)
+    prev_x = prev_y = 0.0
+    for i in range(len(x)):  # однополюсный фильтр, быстро на коротких фразах
+        prev_y = a * (prev_y + x[i] - prev_x)
+        prev_x = x[i]
+        hp[i] = prev_y
+    x = hp
+
+    def delay(sig: np.ndarray, ms: float) -> np.ndarray:
+        d = int(sr * ms / 1000)
+        return np.concatenate([np.zeros(d, np.float32), sig[:-d]]) if 0 < d < len(sig) else np.zeros_like(sig)
+
+    # Металл: короткая гребёнка; комната: пара ранних отражений и мягкий хвост.
+    y = x + 0.28 * amount * delay(x, 4.2) + 0.12 * amount * delay(x, 7.9)
+    y = y + 0.14 * amount * delay(y, 29) + 0.09 * amount * delay(y, 53) + 0.05 * amount * delay(y, 97)
+    peak = float(np.max(np.abs(y))) or 1.0
+    return (y / peak * 0.92).astype(np.float32)
+
+
+def fx_pitch(amount: float) -> float:
+    return 1.0 + 0.07 * max(0.0, min(1.0, amount))

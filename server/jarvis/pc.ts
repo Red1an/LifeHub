@@ -13,6 +13,8 @@ import { HOME } from "../paths.ts";
 const SCRIPT_SRC = path.join(import.meta.dirname, "pc.ps1");
 const SCRIPT = path.join(HOME, "jarvis", "pc.ps1");
 const CALL_TIMEOUT = 15_000;
+/** Без команд столько — PowerShell закрываем (−~120 МБ), следующая команда поднимет его заново (~1 с). */
+const IDLE_MS = 10 * 60_000;
 
 interface Waiter {
   resolve: (v: any) => void;
@@ -23,6 +25,7 @@ interface Waiter {
 let child: ChildProcess | null = null;
 let ready: Promise<void> | null = null;
 let seq = 0;
+let idleTimer: NodeJS.Timeout | undefined;
 const waiters = new Map<number, Waiter>();
 
 export class PcError extends Error {}
@@ -95,6 +98,11 @@ function start(): Promise<void> {
 
 /** Вызвать функцию из pc.ps1. */
 export async function pc<T = unknown>(fn: string, args: Record<string, unknown> = {}, timeout = CALL_TIMEOUT): Promise<T> {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    if (!waiters.size) stopPc();
+  }, IDLE_MS);
+  idleTimer.unref?.();
   if (!child || !ready) ready = start();
   await ready;
   const id = ++seq;

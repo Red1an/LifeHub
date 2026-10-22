@@ -14,14 +14,21 @@
   навык Алисы. Пишет модуль; `voice.game` переключает и хаб (команда «игровой режим»).
 - kv `voice` — состояние голоса (`VoiceStatus`): процесс, что делает, модель, микрофоны, журнал. Пишет хаб.
 - kv `status` — состояние навыка Алисы: адрес вебхука, ngrok, подключён ли навык, вопросов к нейронке сегодня. Пишет хаб.
-- kv `action` — `{ kind }`: `rotate`/`unlink` (Алиса), `voice.install`/`voice.restart`/`voice.test`/`voice.mute`/`voice.unmute`.
-  Хаб выполняет и стирает.
+- kv `library` — программы, найденные на компьютере (`Library`: «Пуск», Steam, Epic, рабочий стол). Пишет хаб.
+- kv `action` — `Action`: `rotate`/`unlink` (Алиса), `voice.install`/`voice.restart`/`voice.test`/`voice.mute`/`voice.unmute`, `voice.enroll`/`voice.enroll.reset`,
+  `library.refresh`, `{ kind: "launch", target }` — открыть, `{ kind: "scenario", id }` — запустить сценарий. Хаб выполняет и стирает.
+- Сценарии — `config.commands`: фразы + `steps` (шаги конструктора, `Step` в types.ts; старые — `say` + `run`).
+  `learned: true` — выучено само (хаб дописывает, когда нейронка разобрала просьбу в действия; `config.learn` выключает).
+- Голос владельца — `voice.speakerLock` (`off`/`important`/`all`) и `voice.speakerThreshold`; запись — действие `voice.enroll`,
+  ход записи и последняя проверка — `voice.enroll` и `voice.speaker` в kv `voice`. Отпечаток хранит голосовой процесс (`~/.lifehub/voice/owner.npz`).
+  Свои названия программ — `config.apps` (`AppAlias`: фразы → `OpenTarget`).
 - коллекция `chat` — `{ q, a?, source: "hub" | "voice" | "alice", at, buttons?, push?, ai? }`. Модуль добавляет
   `{ q, source: "hub" }`, хаб дописывает `a`. Сказанное голосом и колонке хаб пишет сам; `push: true` —
   Джарвис заговорил сам (таймер, напоминание), `q` пустой. Хранятся последние 300.
 
 ## Экраны
 
-Разговор (`/`), Голос (`/voice` — установка, микрофон, режимы, голос), Сводки, Команды, Настройки.
-Подключение колонки (`/setup`) — из настроек.
+Разговор (`/`), Голос (`/voice` — установка, микрофон, режимы, голос), Сценарии (`/commands`, редактор — `/commands/:id`),
+Программы (`/apps` — библиотека и свои названия), Настройки. Сводки (`/brief`) и колонка (`/setup`) — из настроек.
+Окна поверх страницы (Modal) рисуются вне `.jarvis-root` — оборачивайте содержимое в `.jarvis-vars`, чтобы были цвета HUD.
 Дизайн — тёмный HUD (src/styles.css, классы `jarvis-*`), `theme: "dark"`.

@@ -1,6 +1,11 @@
 import os from "node:os";
 import path from "node:path";
-import { apps, pc, pcSupported, screenshotsDir, windows, type App, type Win } from "./pc.ts";
+import { pc, pcSupported, screenshotsDir, windows, type Win } from "./pc.ts";
+import { launch, library, type LibItem } from "./library.ts";
+import { handleSelection, selectionKind } from "./selection.ts";
+import { activate, browserConnected, findTab, findTabByHost, knowsWorkspaces, send, splitWorkspace, tabsIn, workspaces } from "./browser.ts";
+import { normalize, similarity } from "./nlu.ts";
+import { prefs } from "./prefs.ts";
 import { hhmm, plural } from "./nlu.ts";
 import { count, done, fullDate, listing, sir, type Say } from "./speech.ts";
 import { dayKey } from "./nlu.ts";
@@ -146,10 +151,22 @@ export function nameScore(query: string, name: string): number {
 
 const JUNK_APPS = /(uninstall|удал|readme|help|справк|documentation|manual|license|лиценз|release notes|website|веб-сайт|support|changelog)/i;
 
-async function findApp(query: string): Promise<App | null> {
-  let best: App | null = null;
+/** Лучшее совпадение в библиотеке: программы «Пуска», игры Steam/Epic, рабочий стол. */
+/** Насколько фраза — это название программы (0…1). */
+async function bestApp(query: string): Promise<{ item: LibItem; score: number } | null> {
+  let best: { item: LibItem; score: number } | null = null;
+  for (const a of await library()) {
+    if (JUNK_APPS.test(a.name)) continue;
+    const s = nameScore(query, a.name);
+    if (!best || s > best.score) best = { item: a, score: s };
+  }
+  return best;
+}
+
+export async function findApp(query: string): Promise<LibItem | null> {
+  let best: LibItem | null = null;
   let bestScore = 0;
-  for (const a of await apps()) {
+  for (const a of await library()) {
     if (JUNK_APPS.test(a.name)) continue;
     const s = nameScore(query, a.name) - a.name.length / 1000;
     if (s > bestScore) {
@@ -158,6 +175,26 @@ async function findApp(query: string): Promise<App | null> {
     }
   }
   return bestScore >= 0.55 ? best : null;
+}
+
+/** Своё название из модуля: «атака титанов», «мой проект». */
+function findAlias(query: string) {
+  const q = normalize(query);
+  const words = q.split(" ").length;
+  const list = prefs().apps;
+  // Сначала точное совпадение, потом по основам слов: «атаку титанов» = «атака титанов».
+  return (
+    list.find((a) => a.phrases.some((p) => normalize(p) === q)) ??
+    list.find((a) => a.phrases.some((p) => normalize(p).split(" ").length === words && similarity(q, p) >= 1))
+  );
+}
+
+/** Закрыть программу по названию. null — такой не открыто. */
+export async function closeApp(name: string): Promise<{ closed: boolean; label: string } | null> {
+  const w = await findWindow(clean(normalize(name)));
+  if (!w) return null;
+  const closed = await pc<boolean>("window.close", { name: w.name });
+  return { closed, label: w.desc || w.name };
 }
 
 async function findWindow(query: string): Promise<Win | null> {
@@ -176,10 +213,50 @@ async function findWindow(query: string): Promise<Win | null> {
 const FILLER = new Set(["мне", "пожалуйста", "плиз", "приложение", "программу", "программа", "игру", "сайт", "окно", "мой", "мою", "ну", "быстро", "срочно"]);
 const clean = (s: string) => s.split(" ").filter((w) => w && !FILLER.has(w)).join(" ").trim();
 
+const shortTitle = (t: string) => t.split(/\s+[—|–-]\s+/)[0].slice(0, 60);
+
+/** Вкладка по фразе: «атаку титанов», «вкладку почта», «сериал в кинотеатре». */
+function tabFor(phrase: string) {
+  if (!browserConnected()) return null;
+  const { query, workspace } = splitWorkspace(phrase);
+  const q = query.replace(/^(вкладку|вкладка|сериал|фильм|видео|страницу)\s+/, "").trim();
+  // Известный сайт: «почту» → вкладка с mail.google.com, даже если в заголовке «Входящие».
+  for (const [re, url] of SITES) if (re.test(q)) {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    const tab = findTabByHost(host, workspace);
+    if (tab) return tab;
+  }
+  return findTab(q, workspace)?.tab ?? null;
+}
+
+/**
+ * «Включи рика и морти», «открой атаку титанов в кинотеатре» — сначала среди открытых вкладок.
+ * Вызывается и для фраз с «и» (иначе «Рик и Морти» ушло бы нейронке как две просьбы).
+ */
+export function tabCommand(text: string): Reply | null {
+  const m = text.match(/^(открой|включи|запусти|переключись на|перейди на|перейди в|вернись на|покажи)( вкладку)? (.+)$/);
+  if (!m) return null;
+  const tab = tabFor(m[3]);
+  if (!tab) return null;
+  activate(tab);
+  return reply(`Открываю «${shortTitle(tab.title)}».`);
+}
+
 /** Открыть что угодно по названию: папку, сайт, системную программу, программу из «Пуска». */
 export async function openThing(what: string, hubUrl: string): Promise<{ ok: boolean; label: string }> {
   const q = clean(what);
   if (!q) return { ok: false, label: what };
+  const alias = findAlias(q);
+  if (alias) {
+    await launch(alias.target);
+    return { ok: true, label: alias.target.label || alias.phrases[0] };
+  }
+  // Уже открытая вкладка в браузере (в любом пространстве Vivaldi): «включи атаку титанов в кинотеатре».
+  const tab = tabFor(q);
+  if (tab) {
+    activate(tab);
+    return { ok: true, label: `«${shortTitle(tab.title)}»` };
+  }
   if (/^(хаб|лайфхаб|lifehub|лайф хаб)$/.test(q)) {
     await pc("open", { target: hubUrl });
     return { ok: true, label: "хаб" };
@@ -199,6 +276,8 @@ export async function openThing(what: string, hubUrl: string): Promise<{ ok: boo
     return { ok: true, label: domain };
   }
   let search = q;
+  // «вскод», «visio studio код», «вижу студио код», «vision studio cod» — это VS Code.
+  if (/(^|\s)(вс|вэс|ви эс|vs) ?(код|cod|кот|code)(\s|$)|^вскод$/.test(q) || (/(студи|studio)/.test(q) && /(код|cod|кот|code)/.test(q))) search = "Visual Studio Code";
   for (const [re, p, label] of PROGRAMS) if (re.test(q)) {
     if (p.target) {
       await pc("open", { target: p.target });
@@ -208,7 +287,7 @@ export async function openThing(what: string, hubUrl: string): Promise<{ ok: boo
   }
   const app = await findApp(search);
   if (app) {
-    await pc("apps.launch", { id: app.id, path: !!app.path });
+    await launch(app);
     return { ok: true, label: app.name };
   }
   return { ok: false, label: what };
@@ -286,6 +365,10 @@ export async function handlePc(ctx: PcCtx): Promise<Reply | null> {
     if (YES.test(t)) return runPending(ctx, pend);
     if (NO.test(t)) return reply("Отменил.", { state: {} });
   }
+
+  /* ── выделенный текст: перевести, объяснить, пересказать, исправить ── */
+  const sel = selectionKind(t);
+  if (sel) return handleSelection(sel);
 
   /* ── время, дата, сам Джарвис ── */
   if (/^(который час|сколько времени|сколько сейчас времени|время)$/.test(t)) return reply(`Сейчас ${hhmm(new Date())}.`);
@@ -386,6 +469,12 @@ export async function handlePc(ctx: PcCtx): Promise<Reply | null> {
     return reply(`Ищу: ${m[4]}.`);
   }
 
+  /* ── монитор ── */
+  if (/^(выключи|погаси|отключи|усыпи) (монитор\S*|экран|дисплей)$|^(погаси экран|выключи экран)$/.test(t)) {
+    await pc("monitor.off");
+    return reply("Гашу экран.", { quiet: true });
+  }
+
   /* ── окна и вкладки ── */
   if (/^(закрой|закрыть) (окно|это окно|это|текущее окно)$/.test(t)) {
     await pc("hotkey", { name: "close" });
@@ -398,6 +487,14 @@ export async function handlePc(ctx: PcCtx): Promise<Reply | null> {
   if (/^(разверни|развернуть) (окно|это окно|на весь экран)$/.test(t)) {
     await pc("hotkey", { name: "maximize" });
     return reply(ok(), { quiet: true });
+  }
+  if ((m = t.match(/^(сверни|свернуть|спрячь|убери) (?!окно$|это окно$|это$|все$|все окна$|вкладку)(.+)$/))) {
+    const w = await findWindow(clean(m[2]));
+    if (w) {
+      await pc("window.minimize", { pid: w.pid });
+      return reply(ok(), { quiet: true });
+    }
+    return reply(`Не вижу открытого «${m[2]}».`);
   }
   if (/^(сверни все|сверни все окна|покажи рабочий стол|на рабочий стол)$/.test(t)) {
     await pc("hotkey", { name: "desktop" });
@@ -424,6 +521,30 @@ export async function handlePc(ctx: PcCtx): Promise<Reply | null> {
     const active = w.items.find((x) => x.pid === w.active);
     const names = [...new Set(w.items.map((x) => x.desc || x.name))].slice(0, 8);
     return reply(`${active ? `Сейчас перед вами ${active.desc || active.name}. ` : ""}Открыто: ${listing(names)}.`);
+  }
+  if ((m = t.match(/^(переключись|перейди|переключи|вернись) (на|в|во) (вкладку )?(.+)$/))) {
+    const tab = tabFor(m[4]);
+    if (tab) {
+      activate(tab);
+      return reply(`Переключаю на «${shortTitle(tab.title)}».`, { quiet: true });
+    }
+  }
+  if ((m = t.match(/^(что|какие вкладки)( у меня)?( открыто)? (в|во) (пространстве )?(.+)$/))) {
+    const { workspace } = splitWorkspace(`в ${m[6]}`);
+    // Пространства у вкладок неизвестны (Vivaldi не сообщает) — пусть нейронка разберёт по названиям.
+    if (workspace && knowsWorkspaces()) {
+      const list = tabsIn(workspace).map((x) => shortTitle(x.title)).slice(0, 8);
+      const name = workspaces().get(workspace) ?? m[6];
+      return reply(list.length ? `В пространстве «${name}»: ${listing(list)}.` : `В пространстве «${name}» вкладок нет.`);
+    }
+  }
+  if ((m = t.match(/^(закрой|закрыть) вкладку (.+)$/))) {
+    const tab = tabFor(m[2]);
+    if (tab) {
+      send({ kind: "close", tabId: tab.id });
+      return reply(`Закрыл «${shortTitle(tab.title)}».`);
+    }
+    return reply(`Не нашёл вкладку «${m[2]}».`);
   }
   if ((m = t.match(/^(переключись|перейди|переключи) (на|в) (.+)$/)) || (m = t.match(/^(покажи|разверни) ()(.+)$/))) {
     const w = await findWindow(clean(m[3]));
@@ -540,6 +661,14 @@ export async function handlePc(ctx: PcCtx): Promise<Reply | null> {
   }
 
   /* ── открыть что-то ── */
+  // Просто название программы: «танки онлайн», «телеграм», «вскод».
+  if (t.split(" ").length <= 4 && !/^(включи|выключи|сделай|поставь|какой|какая|что|как|где|когда|сколько|кто|почему|зачем)(\s|$)/.test(t)) {
+    const hit = await bestApp(clean(t));
+    if (hit && hit.score >= 0.9) {
+      await launch(hit.item);
+      return reply(`Открываю ${hit.item.name}.`);
+    }
+  }
   if ((m = t.match(/^(открой|запусти|включи|открыть|запустить|зайди на|зайди в|перейди на)\s+(.+)$/))) {
     const r = await openThing(m[2], ctx.hubUrl);
     if (r.ok) return reply(`Открываю ${r.label}.`);

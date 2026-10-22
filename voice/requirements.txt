@@ -10,3 +10,4 @@ num2words
 pywebview>=5
 pystray
 pillow
+soundcard

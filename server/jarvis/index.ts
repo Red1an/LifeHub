@@ -10,8 +10,13 @@ import { aiContext, handle, type Ctx, type Reply, type SessionState } from "./sk
 import { join, type Part, type Say } from "./speech.ts";
 import { handlePc } from "./pcskills.ts";
 import { PcError, warmUp } from "./pc.ts";
-import { makePlan, runDirect, type Exchange } from "./agent.ts";
-import { applyVoiceConfig, installVoice, restartVoice, startVoice, testVoice, voiceControl } from "./voice.ts";
+import { SCREEN_RE, makePlan, runDirect, screenshot, searchStep, type Exchange } from "./agent.ts";
+import { closeApp, tabCommand } from "./pcskills.ts";
+import { launch, writeLibrary } from "./library.ts";
+import { browserConnected, splitWorkspace, startBrowser } from "./browser.ts";
+import { pc } from "./pc.ts";
+import type { CustomCommand, Step } from "./prefs.ts";
+import { addOwnerSample, applyVoiceConfig, enrollVoice, installVoice, resetVoiceprint, restartVoice, startVoice, testVoice, voiceControl } from "./voice.ts";
 
 /*
  * Джарвис — голосовой помощник хаба. Говорить с ним можно:
@@ -125,6 +130,15 @@ async function applyAction() {
   if (a.kind === "voice.test") testVoice();
   if (a.kind === "voice.mute") voiceControl({ mute: true });
   if (a.kind === "voice.unmute") voiceControl({ mute: false, sleep: false });
+  if (a.kind === "voice.enroll") enrollVoice();
+  if (a.kind === "voice.enroll.reset") resetVoiceprint();
+  if (a.kind === "voice.owner.add") addOwnerSample();
+  if (a.kind === "library.refresh") void writeLibrary().catch((e) => console.error("[jarvis] библиотека", e));
+  if (a.kind === "launch" && typeof (a as any).target?.value === "string") void launch((a as any).target).catch(() => {});
+  if (a.kind === "scenario" && typeof (a as any).id === "string") {
+    const cmd = prefs().commands.find((c) => c.id === (a as any).id);
+    if (cmd) void runScenario(cmd, "text").catch(() => {});
+  }
   await writeStatus();
 }
 
@@ -162,7 +176,10 @@ let hubUrl = "http://localhost:4200";
 export function startJarvis(opts: { port: number; https: boolean } = { port: 4200, https: false }) {
   hubUrl = `${opts.https ? "https" : "http"}://localhost:${opts.port}`;
   startVoice(opts);
+  startBrowser();
   warmUp();
+  setTimeout(() => void writeLibrary().catch(() => {}), 15_000);
+  setInterval(() => void writeLibrary().catch(() => {}), 60 * 60_000).unref();
   subscribe((e) => {
     if (e.type !== "data" || e.module !== MODULE || e.origin === "jarvis") return;
     if (e.collection === "kv:config") void applyConfig().catch((err) => console.error("[jarvis]", err));
@@ -390,6 +407,17 @@ function stripWake(text: string): string {
   return list.join(" ");
 }
 
+/** Важное: меняет данные или компьютер. При «только мой голос: важное» — только владельцу. */
+const OWNER_ONLY =
+  /(выключи (компьютер|комп|пк|ноут)|перезагру|спящ|режим сна|усыпи|убей|заверши|принудительно|заблокируй|напечатай|набери|введи|впиши|потратил|заплатил|купил|получил|заработал|запомни|запиши|удали|отмени|перенеси|запланируй|напомни|отметь|отправь|напиши|добавь|создай|вставь|исправь)/;
+const OWNER_SAFE = /(громкост|таймер|яркост|звук|музык|трек|паузу)/;
+
+function guestRefusal(ctx: Ctx): Reply | null {
+  if (ctx.owner !== false || ctx.prefs.voice.speakerLock !== "important") return null;
+  if (!OWNER_ONLY.test(ctx.text) || OWNER_SAFE.test(ctx.text)) return null;
+  return { say: say("Это я сделаю только по голосу хозяина.") };
+}
+
 /** Текст после этих слов — свободный (заметка, поиск, ввод), «и» в нём не делит просьбу. */
 const FREE_TEXT = /^(напечатай|набери|введи|впиши|найди|поищи|загугли|погугли|запомни|запиши|заметка|идея|напомни|таймер|засеки|поставь таймер)(\s|$)/;
 
@@ -404,22 +432,36 @@ function compound(ctx: Ctx): boolean {
  * top — фраза пользователя (а не команда из плана нейронки): составные отдаём нейронке.
  */
 async function rules(ctx: Ctx, allowCustom: boolean, top = false): Promise<Reply | null> {
-  if (allowCustom && !ctx.state.pending && !ctx.state.pc) {
-    const c = await customFull(ctx);
+  const guest = guestRefusal(ctx);
+  if (guest) return guest;
+  const free = allowCustom && !ctx.state.pending && !ctx.state.pc;
+  if (free) {
+    const c = await customFull(ctx, false);
     if (c) return c;
   }
-  if (top && compound(ctx) && aiAllowed()) return null;
+  if (top && compound(ctx)) return tabCommand(ctx.text);
   const r = await handlePc({ text: ctx.text, raw: ctx.raw, address: ctx.address, state: ctx.state, hubUrl });
-  return r ?? (await handle(ctx));
+  if (r) return r;
+  // Выученное — после правил компьютера: открытая вкладка или программа точнее, чем то, что нейронка сделала когда-то.
+  if (free) {
+    const c = await customFull(ctx, true);
+    if (c) return c;
+  }
+  // «Что у меня на экране?» — к нейронке со снимком, а не к календарю («что сейчас»).
+  if (top && ctx.prefs.ai && !ctx.state.pending && SCREEN_RE.test(ctx.text) && !FREE_TEXT.test(ctx.text)) return null;
+  // Названо пространство браузера («что у меня в кинотеатре») — к нейронке со списком вкладок, а не к календарю.
+  if (top && ctx.prefs.ai && !ctx.state.pending && browserConnected() && splitWorkspace(ctx.text).workspace) return null;
+  return await handle(ctx);
 }
 
 /** Своя команда: что сказать и какие команды выполнить следом — в том числе для компьютера. */
-async function customFull(ctx: Ctx): Promise<Reply | null> {
-  const cmd = prefs().commands.find((c) => c.phrases.some((p) => {
+async function customFull(ctx: Ctx, learned = false): Promise<Reply | null> {
+  const cmd = prefs().commands.find((c) => !c.off && !!c.learned === learned && c.phrases.some((p) => {
     const n = wordsToDigits(normalize(p));
     return n && (ctx.text === n || ctx.text.startsWith(n + " ") || ctx.text.endsWith(" " + n));
   }));
   if (!cmd) return null;
+  if (cmd.steps) return runSteps(cmd.steps, ctx);
   const parts: Part[] = cmd.say.trim() ? [cmd.say.trim()] : [];
   let state: SessionState | undefined;
   for (const run of cmd.run.filter((r) => r.trim()).slice(0, 8)) {
@@ -434,6 +476,70 @@ async function customFull(ctx: Ctx): Promise<Reply | null> {
   return { say: s.text ? s : say("Готово."), state, quiet: !s.text };
 }
 
+/** Шаги сценария из конструктора — по порядку. Что сказать — склеиваем в один ответ. */
+async function runSteps(steps: Step[], ctx: Ctx): Promise<Reply> {
+  const parts: Part[] = [];
+  let state: SessionState | undefined;
+  const spoken = steps.some((s) => s.type === "say" && s.text.trim());
+  for (const step of steps.slice(0, 30)) {
+    try {
+      switch (step.type) {
+        case "say":
+          if (step.text.trim()) parts.push(step.text.trim());
+          break;
+        case "command": {
+          const r = await rules({ ...ctx, text: wordsToDigits(normalize(step.text)), raw: step.text, state: {} }, false);
+          if (!r) {
+            parts.push(`Команду «${step.text}» я не понял.`);
+            break;
+          }
+          if (r.state?.pending || r.state?.pc) {
+            state = r.state;
+            parts.push(r.say);
+          } else if ((step.speak || !spoken) && !r.quiet) parts.push(r.say);
+          break;
+        }
+        case "open":
+          if (step.target?.value) await launch(step.target);
+          break;
+        case "search":
+          await searchStep(step.where, step.query);
+          break;
+        case "keys":
+          await pc("keys", { combo: step.combo });
+          break;
+        case "type":
+          await pc("type", { text: step.text, enter: !!step.enter });
+          break;
+        case "volume":
+          await pc("volume.set", { level: step.level });
+          break;
+        case "media":
+          await pc("media", { key: step.key });
+          break;
+        case "close":
+          await closeApp(step.name);
+          break;
+        case "wait":
+          await new Promise((r) => setTimeout(r, Math.max(0, Math.min(60, step.seconds)) * 1000));
+          break;
+      }
+    } catch (e) {
+      parts.push(`Шаг не выполнился: ${(e as Error).message}`);
+    }
+  }
+  const s = join(parts, 400);
+  return { say: s.text ? s : say("Готово."), state, quiet: !s.text };
+}
+
+/** Запуск сценария кнопкой из модуля. */
+async function runScenario(cmd: CustomCommand, channel: "voice" | "text") {
+  const p = prefs();
+  const ctx: Ctx = { text: "", raw: "", entities: [], state: {}, address: p.address, prefs: p, now: new Date() };
+  const r = cmd.steps ? await runSteps(cmd.steps, ctx) : await customFull({ ...ctx, text: wordsToDigits(normalize(cmd.phrases[0] ?? "")) });
+  if (r && channel === "text") logTurn({ q: `▶ ${cmd.phrases[0] ?? "сценарий"}`, a: r.say.text, source: "voice" });
+}
+
 function aiUse() {
   const s = secrets();
   const today = dayKey();
@@ -444,36 +550,89 @@ function aiUse() {
 /** Свободная просьба: Claude составляет план, команды плана идут через обычные правила. */
 async function think(ctx: Ctx, ch: Channel): Promise<Reply> {
   aiUse();
+  const screen = SCREEN_RE.test(ctx.text) ? await screenshot() : null;
   const plan = await makePlan(ctx.raw, {
     prefs: ctx.prefs,
     dayContext: await aiContext(ctx.now),
     history: ch.history,
-    custom: ctx.prefs.commands.flatMap((c) => c.phrases.slice(0, 1)),
+    // Выученное нейронке не показываем: она начинает собирать новые просьбы из старых.
+    custom: ctx.prefs.commands.filter((c) => !c.off && !c.learned).flatMap((c) => c.phrases.slice(0, 1)),
+    screen,
   });
   const parts: Part[] = plan.say.trim() ? [plan.say.trim()] : [];
   let state: SessionState | undefined;
+  let failed = false;
   for (const a of plan.actions) {
     try {
+      if (a.do === "type" && ctx.owner === false && ctx.prefs.voice.speakerLock === "important") {
+        parts.push("Печатать я буду только по голосу хозяина.");
+        failed = true;
+        continue;
+      }
       if (a.do === "command") {
         const text = wordsToDigits(normalize(String(a.text ?? "")));
-        if (!text) continue;
+        // Нейронка вернула ту же фразу командой — правила её уже не поняли, это замкнутый круг.
+        if (!text || text === ctx.text) {
+          failed = true;
+          continue;
+        }
         const r = await rules({ ...ctx, text, raw: String(a.text), state: {} }, true);
-        if (!r) continue;
+        if (!r) {
+          failed = true;
+          continue;
+        }
         const asks = !!(r.state?.pending || r.state?.pc);
         if (asks) state = r.state;
         // Ответ команды озвучиваем, если он нужен (данные) или если Claude ничего не сказал сам.
         if (asks || a.speak || (!plan.say.trim() && !r.quiet)) parts.push(r.say);
       } else await runDirect(a, hubUrl);
     } catch (e) {
+      failed = true;
       parts.push(`Не получилось: ${(e as Error).message}`);
     }
   }
+  if (!failed && !state && !screen) learn(ctx, plan);
   const s = join(parts, 300);
   return { say: s.text ? s : say("Готово."), state };
 }
 
+/** Местоимения — просьба зависит от разговора («открой его»), запоминать нельзя. */
+const CONTEXTUAL = /(^|\s)(это|этот|эту|его|ее|их|там|тут|туда|сюда|тоже|еще раз|снова|он|она|они|так)(\s|$)/;
+
+/**
+ * Самообучение: нейронка разобрала просьбу в действия — запоминаем как сценарий «Выучено».
+ * В следующий раз та же фраза выполнится правилами, мгновенно и без нейронки.
+ */
+function learn(ctx: Ctx, plan: Awaited<ReturnType<typeof makePlan>>) {
+  const p = prefs();
+  if (p.learn === false || ctx.owner === false || !plan.actions.length) return;
+  const phrase = ctx.text.trim();
+  const words = phrase.split(" ").length;
+  if (!phrase || words > 8 || CONTEXTUAL.test(phrase)) return;
+  if (p.commands.some((c) => c.phrases.includes(phrase))) return;
+  // В ответе числа (время, суммы, громкость) — он про этот момент: повторять его потом нельзя.
+  if (/\d/.test(plan.say)) return;
+  const steps: Step[] = [];
+  if (plan.say.trim()) steps.push({ type: "say", text: plan.say.trim() });
+  for (const a of plan.actions) {
+    if (a.do === "command") steps.push({ type: "command", text: String(a.text), ...(a.speak ? { speak: true } : {}) });
+    else if (a.do === "search") steps.push({ type: "search", where: a.where === "youtube" || a.where === "yandex" ? a.where : "google", query: String(a.query) });
+    else if (a.do === "open") {
+      const t = String(a.target ?? "");
+      if (/^https?:\/\//i.test(t)) steps.push({ type: "open", target: { kind: "url", value: t } });
+      else if (/^[a-z]:\\/i.test(t)) steps.push({ type: "open", target: { kind: "path", value: t } });
+      else steps.push({ type: "command", text: `открой ${t}` });
+    } else return; // ввод текста зависит от момента — не запоминаем
+  }
+  const raw = (db.getKv(MODULE, "config") as Record<string, any> | undefined) ?? {};
+  const list: CustomCommand[] = Array.isArray(raw.commands) ? raw.commands : [];
+  const cmd: CustomCommand = { id: crypto.randomBytes(6).toString("hex"), phrases: [phrase], say: "", run: [], steps, learned: true };
+  db.setKv(MODULE, "config", { ...raw, commands: [...list, cmd] });
+  changed("kv:config");
+}
+
 /** Ответ на фразу с компьютера: голос ("voice") или текст в модуле ("text"). */
-export async function converse(channel: "voice" | "text", phrase: string): Promise<Turn> {
+export async function converse(channel: "voice" | "text", phrase: string, opts: { owner?: boolean } = {}): Promise<Turn> {
   const t0 = Date.now();
   const p = prefs();
   let ch = channels.get(channel);
@@ -483,7 +642,7 @@ export async function converse(channel: "voice" | "text", phrase: string): Promi
 
   const raw = phrase.trim();
   const text = stripWake(wordsToDigits(normalize(raw)));
-  const ctx: Ctx = { text, raw, entities: [], state: ch.state, address: p.address, prefs: p, now: new Date() };
+  const ctx: Ctx = { text, raw, entities: [], state: ch.state, address: p.address, prefs: p, now: new Date(), owner: opts.owner };
   let r: Reply | null = null;
   let ai = false;
 
@@ -492,7 +651,8 @@ export async function converse(channel: "voice" | "text", phrase: string): Promi
     else r = await rules(ctx, true, true);
     if (!r && text) {
       const question = text.split(" ").length >= 2;
-      if (p.ai && aiAllowed() && question) {
+      // Дневной лимит — только для колонки Алисы: на компьютере нейронка идёт по подписке Claude.
+      if (p.ai && question) {
         ai = true;
         r = await think(ctx, ch);
       } else {
@@ -516,7 +676,9 @@ export async function converse(channel: "voice" | "text", phrase: string): Promi
     text: r.say.text,
     tts: voice(r.say.tts),
     buttons: r.buttons ?? [],
-    expectReply: !!(nextState.pending || nextState.pc) || /\?\s*$/.test(r.say.text),
+    // Ответ без имени слушаем, только когда правило ждёт «да» или уточнение. Вопросы нейронки
+    // («Чем ещё помочь?») — нет: иначе Джарвис подхватывает разговоры вокруг.
+    expectReply: !!(nextState.pending || nextState.pc) || (!ai && /\?\s*$/.test(r.say.text)),
     quiet: !!r.quiet,
     ai,
     ms: Date.now() - t0,

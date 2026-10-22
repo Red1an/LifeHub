@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { db, kv, toast, useCollection, useStore } from "@lifehub/sdk";
-import { DEFAULT_PREFS, DEFAULT_VOICE, SPEAKERS, type ActionKind, type ChatMsg, type Prefs, type Status, type VoicePrefs, type VoiceStatus } from "./types.ts";
+import { DEFAULT_PREFS, DEFAULT_VOICE, SPEAKERS, type Action, type ActionKind, type BrowserState, type Library, type ChatMsg, type Prefs, type Status, type VoicePrefs, type VoiceStatus } from "./types.ts";
 
 export function usePrefs() {
   const [raw, set, meta] = useStore<Prefs>("config", DEFAULT_PREFS);
@@ -10,6 +10,7 @@ export function usePrefs() {
     morning: { ...DEFAULT_PREFS.morning, ...raw?.morning },
     evening: { ...DEFAULT_PREFS.evening, ...raw?.evening },
     commands: raw?.commands ?? [],
+    apps: raw?.apps ?? [],
     voice: {
       ...DEFAULT_VOICE,
       ...raw?.voice,
@@ -45,9 +46,22 @@ export function useVoice() {
   return { voice, loading: meta.loading };
 }
 
-/** Разовое действие для хаба. */
-export async function action(kind: ActionKind) {
-  await kv.set("action", { kind, at: Date.now() });
+/** Разовое действие для хаба: action("voice.test") или action({ kind: "launch", target }). */
+export async function action(a: ActionKind | Action) {
+  const body = typeof a === "string" ? { kind: a } : a;
+  await kv.set("action", { ...body, at: Date.now() });
+}
+
+/** Вкладки браузера (расширение «Джарвис — вкладки»). */
+export function useBrowser() {
+  const [browser] = useStore<BrowserState | null>("browser", null);
+  return browser;
+}
+
+/** Программы, которые хаб нашёл на компьютере. */
+export function useLibrary() {
+  const [lib, , meta] = useStore<Library | null>("library", null);
+  return { lib, loading: meta.loading };
 }
 
 export const useChat = () => useCollection<ChatMsg>("chat");

@@ -47,6 +47,10 @@ export interface VoiceStatus {
   /** Последняя услышанная фраза. */
   heard?: string;
   heardAt?: number;
+  /** Голос владельца: записан ли, похожесть своих фраз, последняя проверка. */
+  speaker?: { enrolled: boolean; self?: [number, number] | null; score?: number; owner?: boolean; at?: number };
+  /** Запись голоса: идёт / готово / ошибка. */
+  enroll?: { state: "record" | "done" | "error"; step?: number; total?: number; phrase?: string; count?: number; error?: string } | null;
   connected: boolean;
   log: string[];
   installLog: string[];
@@ -124,6 +128,9 @@ export type VoiceEvent =
   | { type: "say"; text: string; tts: string; chime?: boolean }
   | { type: "control"; mute?: boolean; sleep?: boolean; panel?: boolean }
   | { type: "test" }
+  | { type: "enroll"; phrases: string[] }
+  | { type: "enroll.reset" }
+  | { type: "owner.add" }
   | { type: "stop" };
 
 export interface VoiceConfig extends VoicePrefs {
@@ -170,6 +177,8 @@ export function reportState(token: string, body: any): boolean {
     mic: pick("mic"),
     heard: pick("heard"),
     heardAt: pick("heardAt"),
+    speaker: body?.speaker !== undefined ? { ...reported.speaker, ...body.speaker } : reported.speaker,
+    enroll: body && "enroll" in body ? body.enroll : reported.enroll,
   };
   writeStatus();
   return true;
@@ -211,6 +220,30 @@ export function applyVoiceConfig() {
 
 export function testVoice() {
   broadcast({ type: "test" });
+}
+
+/** Фразы для записи голоса: разные звуки, обычная громкость. */
+const ENROLL_PHRASES = [
+  "Джарвис, открой телеграм",
+  "Какая сегодня погода в Санкт-Петербурге",
+  "Поставь громкость на тридцать процентов",
+  "Напомни мне завтра купить хлеб и молоко",
+  "Найди на ютубе музыку для работы",
+  "Сколько я потратил за эту неделю",
+  "Включи режим кино и сделай потише",
+];
+
+export function enrollVoice() {
+  broadcast({ type: "enroll", phrases: ENROLL_PHRASES });
+}
+
+/** «Это был я»: последняя фраза — к голосу владельца. */
+export function addOwnerSample() {
+  broadcast({ type: "owner.add" });
+}
+
+export function resetVoiceprint() {
+  broadcast({ type: "enroll.reset" });
 }
 
 /* ───────────── процесс ───────────── */

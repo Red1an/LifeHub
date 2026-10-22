@@ -1,5 +1,6 @@
 import { ask } from "../ai.ts";
 import { pc, pcSupported, windows } from "./pc.ts";
+import { activate, tabById, tabsContext } from "./browser.ts";
 import { searchUrl, openThing } from "./pcskills.ts";
 import type { Prefs } from "./prefs.ts";
 
@@ -14,7 +15,8 @@ export type Action =
   | { do: "command"; text: string; speak?: boolean }
   | { do: "open"; target: string }
   | { do: "search"; where?: "google" | "youtube" | "yandex"; query: string }
-  | { do: "type"; text: string; enter?: boolean };
+  | { do: "type"; text: string; enter?: boolean }
+  | { do: "tab"; id: number };
 
 export interface Plan {
   say: string;
@@ -43,6 +45,7 @@ function system(p: Prefs): string {
     '- {"do": "open", "target": "<https-ссылка или путь к папке/файлу>"}',
     '- {"do": "search", "where": "google"|"youtube"|"yandex", "query": "<запрос>"} — открыть поиск в браузере (музыка и видео — youtube).',
     '- {"do": "type", "text": "<текст>", "enter": false} — напечатать текст в активное окно (письмо, сообщение, ответ). enter: true — сразу отправить.',
+    '- {"do": "tab", "id": <id вкладки>} — переключиться на уже открытую вкладку браузера (список ниже, с пространствами Vivaldi). Просят включить фильм, сериал, страницу, которые уже открыты, — выбери подходящую вкладку, а не ищи заново.',
     COMMANDS,
     "Правила:",
     "- Если просьбу можно выполнить командами — выполни, а say сделай коротким подтверждением («Сделано.», «Включаю что-нибудь для концентрации.»). Ответы команд с speak: true прозвучат после say — не дублируй их.",
@@ -50,6 +53,7 @@ function system(p: Prefs): string {
     "- Просят текст (письмо, пост, ответ в чат) — сочини и напечатай через type, в say скажи, что напечатал.",
     "- На вопросы и болтовню отвечай сам, без действий. Чего-то не можешь — честно скажи в say.",
     "- Никогда не выключай и не перезагружай компьютер, если об этом не просили прямо.",
+    "- Вопросы о вкладках и пространствах браузера («что у меня в кинотеатре», «какие сериалы открыты») — отвечай сам по списку вкладок ниже, коротко перечисли названия (без «смотреть онлайн» и сайтов). Не превращай вопрос пользователя в command — command с той же фразой ничего не даст.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -62,6 +66,7 @@ async function pcContext(): Promise<string> {
     const active = w.items.find((x) => x.pid === w.active);
     const open = [...new Set(w.items.map((x) => x.desc || x.name))].slice(0, 12);
     return [
+      tabsContext(),
       `Компьютер: громкость ${v.level}${v.muted ? " (выключен звук)" : ""}.`,
       active ? `Активное окно: ${active.desc || active.name} — «${active.title.slice(0, 80)}».` : "",
       open.length ? `Открыты: ${open.join(", ")}.` : "",
@@ -87,7 +92,24 @@ export function parsePlan(raw: string): Plan {
   return { say: text.replace(/[*_#`]/g, ""), actions: [] };
 }
 
-export async function makePlan(question: string, ctx: { prefs: Prefs; dayContext: string; history: Exchange[]; custom: string[] }): Promise<Plan> {
+/** Просьба про то, что сейчас на экране: к запросу приложим снимок. */
+export const SCREEN_RE =
+  /(на экране|экран[еау]?\b|что (это|тут|там) (за|написано)|тут написано|что (ты )?(тут |там |сейчас )?видишь|посмотри|глянь|в этом окне|эт(у|от|о|и) (ошибк|текст|окн|стать|картинк|код|задач|вопрос|сообщени|страниц))/;
+
+/** Снимок монитора с активным окном (JPEG, base64). */
+export async function screenshot(): Promise<{ data: string; title: string } | null> {
+  if (!pcSupported) return null;
+  try {
+    return await pc<{ data: string; title: string }>("screen.capture", { maxW: 1600 }, 20_000);
+  } catch {
+    return null;
+  }
+}
+
+export async function makePlan(
+  question: string,
+  ctx: { prefs: Prefs; dayContext: string; history: Exchange[]; custom: string[]; screen?: { data: string; title: string } | null },
+): Promise<Plan> {
   const pcCtx = await pcContext();
   const history = ctx.history
     .slice(-6)
@@ -98,12 +120,26 @@ export async function makePlan(question: string, ctx: { prefs: Prefs; dayContext
     pcCtx,
     ctx.custom.length ? `Свои команды пользователя (тоже можно вызывать через command): ${ctx.custom.join("; ")}.` : "",
     history ? `Недавний разговор:\n${history}` : "",
+    ctx.screen
+      ? `К сообщению приложен снимок экрана пользователя (активное окно — «${ctx.screen.title}»). Отвечай по нему: что там, что за ошибка, ` +
+        "перевод, совет. Голосом — коротко, суть; если ответ длинный (перевод, код), напечатай его через type только если об этом просили."
+      : "",
     `Пользователь: ${question}`,
   ]
     .filter(Boolean)
     .join("\n\n");
-  const out = await ask({ system: system(ctx.prefs), prompt, model: ctx.prefs.brain === "smart" ? "smart" : "fast" });
+  const out = await ask({
+    system: system(ctx.prefs),
+    prompt,
+    model: ctx.prefs.brain === "smart" ? "smart" : "fast",
+    images: ctx.screen ? [{ mime: "image/jpeg", data: ctx.screen.data }] : undefined,
+  });
   return parsePlan(out);
+}
+
+export async function searchStep(where: string | undefined, query: string) {
+  const w = where === "youtube" || where === "yandex" ? where : "google";
+  await pc("open", { target: searchUrl(w, String(query ?? "")) });
 }
 
 /** Прямые действия плана (команды выполняет index.ts — через общий разбор). */
@@ -115,6 +151,10 @@ export async function runDirect(a: Action, hubUrl: string): Promise<void> {
   } else if (a.do === "search") {
     const where = a.where === "youtube" || a.where === "yandex" ? a.where : "google";
     await pc("open", { target: searchUrl(where, String(a.query ?? "")) });
+  } else if (a.do === "tab") {
+    const t = tabById(Number(a.id));
+    if (!t) throw new Error("вкладка уже закрыта");
+    activate(t);
   } else if (a.do === "type") {
     await pc("type", { text: String(a.text ?? ""), enter: !!a.enter });
   }

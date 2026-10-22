@@ -2,13 +2,18 @@
 
 /* Джарвис: тёмный HUD с голубым свечением. Все классы — с префиксом jarvis-. */
 
-.jarvis-root {
+/* Цвета HUD — и на страницах, и в окнах поверх них (окна рисуются вне .jarvis-root). */
+.jarvis-root,
+.jarvis-vars {
   --jv-bg: #04070c;
   --jv-panel: rgba(16, 32, 48, 0.55);
   --jv-line: rgba(90, 200, 255, 0.18);
   --jv-cyan: #5ad1ff;
   --jv-cyan-soft: rgba(90, 209, 255, 0.12);
   --jv-amber: #ffb547;
+}
+
+.jarvis-root {
   background:
     radial-gradient(1200px 500px at 50% -200px, rgba(40, 140, 220, 0.18), transparent 70%),
     linear-gradient(rgba(90, 200, 255, 0.035) 1px, transparent 1px) 0 0 / 100% 28px,

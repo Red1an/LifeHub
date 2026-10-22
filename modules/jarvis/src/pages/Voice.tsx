@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { cn, formatRelative, toast } from "@lifehub/sdk";
+import { cn, confirm, formatRelative, toast } from "@lifehub/sdk";
 import { Orb, Panel, Screen, Toggle, VoicePill, voiceLine } from "../components/hud.tsx";
 import { action, usePrefs, useVoice } from "../lib/store.ts";
 import { SPEAKERS } from "../lib/types.ts";
@@ -155,15 +155,23 @@ export function Voice() {
         </Field>
         <Toggle checked={v.chime} onChange={(chime) => updateVoice({ chime })} label="Сигнал, когда услышал имя" hint="Звучит, если после имени пауза: «Джарвис… открой почту»" />
         <Toggle
-          checked={v.verifyWake}
-          onChange={(verifyWake) => updateVoice({ verifyWake })}
-          label="Перепроверять имя"
-          hint="Whisper убеждается, что имя действительно прозвучало — почти без ложных срабатываний от разговоров и видео"
+          checked={v.echoGuard}
+          onChange={(echoGuard) => updateVoice({ echoGuard })}
+          label="Не слушать свои колонки"
+          hint="«Джарвис» в видео или песне не будит его: он сравнивает микрофон с тем, что играет компьютер. Вы поверх видео и в наушниках — работает как обычно"
+        />
+        <Toggle
+          checked={v.strictWake}
+          onChange={(strictWake) => updateVoice({ strictWake })}
+          label="Строгая проверка имени"
+          hint="Выполнять, только если имя есть и в распознанном тексте. Меньше ложных срабатываний, но часть команд будет теряться — распознавание иногда коверкает «Джарвис». Длинную чужую речь без имени Джарвис отбрасывает и так"
         />
         <Field label="Ждать ответа после вопроса" hint="Джарвис спросил «Выключить?» — можно ответить без имени">
           <Slider value={v.followUp} min={0} max={15} step={1} onChange={(followUp) => updateVoice({ followUp })} format={(x) => (x ? `${x} с` : "нет")} />
         </Field>
       </Panel>
+
+      <OwnerPanel />
 
       <Panel title="На экране">
         <Field label="Орб" hint="Окно со сферой: что Джарвис услышал и что ответил. Нажмите на сферу — откроется панель">
@@ -263,6 +271,9 @@ export function Voice() {
             ))}
           </select>
         </Field>
+        <Field label="Эффект Джарвиса" hint="Голос чуть ниже, с лёгким металлом и отзвуком — как у ИИ из фильма. 0 — обычный голос">
+          <Slider value={v.voiceFx} min={0} max={1} step={0.1} onChange={(voiceFx) => updateVoice({ voiceFx })} format={(x) => (x ? `${Math.round(x * 100)}%` : "нет")} />
+        </Field>
         <Field label="Скорость речи">
           <Slider value={v.rate} min={0.7} max={1.5} step={0.05} onChange={(rate) => updateVoice({ rate })} format={(x) => `${x.toFixed(2)}×`} />
         </Field>
@@ -286,5 +297,109 @@ export function Voice() {
         </details>
       )}
     </Screen>
+  );
+}
+
+/** Только мой голос: запись отпечатка, режим, порог. */
+function OwnerPanel() {
+  const { prefs, updateVoice } = usePrefs();
+  const { voice } = useVoice();
+  const v = prefs.voice;
+  const sp = voice?.speaker;
+  const en = voice?.enroll;
+  const live = voice?.process === "running";
+  const recording = en?.state === "record";
+  const enrolled = !!sp?.enrolled;
+
+  return (
+    <Panel title="Только мой голос">
+      <p className="text-sm text-[#c3dcea]">
+        Джарвис запоминает ваш голос и узнаёт его по каждой фразе. Чужим можно запретить важное — или не отвечать вовсе. Защищает от гостей и голоса из
+        видео, но не от записи вашего голоса.
+      </p>
+
+      {recording ? (
+        <div className="mt-3 rounded-xl border border-[var(--jv-cyan)] bg-[var(--jv-cyan)]/10 p-4 text-center">
+          <div className="text-xs uppercase tracking-wider text-[#7cc8ec]">
+            Фраза {en?.step} из {en?.total} — повторите после сигнала
+          </div>
+          <div className="jarvis-title mt-2 text-xl text-white">«{en?.phrase}»</div>
+          <div className="mt-3 flex justify-center gap-1">
+            {Array.from({ length: en?.total ?? 0 }, (_, i) => (
+              <span key={i} className={cn("h-1.5 w-6 rounded-full", i < (en?.step ?? 0) - 1 ? "bg-[var(--jv-cyan)]" : i === (en?.step ?? 0) - 1 ? "bg-white" : "bg-white/15")} />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button className="jarvis-chip" disabled={!live} onClick={() => void action("voice.enroll")}>
+            {enrolled ? "Перезаписать голос" : "Записать мой голос"}
+          </button>
+          {enrolled && (
+            <button
+              className="text-sm text-[#ff9b8a]"
+              onClick={async () => {
+                if (!(await confirm("Удалить запись голоса? Джарвис снова будет отвечать всем.", { danger: true }))) return;
+                updateVoice({ speakerLock: "off" });
+                void action("voice.enroll.reset");
+              }}
+            >
+              Удалить запись
+            </button>
+          )}
+          <span className="text-xs text-[#7f9fb2]">
+            {enrolled ? `Голос записан${sp?.self ? ` · свои фразы похожи на ${Math.round(sp.self[0] * 100)}–${Math.round(sp.self[1] * 100)}%` : ""}` : "7 коротких фраз, около минуты. Лучше в тишине"}
+          </span>
+        </div>
+      )}
+      {en?.state === "error" && <p className="mt-2 text-xs text-[#ffb36b]">{en.error}</p>}
+      {en?.state === "done" && !recording && <p className="mt-2 text-xs text-[#3ee08f]">Готово: записано {en.count} фраз. Теперь включите режим ниже.</p>}
+
+      {enrolled && (
+        <div className="mt-4 space-y-3">
+          <div>
+            <div className="mb-1 text-sm text-[#c3dcea]">Кому отвечать</div>
+            <Segmented
+              value={v.speakerLock}
+              onChange={(speakerLock) => updateVoice({ speakerLock })}
+              options={[
+                ["off", "Всем"],
+                ["important", "Важное — мне"],
+                ["all", "Только мне"],
+              ]}
+            />
+            <p className="mt-1 text-xs text-[#7f9fb2]">
+              {v.speakerLock === "important"
+                ? "Чужие могут спросить время или погоду, но не выключить компьютер, не напечатать текст, не записать трату или заметку."
+                : v.speakerLock === "all"
+                  ? "На чужой голос Джарвис не реагирует совсем."
+                  : "Голос записан, но проверка выключена."}
+            </p>
+          </div>
+          {v.speakerLock !== "off" && (
+            <div>
+              <div className="mb-1 flex items-center justify-between text-sm text-[#c3dcea]">
+                <span>Строгость</span>
+                {sp?.score !== undefined && (
+                  <span className={cn("text-xs", sp.owner ? "text-[#3ee08f]" : "text-[#ffb36b]")}>
+                    последняя фраза: {Math.round(sp.score * 100)}% · {sp.owner ? "вы" : "не вы"}
+                    {!sp.owner && (
+                      <button className="ml-2 underline" onClick={() => void action("voice.owner.add")}>
+                        Это был я
+                      </button>
+                    )}
+                  </span>
+                )}
+              </div>
+              <Slider value={v.speakerThreshold} min={0.3} max={0.8} step={0.05} onChange={(speakerThreshold) => updateVoice({ speakerThreshold })} format={(x) => `${Math.round(x * 100)}%`} />
+              <p className="mt-1 text-xs text-[#7f9fb2]">
+                Ваш голос обычно 55–90%, чужие — 10–35%. Не узнал вас — нажмите «Это был я»: Джарвис добавит эту фразу к вашему голосу и
+                будет узнавать лучше. Пропускает чужих — увеличьте строгость.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </Panel>
   );
 }

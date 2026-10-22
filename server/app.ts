@@ -25,6 +25,7 @@ import { proxyService } from "./proxy.ts";
 import { netFetch } from "./net.ts";
 import { converse, handleAlice } from "./jarvis/index.ts";
 import { acceptClient, reportState, type VoiceEvent } from "./jarvis/voice.ts";
+import { acceptTabs, nextCommand } from "./jarvis/browser.ts";
 import { acceptHook, hookInfo, rotateHook } from "./hooks.ts";
 import { SDK_VERSION, type PlatformBuild } from "./compiler.ts";
 import { FILES_DIR, MODULES_DIR, MODULE_ID_RE, HOME, CHECK_COMMAND } from "./paths.ts";
@@ -709,12 +710,33 @@ export function createApp(opts: AppOptions) {
     const token = voiceToken(c);
     return reportState(token, await c.req.json().catch(() => ({}))) ? c.json({ ok: true }) : c.json({ error: "Чужой процесс голоса" }, 409);
   });
+  // Расширение «Джарвис — вкладки» (voice/browser-extension): только с этого компьютера и только от расширения.
+  const fromExtension = (c: Context) => {
+    requireLocal(c);
+    // Сайты в браузере всегда присылают свой Origin — их отсекаем. Расширение присылает chrome-extension:// или ничего.
+    const origin = c.req.header("origin");
+    if (origin && !origin.startsWith("chrome-extension://")) throw new HubError("Только для расширения браузера", 403);
+  };
+  app.get("/api/jarvis/browser/hello", (c) => {
+    fromExtension(c);
+    return c.json({ ok: true });
+  });
+  app.post("/api/jarvis/browser/tabs", async (c) => {
+    fromExtension(c);
+    acceptTabs(await c.req.json().catch(() => ({})));
+    return c.json({ ok: true });
+  });
+  app.get("/api/jarvis/browser/next", async (c) => {
+    fromExtension(c);
+    return c.json((await nextCommand()) ?? {});
+  });
   app.post("/api/jarvis/voice/ask", async (c) => {
     const token = voiceToken(c);
     if (!reportState(token, {})) return c.json({ error: "Чужой процесс голоса" }, 409);
     const body = await c.req.json().catch(() => ({}));
     const text = String(body?.text ?? "").slice(0, 2000);
-    return c.json(await converse("voice", text));
+    const owner = typeof body?.owner === "boolean" ? body.owner : undefined;
+    return c.json(await converse("voice", text, { owner }));
   });
 
   /* ─────────────── работа в фоне и автозапуск ─────────────── */

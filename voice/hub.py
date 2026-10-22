@@ -34,8 +34,9 @@ class Hub:
         )
         return urllib.request.urlopen(req, timeout=timeout, context=self.ctx)
 
-    def ask(self, text: str) -> dict:
-        with self._req("/api/jarvis/voice/ask", {"text": text}, timeout=200) as r:
+    def ask(self, text: str, owner: bool | None = None, score: float | None = None) -> dict:
+        body = {"text": text, "owner": owner, "score": score}
+        with self._req("/api/jarvis/voice/ask", body, timeout=200) as r:
             return json.loads(r.read().decode("utf-8"))
 
     def state(self, **kw):

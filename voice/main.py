@@ -12,6 +12,7 @@
 
 import argparse
 import collections
+import hashlib
 import json
 import os
 import queue
@@ -34,14 +35,22 @@ RATE = 16000
 FRAME_MS = 30
 FRAME = RATE * FRAME_MS // 1000  # 480 сэмплов
 FRAME_BYTES = FRAME * 2
-PREROLL_SEC = 2.0
-END_SILENCE_MS = 800
+PREROLL_SEC = 2.5
+END_SILENCE_MS = 700
 WAIT_COMMAND_SEC = 5.0
-MAX_PHRASE_SEC = 15.0
+MAX_PHRASE_SEC = 10.0
+# Речь — только то, что заметно громче фона: иначе разговоры и видео рядом не дают фразе закончиться.
+SPEECH_OVER_NOISE = 2.2
+MIN_SPEECH_RMS = 250
+# Имени в распознанном тексте нет, а слов больше — скорее всего, это чужой разговор, а не команда.
+MAX_WORDS_WITHOUT_NAME = 8
 FILLER_AFTER_SEC = 1.8
 
 VOSK_MODEL = "vosk-model-small-ru-0.22"
 VOSK_URL = f"https://alphacephei.com/vosk/models/{VOSK_MODEL}.zip"
+
+# «Джарвис, стоп» во время речи — просто замолчать.
+STOP_WORDS = re.compile(r"^\W*(стоп|хватит|замолчи|молчи|тихо|достаточно|все|всё|остановись|прекрати|отмена|понял|ладно)\W*$", re.I)
 
 WAKE_UP = re.compile(r"(просн|слушай|вернись|включись|просыпайся|подъем|подъём)", re.I)
 
@@ -52,6 +61,10 @@ def log(*a):
 def norm(s: str) -> str:
     s = s.lower().replace("ё", "е")
     return re.sub(r"[^\w\s]", " ", s).split()
+
+
+def frame_rms(f: bytes) -> float:
+    return float(np.sqrt(np.mean(np.frombuffer(f, dtype=np.int16).astype(np.float32) ** 2)))
 
 
 def similar(a: str, b: str) -> float:
@@ -72,7 +85,10 @@ def similar(a: str, b: str) -> float:
 EXIT_RESTART = 3
 
 # Как распознавание иногда пишет «Джарвис».
-WAKE_FORMS = {"джарвис", "jarvis", "жарвис", "джервис", "джарвиз", "джарвисс", "чарвис", "джарвес", "дарвис"}
+WAKE_FORMS = {
+    "джарвис", "jarvis", "жарвис", "джервис", "джарвиз", "джарвисс", "чарвис", "джарвес", "дарвис", "джарюс", "жарвез",
+    "джарос", "джервиз", "жарвиз", "джарвиc", "чарльз", "сервиз", "джарви", "жарви",
+}
 
 
 class Mic:
@@ -143,6 +159,19 @@ def find_device(name: str):
     return None
 
 
+def activation(rate=48000):
+    """Сигнал «слушаю»: восходящий аккорд с мягким хвостом, ~0.45 с — слышно даже на фоне музыки."""
+    t = np.arange(int(rate * 0.45)) / rate
+    out = np.zeros_like(t)
+    for i, (f, start) in enumerate([(523.25, 0.0), (659.25, 0.07), (783.99, 0.14), (1046.5, 0.21)]):
+        tt = t - start
+        on = tt >= 0
+        env = np.where(on, np.minimum(1, tt / 0.012) * np.exp(-np.clip(tt, 0, None) * 6.5), 0)
+        # Основной тон + октава тише: звучит «стеклянно», как интерфейс.
+        out += env * (np.sin(2 * np.pi * f * tt) + 0.3 * np.sin(4 * np.pi * f * tt)) * (0.8 + 0.1 * i)
+    return (out / np.max(np.abs(out)) * 0.32).astype(np.float32)
+
+
 def tone(freqs, ms=110, volume=0.25, rate=48000):
     out = []
     for f in freqs:
@@ -201,11 +230,16 @@ class Voice:
         self.stt = None
         self.tts = None
         self.wake = None
-        self.chime = tone([880, 1320])
-        self.ack = tone([1320], ms=90, volume=0.18)
+        self.chime = activation()
+        self.ack = tone([1320], ms=70, volume=0.12)
         self.fillers: list = []
         self.hub_url = args.hub
         self.ui = None
+        self.noise = 300.0
+        self.stop_speech = threading.Event()
+        self.sysaudio = None
+        self.speaker = None
+        self.tts_mem: "collections.OrderedDict[tuple, tuple]" = collections.OrderedDict()
 
     # ───────────── состояние ─────────────
 
@@ -296,14 +330,63 @@ class Voice:
     # ───────────── речь ─────────────
 
     def synth(self, text: str):
-        return self.tts.synth(text, self.cfg.get("speaker", ""), float(self.cfg.get("rate", 1)))
+        """Синтез с кэшем: частые короткие ответы («Готово», «Открываю Telegram») звучат мгновенно."""
+        from tts import fx_pitch, jarvis_fx
 
-    def play(self, audio, sr: int = 48000):
-        """Проиграть звук (массив 48 кГц или пару (массив, частота)). Орб пульсирует в такт."""
+        rate = float(self.cfg.get("rate", 1))
+        fx = float(self.cfg.get("voiceFx", 0) or 0)
+        key = (self.tts.engine, self.cfg.get("speaker", ""), rate, round(fx, 2), text)
+
+        def make():
+            # Эффект понижает тон замедлением — заранее ускоряем речь на столько же.
+            a, sr = self.tts.synth(text, key[1], rate * fx_pitch(fx) if fx else rate)
+            return (jarvis_fx(a, sr, fx), sr) if fx else (a, sr)
+
+        if len(text) > 160:
+            return make()
+        hit = self.tts_mem.get(key)
+        if hit:
+            self.tts_mem.move_to_end(key)
+            return hit
+        path = os.path.join(self.cache_dir(), hashlib.sha1(repr(key).encode("utf-8")).hexdigest() + ".npz")
+        try:
+            z = np.load(path)
+            out = (z["a"], int(z["sr"]))
+        except Exception:
+            out = make()
+            try:
+                np.savez(path, a=out[0].astype(np.float32), sr=out[1])
+            except Exception:
+                pass
+        self.tts_mem[key] = out
+        while len(self.tts_mem) > 200:
+            self.tts_mem.popitem(last=False)
+        return out
+
+    def cache_dir(self):
+        d = os.path.join(os.path.dirname(self.models_dir().rstrip("/\\")), "tts-cache")
+        os.makedirs(d, exist_ok=True)
+        return d
+
+    def prewarm(self):
+        """Частые ответы — в кэш заранее."""
+        addr = self.cfg.get("address") or ""
+        sir = f", {addr}" if addr else ""
+        for p in [f"Да{sir}?", f"Слушаю{sir}.", f"Готово{sir}.", f"Сделано{sir}.", f"Есть{sir}.", "Отменил.", "Пауза.", "Продолжаю.", "Следующий."]:
+            try:
+                self.synth(p)
+            except Exception:
+                break
+
+    def play(self, audio, sr: int = 48000, barge: bool = False) -> bool:
+        """
+        Проиграть звук (массив 48 кГц или пару (массив, частота)). Орб пульсирует в такт.
+        barge — пока играет, слушать имя: «Джарвис…» перебивает речь. True — перебили.
+        """
         if isinstance(audio, tuple):
             audio, sr = audio
         if audio is None or not len(audio):
-            return
+            return False
         loud = float(self.cfg.get("loudness", 0.9))
         out = np.clip(audio * loud, -1, 1)
         stop = threading.Event()
@@ -321,25 +404,82 @@ class Voice:
                     self.ui.level(float(e))
 
             threading.Thread(target=pulse, daemon=True).start()
+        self.stop_speech.clear()
         sd.play(out, sr)
-        sd.wait()
+        interrupted = False
+        if barge and self.mic and self.wake:
+            # Пока говорим — кормим детектор имени микрофоном. Своё имя Джарвис почти не произносит,
+            # так что сработает именно на «Джарвис» от человека.
+            self.wake.reset()
+            end = time.monotonic() + len(out) / sr
+            while time.monotonic() < end:
+                if self.stop_speech.is_set():
+                    interrupted = True
+                    break
+                f = self.mic.read(0.03)
+                if f and len(f) == FRAME_BYTES and self.wake.feed(f):
+                    interrupted = True
+                    break
+            if interrupted:
+                sd.stop()
+            else:
+                sd.wait()
+        else:
+            while not self.stop_speech.wait(0.03):
+                if not sd.get_stream().active:
+                    break
+            if self.stop_speech.is_set():
+                sd.stop()
+                interrupted = True
         stop.set()
         if self.ui:
             self.ui.level(0)
+        return interrupted
 
     def say(self, tts: str, text: str = ""):
-        if self.ui:
-            self.ui.show()
-            self.ui.answer(text or tts)
         if not self.cfg.get("tts", True):
+            if self.ui:
+                self.ui.show()
+                self.ui.answer(text or tts)
             self.play(self.ack)
             return
         self.status("speaking", detail=text or tts)
         try:
-            self.play(self.synth(tts))
+            audio = self.synth(tts)
+            if self.ui:
+                self.ui.show()
+                self.ui.answer(text or tts, len(audio[0]) / audio[1])
+            if self.play(audio, barge=True):
+                self.interrupted()
+                return
         except Exception as e:
             log(f"Не получилось сказать: {e}")
         self.after_speech()
+
+    def interrupted(self):
+        """Перебили: «Джарвис, стоп» — молчим; «Джарвис, <просьба>» — выполняем новую."""
+        log("Перебили")
+        self.mic.flush()
+        self.ring.clear()
+        self.wake.reset()
+        if self.stop_speech.is_set():  # крестик на орбе
+            return
+        self.status("hearing", detail="Слушаю")
+        pcm = self.capture(4.0)
+        if not pcm:
+            return
+        text = self.stt.transcribe(pcm, self.hotwords())
+        found, command = self.strip_wake(text)
+        command = command if found else text
+        log(f"→ {command!r} (перебил)")
+        if not command.strip() or STOP_WORDS.match(command):
+            if self.ui:
+                self.ui.answer("")
+            return
+        owner, score = self.check_owner(pcm)
+        if owner is False and self.denied():
+            return
+        self.converse(command, owner, score)
 
     def after_speech(self):
         # Всё, что микрофон слышал, пока мы говорили, — наш собственный голос.
@@ -374,10 +514,10 @@ class Voice:
             if len(f) != FRAME_BYTES:
                 continue
             frames.append(f)
+            rms = frame_rms(f)
             if self.ui:
-                rms = float(np.sqrt(np.mean(np.frombuffer(f, dtype=np.int16).astype(np.float32) ** 2)))
                 self.ui.level(min(1.0, rms / 2500))
-            speech = self.vad.is_speech(f, RATE)
+            speech = self.vad.is_speech(f, RATE) and rms > max(MIN_SPEECH_RMS, self.noise * SPEECH_OVER_NOISE)
             if on_pause and not started:
                 quiet_start = 0 if speech else quiet_start + 1
                 if quiet_start >= 12:
@@ -400,11 +540,70 @@ class Voice:
                 break
         return b"".join(frames)
 
+    def check_owner(self, pcm: bytes) -> tuple[bool | None, float | None]:
+        """Голос владельца? None — проверка выключена, голос не записан или фраза слишком короткая."""
+        lock = self.cfg.get("speakerLock") or "off"
+        if lock == "off" or not self.speaker or not self.speaker.enrolled or not pcm:
+            return None, None
+        try:
+            sc = self.speaker.score(pcm)
+        except Exception as e:
+            log(f"Проверка голоса не удалась: {e}")
+            return None, None
+        if sc is None:
+            return None, None
+        ok = sc >= float(self.cfg.get("speakerThreshold", 0.5))
+        log(f"Голос: {sc:.2f} — {'владелец' if ok else 'не владелец'}")
+        self.hub.state(speaker={"enrolled": True, "score": round(sc, 2), "owner": ok, "at": int(time.time() * 1000)})
+        return ok, sc
+
+    def stranger(self, pre: bytes) -> bool:
+        """
+        Проверка голоса в момент, когда прозвучало имя (по последним секундам записи). Только при
+        «Только мой голос» и с запасом: короткая запись менее надёжна, своих отсекать нельзя.
+        """
+        if (self.cfg.get("speakerLock") or "off") == "off" or not self.speaker or not self.speaker.enrolled:
+            return False
+        try:
+            sc = self.speaker.score(pre, min_sec=0.5, keep=False)
+        except Exception:
+            return False
+        if sc is None:
+            return False
+        limit = float(self.cfg.get("speakerThreshold", 0.45)) - 0.15
+        if sc < limit:
+            log(f"Имя сказал не владелец ({sc:.2f}) — молчу")
+            return True
+        log(f"Имя: голос {sc:.2f}")
+        return False
+
+    def accept_without_name(self, command: str, owner: bool | None, audio: bytes) -> bool:
+        """
+        Детектор имени сработал, а в распознанном тексте имени нет. Так бывает и когда распознавание
+        исказило «Джарвис», и когда это речь из видео. Решаем по голосу и длине фразы.
+        """
+        words = command.split()
+        if not words or self.cfg.get("strictWake") or len(words) > MAX_WORDS_WITHOUT_NAME:
+            return False  # пусто — шум; длинно — чужой разговор
+        if self.speaker and self.speaker.enrolled:
+            if owner is None:  # проверка выключена — сверяем голос всё равно
+                try:
+                    sc = self.speaker.score(audio)
+                except Exception:
+                    sc = None
+                owner = sc is not None and sc >= float(self.cfg.get("speakerThreshold", 0.45))
+            return bool(owner)
+        return len(words) <= 4
+
+    def denied(self) -> bool:
+        """Режим «только мой голос» для всего — чужому не отвечаем совсем."""
+        return (self.cfg.get("speakerLock") or "off") == "all"
+
     def hotwords(self):
         return " ".join(w.capitalize() for w in (self.cfg.get("wakeWords") or ["джарвис"]))
 
     def strip_wake(self, text: str) -> tuple[bool, str]:
-        """Было ли имя в начале фразы, и фраза без него."""
+        """Было ли имя во фразе, и фраза после него."""
         forms = WAKE_FORMS | {w.lower() for w in self.cfg.get("wakeWords") or []}
         words = text.split()
         for i, w in enumerate(words):
@@ -412,14 +611,14 @@ class Voice:
             if not n:
                 continue
             n = n[0]
-            if n in forms or any(similar(n, f) >= 0.72 for f in forms):
+            if n in forms or any(similar(n, f) >= 0.6 for f in forms):
                 rest = " ".join(words[i + 1 :]).lstrip(",.!?— -")
                 return True, rest
         return False, text
 
     # ───────────── разговор ─────────────
 
-    def ask(self, text: str):
+    def ask(self, text: str, owner: bool | None = None, score: float | None = None):
         """Отправить фразу хабу и ответить. Возвращает True, если Джарвис ждёт ответ."""
         self.status("thinking", heard=text, heardAt=int(time.time() * 1000))
         if self.ui:
@@ -429,7 +628,7 @@ class Voice:
 
         def run():
             try:
-                result.update(self.hub.ask(text))
+                result.update(self.hub.ask(text, owner, score))
             except Exception as e:
                 result["error"] = str(e)
 
@@ -451,45 +650,62 @@ class Voice:
             self.say(result.get("tts") or result.get("text") or "", result.get("text", ""))
         return bool(result.get("expectReply"))
 
-    def converse(self, first: str):
-        expect = self.ask(first)
+    def converse(self, first: str, owner: bool | None = None, score: float | None = None):
+        expect = self.ask(first, owner, score)
         follow = float(self.cfg.get("followUp", 6) or 0)
         while expect and follow > 0:
             self.status("hearing", detail="Слушаю ответ")
             pcm = self.capture(follow)
             if not pcm:
                 break
+            owner, score = self.check_owner(pcm)
+            if owner is False and self.denied():
+                break
             self.status("thinking", detail="Распознаю")
             text = self.stt.transcribe(pcm)
             log(f"→ {text}")
             if not text.strip():
                 break
-            expect = self.ask(text)
+            expect = self.ask(text, owner, score)
 
     def on_wake(self):
+        pre = b"".join(self.ring)
+        # «Джарвис» прозвучал из своих же колонок (видео, музыка) — это не к нам.
+        if self.sysaudio and self.cfg.get("echoGuard", True):
+            echo, c = self.sysaudio.is_echo(pre)
+            if echo:
+                log(f"Имя прозвучало из колонок ({c:.2f}) — молчу")
+                return
+        # Имя сказал явно не владелец (видео, гости) — молчим сразу, без сигнала и орба.
+        if self.stranger(pre):
+            return
         if self.ui and not self.sleeping:
             self.ui.clear()
             self.ui.show()
         self.status("hearing", detail="Слушаю")
-        pre = b"".join(self.ring)
-        # Сигнал — только если после имени пауза: значит, ждут, что Джарвис отзовётся.
-        # Говорят дальше без паузы — сигнал только мешал бы (и звенел бы на ложных срабатываниях).
-        chimed = []
-
-        def chime():
-            if self.cfg.get("chime", True) and not self.sleeping and not chimed:
-                chimed.append(1)
-                self.play(self.chime)
-
-        pcm = self.capture(WAIT_COMMAND_SEC, on_pause=chime)
+        # Сигнал «слушаю» — сразу, как услышал имя: понятно, что Джарвис включился.
+        # Микрофон в это время продолжает писать в очередь — фраза не теряется.
+        if self.cfg.get("chime", True) and not self.sleeping:
+            self.play(self.chime)
+        pcm = self.capture(WAIT_COMMAND_SEC)
+        if pcm and self.cfg.get("chime", True) and not self.sleeping:
+            self.play(self.ack)
         audio = pre + (pcm or b"")
+        owner, score = self.check_owner(audio)
+        if owner is False and self.denied():
+            log("Не голос владельца — молчу")
+            if self.ui:
+                self.ui.answer("Это не голос хозяина.")
+            return
         self.status("thinking", detail="Распознаю")
         t0 = time.time()
         text = self.stt.transcribe(audio, self.hotwords())
         log(f"→ {text!r} ({time.time() - t0:.2f} с)")
         found, command = self.strip_wake(text)
-        if self.cfg.get("verifyWake", True) and not found:
-            log("Имени во фразе нет — ложное срабатывание")
+        if not found and not self.accept_without_name(command, owner, audio):
+            log(f"Имени во фразе нет — ложное срабатывание: {command!r}")
+            if self.ui:
+                self.ui.hide(now=True)
             return
         if self.sleeping:
             if WAKE_UP.search(command):
@@ -497,11 +713,16 @@ class Voice:
                 self.say(f"Слушаю, {self.cfg.get('address') or ''}.".replace(", .", "."))
             return
         if not command.strip():
-            # Прозвучало только имя — отзываемся и ждём саму просьбу.
-            chime()
+            # Прозвучало только имя (оно есть в распознанном тексте — иначе отсеяли выше) — отзываемся и ждём просьбу.
+            addr = self.cfg.get("address") or ""
+            self.say(f"Да{', ' + addr if addr else ''}?")
             self.status("hearing", detail="Слушаю")
             pcm = self.capture(WAIT_COMMAND_SEC)
             if not pcm:
+                return
+            owner, score = self.check_owner(pcm)
+            if owner is False and self.denied():
+                log("Не голос владельца — молчу")
                 return
             self.status("thinking", detail="Распознаю")
             text = self.stt.transcribe(pcm, self.hotwords())
@@ -509,7 +730,53 @@ class Voice:
             command = self.strip_wake(text)[1] if self.strip_wake(text)[0] else text
             if not command.strip():
                 return
-        self.converse(command)
+        self.converse(command, owner, score)
+
+    # ───────────── запись голоса владельца ─────────────
+
+    def enroll(self, phrases: list[str]):
+        if not self.speaker:
+            return
+        total = len(phrases)
+        try:
+            self.status("loading", detail="Готовлю запись голоса")
+            self.speaker.ensure_model()
+        except Exception as e:
+            self.hub.state(enroll={"state": "error", "error": f"Модель голоса не загрузилась: {e}"})
+            return
+        if self.ui:
+            self.ui.clear()
+            self.ui.show()
+        self.say("Запишу ваш голос. Повторяйте за мной фразы после сигнала.")
+        embs = []
+        for i, phrase in enumerate(phrases):
+            self.hub.state(enroll={"state": "record", "step": i + 1, "total": total, "phrase": phrase})
+            for attempt in range(2):
+                if self.ui:
+                    self.ui.heard(f"{i + 1} из {total}")
+                self.say(phrase)
+                self.play(self.chime)
+                self.status("hearing", detail=f"Повторите: «{phrase}»")
+                pcm = self.capture(6.0)
+                e = self.speaker.embed(pcm) if pcm else None
+                if e is not None:
+                    embs.append(e)
+                    self.play(self.ack)
+                    break
+                self.say("Не расслышал, ещё раз.")
+        self.after_speech()
+        if len(embs) < 3:
+            self.hub.state(enroll={"state": "error", "error": "Слишком мало записей — попробуйте ещё раз в тишине"})
+            self.say("Не получилось записать голос. Попробуйте ещё раз в тишине.")
+            return
+        scores = self.speaker.save(embs)
+        log(f"Голос записан: {len(embs)} фраз, похожесть на себя {min(scores):.2f}–{max(scores):.2f}")
+        self.hub.state(
+            enroll={"state": "done", "count": len(embs)},
+            speaker={"enrolled": True, "self": [round(min(scores), 2), round(max(scores), 2)]},
+        )
+        addr = self.cfg.get("address") or ""
+        self.say(f"Готово{', ' + addr if addr else ''}. Теперь я узнаю ваш голос.")
 
     def handle_events(self):
         handled = False
@@ -537,6 +804,18 @@ class Voice:
                 if e.get("panel") and self.ui:
                     self.ui.open_panel()
                 self.after_speech()
+            elif t == "enroll":
+                self.enroll([str(x) for x in e.get("phrases") or []][:10])
+            elif t == "owner.add":
+                if self.speaker and self.speaker.add_last():
+                    log("Последняя фраза добавлена к голосу владельца")
+                    sc = self.speaker.self_scores
+                    self.hub.state(speaker={"enrolled": True, "owner": True, "added": True, "self": [round(min(sc), 2), round(max(sc), 2)]})
+                    self.say("Запомнил. Теперь узнаю вас лучше.")
+            elif t == "enroll.reset":
+                if self.speaker:
+                    self.speaker.reset()
+                self.hub.state(speaker={"enrolled": False}, enroll=None)
             elif t == "test":
                 self.say(f"Голос работает. Слушаю вас, {self.cfg.get('address') or ''}.".replace(", .", "."))
             elif t == "stop":
@@ -571,7 +850,7 @@ class Voice:
 
                 gc.collect()
                 self.load_tts()
-            elif (old.get("speaker"), old.get("rate"), old.get("address")) != (cfg.get("speaker"), cfg.get("rate"), cfg.get("address")) and self.tts:
+            elif (old.get("speaker"), old.get("rate"), old.get("address"), old.get("voiceFx")) != (cfg.get("speaker"), cfg.get("rate"), cfg.get("address"), cfg.get("voiceFx")) and self.tts:
                 self.make_fillers()
             if old.get("mic") != cfg.get("mic"):
                 self.open_mic()
@@ -604,6 +883,9 @@ class Voice:
         self.say(f"{g}{', ' + addr if addr else ''}. Все системы в норме.")
 
     def on_tray(self, action: str):
+        if action == "stop":
+            self.stop_speech.set()
+            return
         if action == "mute":
             self.muted = not self.muted
         elif action == "sleep":
@@ -645,6 +927,24 @@ class Voice:
         self.load_wake()
         self.load_tts()
         self.load_stt()
+        try:
+            from speaker import Speaker
+
+            self.speaker = Speaker(self.models_dir())
+            if self.speaker.enrolled and (self.cfg.get("speakerLock") or "off") != "off":
+                self.speaker.ensure_model()
+            self.hub.state(
+                speaker={"enrolled": self.speaker.enrolled, "self": [round(min(self.speaker.self_scores), 2), round(max(self.speaker.self_scores), 2)] if self.speaker.self_scores else None}
+            )
+        except Exception as e:
+            log(f"Проверка голоса недоступна: {e}")
+        self.prewarm()
+        try:
+            from echo import SystemAudio
+
+            self.sysaudio = SystemAudio()
+        except Exception as e:
+            log(f"Звук колонок не слушается: {e}")
         self.open_mic()
         if self.cfg.get("greet", True):
             self.greet()
@@ -658,6 +958,9 @@ class Voice:
             if self.muted:
                 continue
             self.ring.append(frame)
+            rms = frame_rms(frame)
+            if not self.vad.is_speech(frame, RATE):
+                self.noise = self.noise * 0.98 + min(rms, 4000) * 0.02
             if self.wake.feed(frame):
                 log("Услышал имя")
                 try:

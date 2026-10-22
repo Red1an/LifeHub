@@ -28,6 +28,8 @@ export interface Ctx {
   /** Настройки из модуля «Джарвис». */
   prefs: Prefs;
   now: Date;
+  /** Голос владельца: true/false — проверили, undefined — не проверяли (текст, колонка, проверка выключена). */
+  owner?: boolean;
 }
 
 type StoredEvent = { id: string; calendarId: string; title: string; start: string; end: string; allDay: boolean; kind: "event" | "reminder" };

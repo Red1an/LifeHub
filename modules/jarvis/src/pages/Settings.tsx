@@ -95,6 +95,13 @@ export function Settings() {
         </button>
       </Panel>
 
+      <Panel title="Сводки">
+        <p className="mb-3 text-sm text-[#c3dcea]">Что Джарвис рассказывает на «доброе утро» и «итоги дня».</p>
+        <Link to="/brief" className="jarvis-chip inline-flex">
+          Настроить сводки →
+        </Link>
+      </Panel>
+
       <Panel title="Колонка с Алисой">
         <p className="mb-3 text-sm text-[#c3dcea]">
           С Джарвисом можно говорить и через Яндекс Станцию — приватным навыком Алисы. Команды для компьютера через колонку не работают.

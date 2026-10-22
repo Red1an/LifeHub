@@ -59,12 +59,23 @@
   #heard { margin-top: 6px; font-size: 13px; color: var(--muted); line-height: 1.35; max-height: 2.7em; overflow: hidden; }
   #heard:empty { display: none; }
   #answer {
-    margin-top: 4px; font-size: 15px; line-height: 1.4; color: var(--ink); max-height: 8.4em; overflow: hidden;
+    margin-top: 4px; font-size: 15px; line-height: 1.4; color: var(--ink); overflow-y: auto; scrollbar-width: none;
     text-shadow: 0 0 18px rgba(90, 209, 255, 0.15);
   }
   #answer:empty { display: none; }
-  #answer .w { opacity: 0; transition: opacity 0.25s; }
-  #answer .w.v { opacity: 1; }
+  #answer::-webkit-scrollbar { display: none; }
+  /* Карточка занимает остаток окна, текст ответа прокручивается внутри неё. */
+  #card { display: flex; flex-direction: column; }
+  /* Субтитры: слова проявляются в темпе речи, старые строки уезжают вверх и растворяются. */
+  #answer {
+    flex: 1; min-height: 0; overflow: hidden !important; position: relative;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22px, #000 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 22px, #000 100%);
+  }
+  #answer.top { -webkit-mask-image: none; mask-image: none; }
+  #lines { transition: transform 0.45s cubic-bezier(0.25, 0.8, 0.3, 1); will-change: transform; }
+  #answer .w { opacity: 0; filter: blur(3px); transition: opacity 0.35s ease, filter 0.35s ease; }
+  #answer .w.v { opacity: 1; filter: none; }
 
   #drag { position: fixed; left: 0; right: 0; top: 0; height: 14px; z-index: 5; cursor: move; }
   @keyframes blink { 50% { opacity: 0.35; } }
@@ -203,23 +214,40 @@
     loading: "Запускаюсь", sleeping: "Режим ожидания", muted: "Микрофон выключен", error: "Ошибка",
   };
 
+  /* Слова появляются по одному в темпе речи; не влезло — строки плавно сдвигаются вверх. */
   let typing = null;
-  function typeAnswer(text) {
+  function typeAnswer(text, duration) {
     clearInterval(typing);
     $answer.innerHTML = "";
-    const words = text.split(/(\s+)/);
-    const spans = words.map((w) => {
+    $answer.classList.add("top");
+    const lines = document.createElement("div");
+    lines.id = "lines";
+    $answer.appendChild(lines);
+    const spans = text.split(/(\s+)/).map((w) => {
       const s = document.createElement("span");
       s.className = "w";
       s.textContent = w;
-      $answer.appendChild(s);
+      lines.appendChild(s);
       return s;
     });
-    let i = 0;
-    typing = setInterval(() => {
+    const words = spans.filter((s) => s.textContent.trim()).length || 1;
+    // Под длительность речи: последнее слово появляется чуть раньше, чем Джарвис договорит.
+    const step = duration ? Math.max(60, Math.min(600, (duration * 1000 * 0.9) / words)) : 45;
+    let i = 0, shift = 0;
+    const reveal = () => {
+      while (i < spans.length && !spans[i].textContent.trim()) spans[i++].classList.add("v");
       if (i >= spans.length) return clearInterval(typing);
-      spans[i++].classList.add("v");
-    }, 45);
+      const w = spans[i++];
+      w.classList.add("v");
+      const bottom = w.offsetTop + w.offsetHeight;
+      if (bottom - shift > $answer.clientHeight) {
+        shift = bottom - $answer.clientHeight;
+        lines.style.transform = `translateY(${-shift}px)`;
+        $answer.classList.remove("top");
+      }
+    };
+    reveal();
+    typing = setInterval(reveal, step);
   }
 
   window.jv = {
@@ -231,8 +259,10 @@
     },
     level(x) { levelTarget = Math.max(0, Math.min(1, x)); },
     heard(t) { $heard.textContent = t ? `«${t}»` : ""; },
-    answer(t) { t ? typeAnswer(t) : ($answer.innerHTML = ""); },
-    clear() { $heard.textContent = ""; $answer.innerHTML = ""; },
+    answer(t, duration) {
+      t ? typeAnswer(t, duration || 0) : (clearInterval(typing), ($answer.innerHTML = ""));
+    },
+    clear() { clearInterval(typing); $heard.textContent = ""; $answer.innerHTML = ""; },
     visible(on) {
       root.classList.toggle("on", !!on);
       if (on && !running) { running = true; last = performance.now(); requestAnimationFrame(frame); }

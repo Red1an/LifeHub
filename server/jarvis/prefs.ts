@@ -11,14 +11,48 @@ export const MODULE = "jarvis";
 export type MorningPart = "events" | "deadlines" | "habits" | "devpath" | "portfolio";
 export type EveningPart = "habits" | "spending" | "devpath" | "tomorrow" | "deadlines";
 
+/** Что открыть: программа из библиотеки (id), файл/папка/программа по пути, ссылка. */
+export interface OpenTarget {
+  kind: "lib" | "path" | "url";
+  value: string;
+  /** Как показывать в интерфейсе. */
+  label?: string;
+}
+
+/** Шаг сценария (конструктор в модуле). */
+export type Step =
+  | { type: "say"; text: string }
+  | { type: "command"; text: string; speak?: boolean }
+  | { type: "open"; target: OpenTarget }
+  | { type: "search"; where: "google" | "youtube" | "yandex"; query: string }
+  | { type: "keys"; combo: string }
+  | { type: "type"; text: string; enter?: boolean }
+  | { type: "volume"; level: number }
+  | { type: "media"; key: "play" | "next" | "prev" }
+  | { type: "close"; name: string }
+  | { type: "wait"; seconds: number };
+
 export interface CustomCommand {
   id: string;
   /** Фразы-триггеры, любая из них. */
   phrases: string[];
-  /** Что сказать (может быть пусто). */
+  /** Что сказать (может быть пусто). Старый формат — без steps. */
   say: string;
-  /** Какие команды Джарвиса выполнить следом: «что дальше», «привычки»… */
+  /** Какие команды Джарвиса выполнить следом. Старый формат — без steps. */
   run: string[];
+  /** Шаги сценария. Есть — say и run не используются. */
+  steps?: Step[];
+  /** Выключен — фраза не срабатывает. */
+  off?: boolean;
+  /** Джарвис выучил сам: так разобрала нейронка, теперь — без неё. */
+  learned?: boolean;
+}
+
+/** Своё название программы: «атака титанов» → ссылка, «мой проект» → папка, «телега» → Telegram. */
+export interface AppAlias {
+  id: string;
+  phrases: string[];
+  target: OpenTarget;
 }
 
 /** Голосовой помощник на компьютере (voice/ — процесс на Python, его запускает хаб). */
@@ -37,6 +71,8 @@ export interface VoicePrefs {
   tts: boolean;
   /** Скорость речи, 0.7–1.5. */
   rate: number;
+  /** Эффект «ИИ из фильма»: ниже, с металлом и отзвуком, 0–1 (0 — без эффекта). */
+  voiceFx: number;
   /** Громкость голоса относительно системной, 0.2–1. */
   loudness: number;
   /** Микрофон: имя устройства или "" — по умолчанию. */
@@ -51,8 +87,16 @@ export interface VoicePrefs {
   chime: boolean;
   /** После вопроса Джарвиса слушать ответ без слова активации, секунд (0 — нет). */
   followUp: number;
-  /** Проверять Whisper'ом, что имя действительно прозвучало (меньше ложных срабатываний). */
+  /** Устарело (заменено strictWake), не используется. */
   verifyWake: boolean;
+  /** Не реагировать на «Джарвис» из своих колонок (видео, музыка). */
+  echoGuard: boolean;
+  /** Строгая проверка: имени нет в распознанном тексте — фразу не выполнять. Обычно выключено: распознавание коверкает имя. */
+  strictWake: boolean;
+  /** Только мой голос: off — всем; important — важное только владельцу; all — чужим не отвечать вовсе. */
+  speakerLock: "off" | "important" | "all";
+  /** Порог похожести на голос владельца, 0.3–0.8. */
+  speakerThreshold: number;
   /** Предупреждать о событиях календаря за N минут (0 — нет). */
   announce: number;
   /** Озвучивать напоминания «Расписания» в их время. */
@@ -74,10 +118,14 @@ export interface Prefs {
   morning: Record<MorningPart, boolean>;
   evening: Record<EveningPart, boolean>;
   commands: CustomCommand[];
+  /** Свои названия программ, сайтов, папок. */
+  apps: AppAlias[];
   /** Сохранять разговоры в историю модуля. */
   history: boolean;
   /** Модель для свободных просьб: fast — быстрее, smart — умнее. */
   brain: "fast" | "smart";
+  /** Запоминать, как нейронка разобрала просьбу, и в следующий раз — без неё. */
+  learn: boolean;
   voice: VoicePrefs;
 }
 
@@ -89,6 +137,7 @@ export const DEFAULT_VOICE: VoicePrefs = {
   speaker: "dmitri",
   tts: true,
   rate: 1,
+  voiceFx: 0.6,
   loudness: 0.9,
   mic: "",
   model: "large-v3-turbo",
@@ -97,6 +146,10 @@ export const DEFAULT_VOICE: VoicePrefs = {
   chime: true,
   followUp: 6,
   verifyWake: true,
+  strictWake: false,
+  echoGuard: true,
+  speakerLock: "off",
+  speakerThreshold: 0.45,
   announce: 10,
   reminders: true,
   greet: true,
@@ -112,8 +165,10 @@ export const DEFAULT_PREFS: Prefs = {
   morning: { events: true, deadlines: true, habits: true, devpath: true, portfolio: true },
   evening: { habits: true, spending: true, devpath: true, tomorrow: true, deadlines: true },
   commands: [],
+  apps: [],
   history: true,
   brain: "fast",
+  learn: true,
   voice: DEFAULT_VOICE,
 };
 
@@ -132,6 +187,7 @@ export function prefs(): Prefs {
     morning: { ...DEFAULT_PREFS.morning, ...raw.morning },
     evening: { ...DEFAULT_PREFS.evening, ...raw.evening },
     commands: Array.isArray(raw.commands) ? raw.commands : [],
+    apps: Array.isArray(raw.apps) ? raw.apps : [],
     voice: { ...DEFAULT_VOICE, ...raw.voice, ...legacyEngine(raw.voice) },
   };
 }

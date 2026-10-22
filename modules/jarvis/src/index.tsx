@@ -6,6 +6,8 @@ import { Brief } from "./pages/Brief.tsx";
 import { Chat } from "./pages/Chat.tsx";
 import { Commands } from "./pages/Commands.tsx";
 import { Settings } from "./pages/Settings.tsx";
+import { Apps } from "./pages/Apps.tsx";
+import { Scenario } from "./pages/Scenario.tsx";
 import { Setup } from "./pages/Setup.tsx";
 import { Voice } from "./pages/Voice.tsx";
 
@@ -34,14 +36,16 @@ export default defineModule({
     "/setup": Setup,
     "/brief": Brief,
     "/commands": Commands,
+    "/commands/:id": Scenario,
+    "/apps": Apps,
     "/settings": Settings,
     "*": Chat,
   },
   nav: [
     { to: "/", label: "Разговор", icon: "💬" },
     { to: "/voice", label: "Голос", icon: "🎙️" },
-    { to: "/brief", label: "Сводки", icon: "☀️" },
-    { to: "/commands", label: "Команды", icon: "⚡" },
+    { to: "/commands", label: "Сценарии", icon: "⚡" },
+    { to: "/apps", label: "Программы", icon: "🚀" },
     { to: "/settings", label: "Настройки", icon: "⚙️" },
   ],
   widgets: {
