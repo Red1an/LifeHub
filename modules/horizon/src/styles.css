@@ -1,0 +1,154 @@
+@import url("https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;0,7..72,700;1,7..72,400&display=swap");
+
+/* «Ночной альманах»: тёмное небо, тёплая бумага текста, у каждой рубрики свой цвет. */
+.horizon-root {
+  --hz-bg: #0a0e1a;
+  --hz-panel: #121829;
+  --hz-panel-2: #1a2238;
+  --hz-line: rgba(255, 255, 255, 0.08);
+  --hz-text: #ece6da;
+  --hz-muted: #9aa3b8;
+  min-height: 100%;
+  color: var(--hz-text);
+  background:
+    radial-gradient(1200px 500px at 80% -10%, rgba(120, 100, 255, 0.14), transparent 60%),
+    radial-gradient(900px 400px at -10% 10%, rgba(245, 180, 83, 0.08), transparent 60%),
+    var(--hz-bg);
+}
+
+.horizon-serif {
+  font-family: "Literata", Georgia, "Times New Roman", serif;
+}
+
+.horizon-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 40%), var(--hz-panel);
+  border: 1px solid var(--hz-line);
+  border-radius: 20px;
+}
+
+.horizon-prose p + p {
+  margin-top: 0.8em;
+}
+.horizon-prose {
+  font-family: "Literata", Georgia, serif;
+  font-size: 16.5px;
+  line-height: 1.65;
+  color: var(--hz-text);
+}
+.horizon-prose strong {
+  color: #fff;
+  font-weight: 600;
+}
+
+.horizon-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.horizon-chip {
+  border: 1px solid var(--hz-line);
+  background: var(--hz-panel-2);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 14px;
+  color: var(--hz-text);
+  transition: background 0.15s, border-color 0.15s;
+}
+.horizon-chip:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.horizon-chip[data-on="true"] {
+  background: #ece6da;
+  color: #0a0e1a;
+  border-color: #ece6da;
+}
+
+.horizon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--hz-panel-2);
+  border: 1px solid var(--hz-line);
+  color: var(--hz-text);
+  transition: background 0.15s, transform 0.1s;
+}
+.horizon-btn:hover {
+  background: #222b45;
+}
+.horizon-btn:active {
+  transform: scale(0.98);
+}
+.horizon-btn:disabled {
+  opacity: 0.5;
+}
+.horizon-btn-main {
+  background: #ece6da;
+  color: #0a0e1a;
+  border-color: #ece6da;
+}
+.horizon-btn-main:hover {
+  background: #fff;
+}
+
+.horizon-input {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--hz-line);
+  background: #0d1322;
+  color: var(--hz-text);
+  padding: 0 14px;
+  font-size: 16px;
+  outline: none;
+}
+.horizon-input:focus {
+  border-color: rgba(236, 230, 218, 0.5);
+}
+
+.horizon-fade {
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent);
+  mask-image: linear-gradient(180deg, #000 55%, transparent);
+}
+
+.horizon-range {
+  width: 100%;
+  accent-color: #f5b453;
+  height: 32px;
+}
+
+@keyframes horizon-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.horizon-pop {
+  animation: horizon-pop 0.35s ease-out both;
+}
+
+@keyframes horizon-shimmer {
+  0% {
+    background-position: -300px 0;
+  }
+  100% {
+    background-position: 300px 0;
+  }
+}
+.horizon-skeleton {
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+  background-size: 600px 100%;
+  animation: horizon-shimmer 1.4s linear infinite;
+}
