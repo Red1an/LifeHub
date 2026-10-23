@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { addDays, db, dayKey, kv, useCollection, useStore, type WithDoc } from "@lifehub/sdk";
 import { generate, genPuzzle } from "./gen";
 import { loadOnThisDay } from "./sources";
@@ -27,8 +27,11 @@ const days = db.collection<DayDoc>("days");
 
 export const cardId = (day: string, kind: Kind, n = 1) => (n > 1 ? `${day}_${kind}_${n}` : `${day}_${kind}`);
 
-/** Генерация, которая «зависла» (закрыли вкладку посреди запроса), — считается ошибкой. */
-const STALE_MS = 4 * 60_000;
+/**
+ * Генерация, которая «зависла»: вкладку или приложение закрыли посреди запроса, хаб перезапустился —
+ * и записать ошибку стало некуда. Хаб ждёт нейронку до 3 минут, поэтому старше 5 минут — точно брошена.
+ */
+const STALE_MS = 5 * 60_000;
 export const isStale = (c: CardDoc) => c.status === "loading" && Date.now() - c.startedAt > STALE_MS;
 
 /** Короткое имя карточки — для «уже было», лайков и повторения. */
@@ -106,10 +109,12 @@ function pump() {
 export function runCard(id: string, kind: Kind, day: string, all: WithDoc<CardDoc>[], prefs: Prefs, opts: { topic?: string; reroll?: boolean } = {}) {
   if (running.has(id)) return;
   running.add(id);
-  const startedAt = Date.now();
-  void cards.put(id, { day, kind, status: "loading", startedAt });
+  void cards.put(id, { day, kind, status: "loading", startedAt: Date.now() });
   queue.push(async () => {
+    // Время — от начала запроса, а не от постановки в очередь: иначе ждущие в очереди выглядели бы брошенными.
+    const startedAt = Date.now();
     try {
+      await cards.put(id, { day, kind, status: "loading", startedAt });
       // Заменяемая карточка («↻ Другой») тоже считается бывшей — и не зашедшей.
       const mine = all.filter((c) => c.kind === kind && c.status === "ready").sort((a, b) => a.startedAt - b.startedAt);
       const prev = opts.reroll ? all.find((c) => c.id === id && c.status === "ready") : undefined;
@@ -130,7 +135,15 @@ export function runCard(id: string, kind: Kind, day: string, all: WithDoc<CardDo
       }
       if (quick?.length) await addQuick(quick);
     } catch (e) {
-      await cards.put(id, { day, kind, status: "error", startedAt, error: (e as Error).message || "Не получилось" });
+      // Хаб мог быть недоступен (перезапуск) — пробуем записать ошибку ещё пару раз.
+      for (let i = 0; i < 3; i++) {
+        try {
+          await cards.put(id, { day, kind, status: "error", startedAt, error: (e as Error).message || "Не получилось" });
+          break;
+        } catch {
+          await new Promise((r) => setTimeout(r, 5000 * (i + 1)));
+        }
+      }
     } finally {
       running.delete(id);
     }
@@ -138,19 +151,45 @@ export function runCard(id: string, kind: Kind, day: string, all: WithDoc<CardDo
   pump();
 }
 
-/** Порция дня: запускает генерацию недостающих карточек, когда открыт сегодняшний день. */
+/** Сколько раз за сеанс карточку перезапускали сами — чтобы не долбить нейронку, если она лежит. */
+const autoTries = new Map<string, number>();
+const AUTO_LIMIT = 2;
+
+/** Нужно ли (пере)запустить карточку без нажатия: её нет, она брошена или упала (не чаще AUTO_LIMIT раз). */
+function needsRun(c: CardDoc | undefined, id: string) {
+  if (running.has(id)) return false;
+  if (!c) return true;
+  const tries = autoTries.get(id) ?? 0;
+  if (tries >= AUTO_LIMIT) return false;
+  if (isStale(c)) return true;
+  return c.status === "error" && Date.now() - c.startedAt > 60_000;
+}
+
+/**
+ * Порция дня: когда открыт сегодняшний день, запускает недостающие карточки и перезапускает брошенные
+ * (проверка — при каждом изменении карточек и раз в минуту, пока страница открыта).
+ */
 export function useDaily(day: string) {
   const all = useCards();
   const [prefs, , { loading: prefsLoading }] = usePrefs();
+  const [tick, setTick] = useState(0);
   const today = day === dayKey();
   const list = KINDS.filter((k) => !prefs.off.includes(k));
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  const state = all.items.filter((c) => c.day === day).map((c) => `${c.id}:${c.status}:${c.startedAt}`).join("|");
   useEffect(() => {
     if (!today || all.loading || prefsLoading) return;
     for (const k of list) {
       const id = cardId(day, k);
-      if (!all.items.some((c) => c.id === id)) runCard(id, k, day, all.items, prefs);
+      const c = all.items.find((x) => x.id === id);
+      if (!needsRun(c, id)) continue;
+      if (c) autoTries.set(id, (autoTries.get(id) ?? 0) + 1);
+      runCard(id, k, day, all.items, prefs);
     }
-  }, [today, all.loading, prefsLoading, day, list.join(",")]);
+  }, [today, all.loading, prefsLoading, day, list.join(","), state, tick]);
   const mine = all.items.filter((c) => c.day === day);
   const byKind = (k: Kind) => mine.find((c) => c.id === cardId(day, k));
   return { all, prefs, kinds: today ? list : KINDS.filter((k) => byKind(k)), byKind, retry: (k: Kind) => runCard(cardId(day, k), k, day, all.items, prefs),
