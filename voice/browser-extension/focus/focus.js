@@ -1,5 +1,5 @@
 /*
- * Фокус — осознанный вход на отвлекающие сайты.
+ * Фокус — осознанный вход на отвлекающие сайты (YouTube, Инстаграм, Озон, Wildberries и свои из модуля).
  *
  *  - заход на сайт из списка без открытого сеанса → вкладка уходит на focus/gate.html: «Зачем пришёл?»,
  *    таймер и ожидание перед входом (растёт с каждым сеансом за день и в рабочее время);
@@ -18,6 +18,8 @@ const FOCUS_DEFAULTS = {
   sites: [
     { id: "youtube", name: "YouTube", hosts: ["youtube.com", "youtu.be"], on: true, clean: true, dailyMin: 60 },
     { id: "instagram", name: "Инстаграм", hosts: ["instagram.com"], on: true, clean: true, dailyMin: 30 },
+    { id: "ozon", name: "Озон", hosts: ["ozon.ru"], on: true, clean: false, dailyMin: 20 },
+    { id: "wildberries", name: "Wildberries", hosts: ["wildberries.ru", "wb.ru"], on: true, clean: false, dailyMin: 20 },
     { id: "vk", name: "ВКонтакте", hosts: ["vk.com", "vk.ru"], on: false, clean: false, dailyMin: 30 },
     { id: "tiktok", name: "TikTok", hosts: ["tiktok.com"], on: false, clean: false, dailyMin: 15 },
   ],

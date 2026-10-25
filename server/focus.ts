@@ -10,13 +10,16 @@ import { HUB_DIR } from "./paths.ts";
  * Настройки — kv "config" модуля modules/focus (формат — modules/focus/src/lib/types.ts, менять только вместе;
  * значения по умолчанию есть и у расширения, и у модуля). Сеансы — коллекция "sessions".
  * kv "extension" — когда расширение последний раз заходило (модуль показывает, подключено ли оно).
+ *
+ * Телефон — Фокус в приложении LifeHub (phone/android): те же настройки и сеансы через /api/app/focus/*
+ * (server/mobile.ts, вход токеном устройства). kv "phone" — когда телефон заходил.
  */
 
 export const FOCUS = "focus";
 /** Короткие задачки «Кругозора» (modules/horizon, kv "quick") — на экран ожидания. */
 const HORIZON = "horizon";
 
-let seenWritten = 0;
+const seenWritten: Record<string, number> = {};
 
 /** Где лежит расширение — модуль показывает путь в инструкции по установке. */
 export function startFocus() {
@@ -24,11 +27,12 @@ export function startFocus() {
 }
 
 /** Настройки для расширения (null — модуль ещё не сохранял, расширение берёт свои по умолчанию). */
-export function focusConfig(version: string) {
-  if (Date.now() - seenWritten > 60_000) {
-    seenWritten = Date.now();
-    db.setKv(FOCUS, "extension", { seenAt: seenWritten, version: version.slice(0, 20) });
-    emit({ type: "data", module: FOCUS, collection: "kv:extension", origin: "focus" });
+export function focusConfig(version: string, device: "pc" | "phone" = "pc") {
+  const key = device === "phone" ? "phone" : "extension";
+  if (Date.now() - (seenWritten[key] ?? 0) > 60_000) {
+    seenWritten[key] = Date.now();
+    db.setKv(FOCUS, key, { seenAt: seenWritten[key], version: version.slice(0, 20) });
+    emit({ type: "data", module: FOCUS, collection: `kv:${key}`, origin: "focus" });
   }
   return { config: db.getKv(FOCUS, "config") ?? null, puzzles: quickPuzzles() };
 }
@@ -74,6 +78,7 @@ export function acceptSessions(body: any) {
         endedBy: s.endedBy ? str(s.endedBy, 20) : null,
         waited: num(s.waited) ?? 0,
         titles: (Array.isArray(s.titles) ? s.titles : []).slice(0, 30).map((t: unknown) => str(t, 200)),
+        device: s.device === "phone" ? "phone" : "pc",
       },
       false,
     );

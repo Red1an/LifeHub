@@ -1,6 +1,7 @@
 /*
- * Фокус на самих сайтах (YouTube, Инстаграм):
- *  - «чистый режим» (галочка у сайта в модуле): без рекомендаций, Shorts, Reels и «Интересного»;
+ * Фокус на самих сайтах. Скрипт подключается ко всем https-страницам, но на чужих сразу затихает:
+ * работает только на сайтах из настроек «Фокуса» (YouTube, Инстаграм, Озон, Wildberries, свои).
+ *  - «чистый режим» (галочка у YouTube и Инстаграма): без рекомендаций, Shorts, Reels и «Интересного»;
  *  - плашка с оставшимся временем и целью сеанса; «Я всё» заканчивает сеанс раньше.
  */
 
@@ -8,8 +9,10 @@
   const host = location.hostname;
   const isYT = /(^|\.)youtube\.com$/.test(host);
   const isIG = /(^|\.)instagram\.com$/.test(host);
-  const siteId = isYT ? "youtube" : isIG ? "instagram" : null;
-  if (!siteId) return;
+  /** Сайт из настроек, чьи домены совпали с этой страницей (пока настроек нет — только YouTube и Инстаграм). */
+  let siteId = isYT ? "youtube" : isIG ? "instagram" : null;
+  const siteOf = (config) =>
+    config && config.sites ? config.sites.find((s) => s.on && s.hosts.some((h) => host === h || host.endsWith("." + h))) || null : null;
 
   const YT_CSS = `
     ytd-browse[page-subtype="home"] #primary,
@@ -87,20 +90,33 @@
 
   async function load() {
     const { config, sessions } = await chrome.storage.local.get(["config", "sessions"]);
-    const site = config && config.sites ? config.sites.find((s) => s.id === siteId) : null;
-    clean = site ? !!(site.on && site.clean) : true;
+    const site = siteOf(config);
+    if (config && config.sites) siteId = site ? site.id : null;
+    if (!siteId) {
+      applyClean(false);
+      session = null;
+      renderPill();
+      return false;
+    }
+    clean = (isYT || isIG) && (site ? !!site.clean : true);
     applyClean(clean);
     session = sessions && sessions[siteId] ? sessions[siteId] : null;
     redirects();
     renderPill();
+    return true;
   }
 
+  let ticking = false;
+  const start = (ours) => {
+    if (!ours || ticking) return;
+    ticking = true;
+    setInterval(() => {
+      redirects();
+      renderPill();
+    }, 1000);
+  };
   chrome.storage.onChanged.addListener((ch) => {
-    if (ch.config || ch.sessions) load();
+    if (ch.config || ch.sessions) load().then(start);
   });
-  load();
-  setInterval(() => {
-    redirects();
-    renderPill();
-  }, 1000);
+  load().then(start);
 })();

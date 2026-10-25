@@ -13,6 +13,10 @@ export interface Site {
   clean: boolean;
   /** Минут в день; дальше вход только на 5 минут и с долгим ожиданием. 0 — без лимита. */
   dailyMin: number;
+  /** Приложения Android (имена пакетов), которые на телефоне считаются этим сайтом. */
+  apps?: string[];
+  /** Добавлен вручную — можно удалить (встроенные только выключаются). */
+  custom?: boolean;
 }
 
 export interface FocusConfig {
@@ -35,10 +39,12 @@ export interface FocusConfig {
 export const DEFAULT_CONFIG: FocusConfig = {
   enabled: true,
   sites: [
-    { id: "youtube", name: "YouTube", hosts: ["youtube.com", "youtu.be"], on: true, clean: true, dailyMin: 60 },
-    { id: "instagram", name: "Инстаграм", hosts: ["instagram.com"], on: true, clean: true, dailyMin: 30 },
-    { id: "vk", name: "ВКонтакте", hosts: ["vk.com", "vk.ru"], on: false, clean: false, dailyMin: 30 },
-    { id: "tiktok", name: "TikTok", hosts: ["tiktok.com"], on: false, clean: false, dailyMin: 15 },
+    { id: "youtube", name: "YouTube", hosts: ["youtube.com", "youtu.be"], on: true, clean: true, dailyMin: 60, apps: ["com.google.android.youtube", "app.revanced.android.youtube", "app.rvx.android.youtube"] },
+    { id: "instagram", name: "Инстаграм", hosts: ["instagram.com"], on: true, clean: true, dailyMin: 30, apps: ["com.instagram.android", "com.instagram.lite"] },
+    { id: "ozon", name: "Озон", hosts: ["ozon.ru"], on: true, clean: false, dailyMin: 20, apps: ["ru.ozon.app.android"] },
+    { id: "wildberries", name: "Wildberries", hosts: ["wildberries.ru", "wb.ru"], on: true, clean: false, dailyMin: 20, apps: ["com.wildberries.ru"] },
+    { id: "vk", name: "ВКонтакте", hosts: ["vk.com", "vk.ru"], on: false, clean: false, dailyMin: 30, apps: ["com.vkontakte.android"] },
+    { id: "tiktok", name: "TikTok", hosts: ["tiktok.com"], on: false, clean: false, dailyMin: 15, apps: ["com.zhiliaoapp.musically", "com.ss.android.ugc.trill"] },
   ],
   waitSec: 15,
   waitStepSec: 15,
@@ -61,6 +67,8 @@ export interface Session {
   endedBy: "timer" | "self" | "closed" | null;
   waited: number;
   titles: string[];
+  /** Откуда: расширение на компьютере или приложение на телефоне (старые записи — без поля, это компьютер). */
+  device?: "pc" | "phone";
 }
 
 export interface Channel {
@@ -87,6 +95,12 @@ export interface Watched {
   channelTitle: string;
   topic: string;
   at: number;
+}
+
+/** Приложения, установленные на телефоне (присылает LifeHub) — чтобы выбрать их для сайта. */
+export interface PhoneApps {
+  at: number;
+  apps: { pkg: string; label: string }[];
 }
 
 export const DEFAULT_TOPICS = ["Обучение", "Научпоп", "Путешествия"];

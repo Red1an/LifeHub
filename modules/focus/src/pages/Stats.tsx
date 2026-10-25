@@ -88,7 +88,10 @@ function SessionRow({ s }: { s: Session & { id: string } }) {
     <div className="py-3">
       <div className="flex items-baseline justify-between gap-3">
         <div className="min-w-0">
-          <span className="text-muted">{s.siteName} · </span>
+          <span className="text-muted">
+            {s.device === "phone" ? "📱 " : ""}
+            {s.siteName} ·{" "}
+          </span>
           <span className="font-medium">«{s.purpose || "без цели"}»</span>
         </div>
         <div className="flex-none text-sm tabular-nums">{fmtMin(sessionMin(s))}</div>

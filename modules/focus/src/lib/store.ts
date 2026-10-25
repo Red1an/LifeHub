@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useCollection, useStore, startOfDay, startOfWeek, addDays, dayKey } from "@lifehub/sdk";
-import { DEFAULT_CONFIG, DEFAULT_TOPICS, type Channel, type FocusConfig, type Session, type Video, type Watched } from "./types";
+import { DEFAULT_CONFIG, DEFAULT_TOPICS, type Channel, type FocusConfig, type PhoneApps, type Session, type Video, type Watched } from "./types";
 
 type Plain = Omit<FocusConfig, "pending">;
 
@@ -20,6 +20,7 @@ export function isLooser(a: Plain, b: Plain): boolean {
     if (s.clean && !t.clean) return true;
     if (s.dailyMin > 0 && (t.dailyMin === 0 || t.dailyMin > s.dailyMin)) return true;
     if (s.hosts.some((h) => !t.hosts.includes(h))) return true;
+    if ((s.apps ?? []).some((a) => !(t.apps ?? []).includes(a))) return true;
   }
   if (b.waitSec < a.waitSec || b.waitStepSec < a.waitStepSec) return true;
   if (maxOf(b.minutes) > maxOf(a.minutes)) return true;
@@ -54,6 +55,31 @@ export function useConfig() {
       setStored({ ...next, pending: null });
     }
   }, [loading, ripe]);
+  // Новые встроенные сайты (Озон, Wildberries…) и приложения к старым — дописать в сохранённые настройки.
+  // Это только ужесточает, поэтому сразу.
+  const upgrade = (c: Omit<FocusConfig, "pending">) => {
+    let changed = false;
+    const sites = c.sites.map((s) => {
+      const d = DEFAULT_CONFIG.sites.find((x) => x.id === s.id);
+      if (d?.apps && !s.apps) {
+        changed = true;
+        return { ...s, apps: d.apps };
+      }
+      return s;
+    });
+    for (const d of DEFAULT_CONFIG.sites)
+      if (!sites.some((s) => s.id === d.id)) {
+        sites.push(d);
+        changed = true;
+      }
+    return changed ? { ...c, sites } : null;
+  };
+  useEffect(() => {
+    if (loading || !stored) return;
+    const base = upgrade(raw);
+    const pend = raw.pending ? upgrade(raw.pending) : null;
+    if (base || pend) setStored({ ...(base ?? raw), pending: raw.pending ? { ...(pend ?? raw.pending), applyAt: raw.pending.applyAt } : null });
+  }, [loading, stored]);
   const config: Plain = ripe && raw.pending ? (({ applyAt: _a, ...rest }) => rest)(raw.pending) : strip(raw);
   const pending = !ripe && raw.pending ? raw.pending : null;
   /** То, что видно в настройках: ждущее изменение или действующее. */
@@ -89,6 +115,8 @@ export const useWatched = () => useCollection<Watched>("watched");
 export const useTopics = () => useStore<string[]>("topics", DEFAULT_TOPICS);
 export const useFeedCache = () => useStore<{ at: number; videos: Video[]; failed: string[] } | null>("feed", null);
 export const useExtension = () => useStore<{ seenAt: number; version: string } | null>("extension", null);
+export const usePhone = () => useStore<{ seenAt: number; version: string } | null>("phone", null);
+export const usePhoneApps = () => useStore<PhoneApps | null>("phoneApps", null);
 export const useInstall = () => useStore<{ extensionPath: string } | null>("install", null);
 
 /** Длительность сеанса в минутах (идущий — по сей момент). */

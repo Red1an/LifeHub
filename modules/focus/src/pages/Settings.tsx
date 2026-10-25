@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Page, Section, Card, Button, Input, Switch, Field, Badge, toast, cn } from "@lifehub/sdk";
-import { pauseState, useConfig, useExtension, useInstall } from "../lib/store";
+import { Page, Section, Card, Button, Input, Switch, Field, Badge, Link, Select, toast, cn } from "@lifehub/sdk";
+import { pauseState, useConfig, useExtension, useInstall, usePhone, usePhoneApps } from "../lib/store";
 import type { FocusConfig, Site } from "../lib/types";
 
 type Plain = Omit<FocusConfig, "pending">;
@@ -32,6 +32,7 @@ export function Settings() {
   return (
     <Page title="Настройки" subtitle="Ужесточить — сразу. Ослабить — только через задержку." width="normal">
       <ExtensionCard />
+      <PhoneCard />
 
       {pending && (
         <Card className="mb-6 border-warning/40 bg-warning/10">
@@ -49,37 +50,7 @@ export function Settings() {
 
       <PauseCard config={config} now={now} setPause={setPause} />
 
-      <Section title="Сайты">
-        <div className="space-y-3">
-          {draft.sites.map((s) => (
-            <Card key={s.id} padding="sm">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-medium">{s.name}</div>
-                  <div className="truncate text-xs text-muted">{s.hosts.join(", ")}</div>
-                </div>
-                <Switch checked={s.on} onChange={(v) => setSite(s.id, { on: v })} />
-              </div>
-              {s.on && (
-                <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-line pt-3">
-                  <label className="flex items-center gap-2 text-sm">
-                    Лимит в день
-                    <NumberInput value={s.dailyMin} onChange={(v) => setSite(s.id, { dailyMin: v })} />
-                    мин
-                  </label>
-                  {(s.id === "youtube" || s.id === "instagram") && (
-                    <Switch
-                      checked={s.clean}
-                      onChange={(v) => setSite(s.id, { clean: v })}
-                      label={s.id === "youtube" ? "Без рекомендаций и Shorts" : "Без Reels и «Интересного»"}
-                    />
-                  )}
-                </div>
-              )}
-            </Card>
-          ))}
-        </div>
-      </Section>
+      <SitesSection draft={draft} set={set} setSite={setSite} />
 
       <Section title="Вход">
         <Card className="space-y-4">
@@ -129,6 +100,129 @@ export function Settings() {
         </Card>
       </Section>
     </Page>
+  );
+}
+
+/** Сайты и приложения под защитой: встроенные (включить/выключить) и свои (добавить/удалить). */
+function SitesSection({ draft, set, setSite }: { draft: Plain; set: (p: Partial<Plain>) => void; setSite: (id: string, p: Partial<Site>) => void }) {
+  const [phoneApps] = usePhoneApps();
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [hosts, setHosts] = useState("");
+  const [apps, setApps] = useState<string[]>([]);
+  const label = (pkg: string) => phoneApps?.apps.find((a) => a.pkg === pkg)?.label ?? pkg;
+  const parseHosts = (t: string) =>
+    [...new Set(t.split(/[\s,;]+/).map((h) => h.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "")).filter((h) => h.includes(".")))];
+
+  function addSite() {
+    const n = name.trim();
+    const h = parseHosts(hosts);
+    if (!n || (!h.length && !apps.length)) return toast("Нужно название и сайт или приложение", "error");
+    const id = "c-" + Date.now().toString(36);
+    set({ sites: [...draft.sites, { id, name: n, hosts: h, on: true, clean: false, dailyMin: 20, apps, custom: true }] });
+    setAdding(false);
+    setName("");
+    setHosts("");
+    setApps([]);
+    toast(`«${n}» под защитой`, "success");
+  }
+
+  return (
+    <Section title="Сайты и приложения">
+      <div className="space-y-3">
+        {draft.sites.map((s) => (
+          <Card key={s.id} padding="sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-medium">{s.name}</div>
+                <div className="truncate text-xs text-muted">
+                  {[s.hosts.join(", "), (s.apps ?? []).length ? `📱 ${(s.apps ?? []).map(label).join(", ")}` : ""].filter(Boolean).join(" · ")}
+                </div>
+              </div>
+              <Switch checked={s.on} onChange={(v) => setSite(s.id, { on: v })} />
+            </div>
+            {s.on && (
+              <div className="mt-3 space-y-3 border-t border-line pt-3">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                  <label className="flex items-center gap-2 text-sm">
+                    Лимит в день
+                    <NumberInput value={s.dailyMin} onChange={(v) => setSite(s.id, { dailyMin: v })} />
+                    мин
+                  </label>
+                  {(s.id === "youtube" || s.id === "instagram") && (
+                    <Switch
+                      checked={s.clean}
+                      onChange={(v) => setSite(s.id, { clean: v })}
+                      label={s.id === "youtube" ? "Без рекомендаций и Shorts" : "Без Reels и «Интересного»"}
+                    />
+                  )}
+                </div>
+                <AppsPicker value={s.apps ?? []} onChange={(v) => setSite(s.id, { apps: v })} />
+                {s.custom && (
+                  <Button size="sm" variant="ghost" onClick={() => set({ sites: draft.sites.filter((x) => x.id !== s.id) })}>
+                    Удалить
+                  </Button>
+                )}
+              </div>
+            )}
+          </Card>
+        ))}
+        {adding ? (
+          <Card className="space-y-3">
+            <Field label="Название">
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Например: Авито" />
+            </Field>
+            <Field label="Сайты" hint="Через запятую: avito.ru, m.avito.ru — поддомены считаются сами">
+              <Input value={hosts} onChange={(e) => setHosts(e.target.value)} placeholder="avito.ru" />
+            </Field>
+            <AppsPicker value={apps} onChange={setApps} />
+            <div className="flex gap-2">
+              <Button onClick={addSite}>Добавить</Button>
+              <Button variant="ghost" onClick={() => setAdding(false)}>
+                Отмена
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          <Button variant="secondary" onClick={() => setAdding(true)}>
+            + Свой сайт или приложение
+          </Button>
+        )}
+      </div>
+    </Section>
+  );
+}
+
+/** Приложения на телефоне для сайта: выбрать из установленных (их список присылает LifeHub). */
+function AppsPicker({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const [phoneApps] = usePhoneApps();
+  const label = (pkg: string) => phoneApps?.apps.find((a) => a.pkg === pkg)?.label ?? pkg;
+  const installed = new Set(phoneApps?.apps.map((a) => a.pkg) ?? []);
+  // Показываем только то, что стоит на телефоне (если список уже пришёл), остальное — в подсказке.
+  const shown = phoneApps ? value.filter((p) => installed.has(p)) : value;
+  const options = (phoneApps?.apps ?? []).filter((a) => !value.includes(a.pkg));
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-muted">📱 На телефоне:</span>
+      {shown.map((p) => (
+        <span key={p} className="inline-flex items-center gap-1 rounded-full bg-surface-2 py-1 pl-3 pr-1">
+          {label(p)}
+          <button className="rounded-full px-1.5 text-muted hover:text-fg" aria-label="Убрать" onClick={() => onChange(value.filter((x) => x !== p))}>
+            ✕
+          </button>
+        </span>
+      ))}
+      {phoneApps ? (
+        <Select
+          className="w-48 !py-1"
+          value=""
+          onChange={(e) => e.target.value && onChange([...value, e.target.value])}
+          options={[{ value: "", label: "+ приложение…" }, ...options.map((a) => ({ value: a.pkg, label: a.label }))]}
+        />
+      ) : (
+        <span className="text-xs text-muted">{shown.length ? "" : "нет — "}список приложений появится, когда подключишь LifeHub на телефоне</span>
+      )}
+    </div>
   );
 }
 
@@ -216,6 +310,33 @@ function ExtensionCard() {
         {ext && <p className="text-xs">Последний раз было на связи {new Date(ext.seenAt).toLocaleString("ru")}. Хаб должен быть запущен — без него расширение работает по последним настройкам.</p>}
       </div>
     </Card>
+  );
+}
+
+/** Фокус на телефоне — в приложении LifeHub (phone/android): подключается в настройках хаба. */
+function PhoneCard() {
+  const [phone] = usePhone();
+  const connected = !!phone && Date.now() - phone.seenAt < 60 * 60_000;
+  return (
+    <Section title="Телефон">
+      <Card className="text-sm">
+        {phone ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={connected ? "success" : "neutral"}>{connected ? "Телефон на связи" : "Телефон подключён"}</Badge>
+            <span className="text-muted">последний раз {new Date(phone.seenAt).toLocaleString("ru")}</span>
+          </div>
+        ) : (
+          <p className="text-muted">
+            На телефоне Фокус встроен в приложение LifeHub: тот же «Зачем пришёл?» перед YouTube и Инстой — в приложениях и в браузере,
+            работает и без связи.{" "}
+            <Link to="~/settings" className="text-accent underline">
+              Подключить телефон
+            </Link>{" "}
+            — в настройках хаба, раздел «Приложение на телефоне».
+          </p>
+        )}
+      </Card>
+    </Section>
   );
 }
 
