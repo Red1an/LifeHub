@@ -21,6 +21,9 @@
     Интерфейс — модуль `modules/jarvis`; связь с ним через его данные (kv `config`/`status`/`voice`/`action`, коллекция `chat`).
   - `focus.ts` — «Фокус» (модуль `modules/focus`): настройки и журнал сеансов для того же расширения
     (`voice/browser-extension/focus/` — «Зачем пришёл?», таймер, YouTube без рекомендаций).
+  - `devpath/` — проверка практики DevPath (модуль `modules/devpath`): большие проекты по этапам (тесты хаба + Docker-инфраструктура),
+    миссии и каты — всё в `~/DevPath/<id>` через `dotnet test` (`runner.ts`, разбор TRX и ошибок сборки), запросы — через
+    коллекцию `runs` модуля (`index.ts`). `node server/devpath/verify.ts` — проверка самих этапов, миссий и кат.
 - `voice/` — голос Джарвиса на Python (`.venv` ставит хаб): `main.py` — цикл, `stt.py` GigaAM/Whisper, `tts.py` Piper/Silero,
   `speaker.py` — голос владельца (WeSpeaker), `echo.py` — не просыпаться от своих колонок,
   `ui.py` + `ui/orb.html` — орб, панель и трей (pywebview). Модели — в `~/.lifehub/voice/models`.

@@ -65,7 +65,7 @@ export function ReviewPage() {
   if (finished || !card) {
     return (
       <Screen>
-        <Header title="🔁 Повторение" back="/" />
+        <Header title="🔁 Повторение" back="/learn" />
         <Panel glow className="dp-pop py-10 text-center">
           <div className="text-7xl">{stats.done ? "🧠" : "🌿"}</div>
           <div className="mt-3 text-2xl font-extrabold">{stats.done ? "Память прокачана!" : "На сегодня всё повторено"}</div>
@@ -76,7 +76,7 @@ export function ReviewPage() {
           )}
           {!stats.done && <div className="mt-1 text-sm text-[var(--dp-muted)]">Начни новые темы — их карточки попадут сюда. Или сгенерируй карточки из урока.</div>}
           <div className="mt-6 flex justify-center gap-2">
-            <Link to="/" className="dp-btn dp-btn-primary">К заданиям</Link>
+            <Link to="/learn" className="dp-btn dp-btn-primary">К заданиям</Link>
             <Link to="/blitz" className="dp-btn dp-btn-ghost">⏱️ Блиц</Link>
           </div>
         </Panel>
@@ -91,7 +91,7 @@ export function ReviewPage() {
   return (
     <Screen>
       <div className="mb-4 flex items-center gap-3">
-        <Link to="/" className="text-2xl text-[var(--dp-muted)]">✕</Link>
+        <Link to="/learn" className="text-2xl text-[var(--dp-muted)]">✕</Link>
         <Bar value={stats.done / total} className="flex-1" color="linear-gradient(90deg,#8b5cf6,#22d3ee)" />
         <div className="text-sm text-[var(--dp-muted)]">{q.length}</div>
       </div>

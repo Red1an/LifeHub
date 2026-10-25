@@ -15,6 +15,7 @@ import { formatEsbuildError } from "./libs.ts";
 import { setPassword } from "./auth.ts";
 import { startNgrok } from "./ngrok.ts";
 import { startJarvis } from "./jarvis/index.ts";
+import { startDevpath } from "./devpath/index.ts";
 import { supervise, isSupervised, EXIT_PORT_BUSY, enableAutostart, disableAutostart, autostartEnabled } from "./system.ts";
 
 const run = promisify(execFile);
@@ -94,6 +95,7 @@ async function start(args: string[]) {
       console.log(`  Данные:  ${HOME}\n`);
       startNgrok(port, useHttps);
       startJarvis({ port, https: useHttps });
+      startDevpath();
     },
   );
   // Порт занят: либо хаб уже работает (в фоне), либо предыдущий процесс ещё не освободил порт.

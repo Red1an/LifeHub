@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { defineModule, Link, cn, type ModuleSummary } from "@lifehub/sdk";
+import { defineModule, Link, cn, useCollection, type ModuleSummary } from "@lifehub/sdk";
 import "./styles.css";
 import { Today } from "./pages/Today.tsx";
 import { MapPage, TrackPage } from "./pages/Map.tsx";
@@ -13,8 +13,13 @@ import { ProfilePage, useSound } from "./pages/Profile.tsx";
 import { TestPage, MistakesPage, MixedPage, PlacementPage } from "./pages/Training.tsx";
 import { ProjectsPage, ProjectPage } from "./pages/Projects.tsx";
 import { GoalPage } from "./pages/Goal.tsx";
+import { WorkshopPage } from "./pages/Workshop.tsx";
+import { MissionPage } from "./pages/Mission.tsx";
+import { KatasPage, KataPage } from "./pages/Kata.tsx";
+import { ProjectHome, StagePage } from "./pages/Project.tsx";
+import { BUILD_PROJECTS } from "./data/projects-build.ts";
+import type { BuildState } from "./lib/types.ts";
 import { useDev } from "./lib/store.ts";
-import { ALL_TOPICS, topicById } from "./data/curriculum.ts";
 
 function Layout({ children }: { children: ReactNode }) {
   useSound();
@@ -51,20 +56,26 @@ function Widget() {
   );
 }
 
-/** Сводка для главной хаба: сколько тем пройдено и что изучается сейчас. */
+/** Сводка для главной хаба: этап проекта. */
 function useSummary(): ModuleSummary | null {
-  const dev = useDev();
-  if (dev.loading) return null;
-  const items = dev.topics.items;
-  const done = items.filter((t) => t.status === "done").length;
-  const current = items.filter((t) => t.status === "learning").sort((a, b) => b.updatedAt - a.updatedAt)[0];
-  const title = current && topicById(current.id)?.title;
-  return { value: `${done}/${ALL_TOPICS.length}`, text: title ? `сейчас: ${title}` : "тем пройдено" };
+  const builds = useCollection<BuildState>("builds");
+  if (builds.loading) return null;
+  const p = BUILD_PROJECTS[0];
+  const state = builds.items.find((b) => b.id === p.id);
+  const n = state?.stage ?? 1;
+  const title = p.roadmap.find((r) => r.n === n)?.title;
+  return { value: `${state?.finished.length ?? 0}/${p.roadmap.length}`, text: state ? `${p.title}: ${title}` : `${p.title}: не начат` };
 }
 
 export default defineModule({
   routes: {
-    "/": Today,
+    "/": ProjectHome,
+    "/build/:project/:n": StagePage,
+    "/train": WorkshopPage,
+    "/learn": Today,
+    "/mission/:id": MissionPage,
+    "/katas": KatasPage,
+    "/kata/:id": KataPage,
     "/map": MapPage,
     "/track/:id": TrackPage,
     "/topic/:id": TopicPage,
@@ -86,13 +97,12 @@ export default defineModule({
     "/projects": ProjectsPage,
     "/project/:id": ProjectPage,
     "/goal": GoalPage,
-    "*": Today,
+    "*": ProjectHome,
   },
   nav: [
-    { to: "/", label: "Сегодня", icon: "🎯" },
-    { to: "/map", label: "Карта", icon: "🗺️" },
-    { to: "/arena", label: "Арена", icon: "⚔️" },
-    { to: "/mentor", label: "Наставник", icon: "💬" },
+    { to: "/", label: "Проект", icon: "🏗️" },
+    { to: "/train", label: "Тренировка", icon: "🎯" },
+    { to: "/map", label: "Справочник", icon: "📚" },
     { to: "/profile", label: "Профиль", icon: "👤" },
   ],
   widgets: {

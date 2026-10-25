@@ -165,7 +165,7 @@ function LessonResult({ id, result, onAgain }: { id: string; result: PlayerResul
       </Panel>
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
         <Link to={`/practice/${id}`} className="dp-btn dp-btn-primary">🛠️ Практика</Link>
-        <Link to="/" className="dp-btn dp-btn-ghost">🎯 К заданиям дня</Link>
+        <Link to="/learn" className="dp-btn dp-btn-ghost">🎯 К заданиям дня</Link>
         <button className="dp-btn dp-btn-ghost" onClick={onAgain}>↻ Ещё раз</button>
       </div>
     </div>

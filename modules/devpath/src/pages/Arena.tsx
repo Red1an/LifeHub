@@ -127,7 +127,7 @@ function SingleChallenge({ kind }: { kind: "bug" | "question" }) {
           <div className="mt-6 grid gap-2 sm:grid-cols-2">
             <Btn onClick={() => setN(n + 1)}>{kind === "bug" ? "🐞 Ещё баг" : "🎤 Ещё вопрос"}</Btn>
             <Btn tone="ghost" onClick={() => nav(`/${kind}/${randomTopic(dev).id}`)}>🎲 Другая тема</Btn>
-            <Link to="/" className="dp-btn dp-btn-ghost">🎯 К заданиям дня</Link>
+            <Link to="/learn" className="dp-btn dp-btn-ghost">🎯 К заданиям дня</Link>
             <Link to={`/topic/${id}`} className="dp-btn dp-btn-ghost">📖 К теме</Link>
           </div>
         </div>

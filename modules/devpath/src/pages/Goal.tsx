@@ -25,7 +25,7 @@ export function GoalPage() {
 
   return (
     <Screen>
-      <Header title="🧭 Моя цель" subtitle={goal.title} back="/" right={<Btn tone="ghost" className="!min-h-9 !px-3 text-sm" onClick={() => setEditing(true)}>Изменить</Btn>} />
+      <Header title="🧭 Моя цель" subtitle={goal.title} back="/learn" right={<Btn tone="ghost" className="!min-h-9 !px-3 text-sm" onClick={() => setEditing(true)}>Изменить</Btn>} />
 
       <Panel glow className="mb-4">
         <div className="flex items-center gap-4">

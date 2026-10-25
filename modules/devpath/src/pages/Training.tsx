@@ -105,7 +105,7 @@ export function MistakesPage() {
           <p className="mb-4 text-sm text-[var(--dp-muted)]">Вопрос считается исправленным после двух верных ответов. Осталось: {dev.openMistakes.length}</p>
           <div className="grid gap-2 sm:grid-cols-2">
             {dev.openMistakes.length > 0 && <Btn onClick={() => { setDone(null); setRun(run + 1); }}>Ещё подход</Btn>}
-            <Link to="/" className="dp-btn dp-btn-ghost">К заданиям дня</Link>
+            <Link to="/learn" className="dp-btn dp-btn-ghost">К заданиям дня</Link>
           </div>
         </Result>
       </Screen>
@@ -114,7 +114,7 @@ export function MistakesPage() {
   if (!batch.length) {
     return (
       <Screen>
-        <Header title="🩹 Работа над ошибками" back="/" />
+        <Header title="🩹 Работа над ошибками" back="/learn" />
         <Panel className="py-8 text-center">
           <div className="text-6xl">✨</div>
           <div className="mt-2 font-bold">Ошибок нет</div>
@@ -158,7 +158,7 @@ export function MixedPage() {
         <Result title="Смешанная тренировка" r={done.r} xp={done.xp}>
           <div className="grid gap-2 sm:grid-cols-2">
             <Btn onClick={() => { setDone(null); setRun(run + 1); }}>↻ Ещё 10 вопросов</Btn>
-            <Link to="/" className="dp-btn dp-btn-ghost">К заданиям дня</Link>
+            <Link to="/learn" className="dp-btn dp-btn-ghost">К заданиям дня</Link>
           </div>
         </Result>
       </Screen>

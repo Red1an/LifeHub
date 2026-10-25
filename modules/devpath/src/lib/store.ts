@@ -8,7 +8,7 @@ import { contentFor } from "./content.ts";
 import { computeRoadmap, type Goal } from "./roadmap.ts";
 import {
   DEFAULT_SETTINGS, type ActivityKind, type Card, type DayPlan, type LogEntry, type Mistake, type ProjectState, type Settings, type Step,
-  type TopicState, type Watched,
+  type TopicState, type Watched, type KataState, type MissionState,
 } from "./types.ts";
 
 export const topicsDb = db.collection<TopicState>("topics");
@@ -54,6 +54,8 @@ export function useDev() {
   const cards = useCollection<Card>("cards");
   const log = useCollection<LogEntry>("log");
   const mistakes = useCollection<Mistake>("mistakes");
+  const missions = useCollection<MissionState>("missions");
+  const katas = useCollection<KataState>("katas");
   const [settings] = useSettings();
   const [goal, , goalMeta] = useStore<Goal | null>("roadmap", null);
 
@@ -70,6 +72,8 @@ export function useDev() {
       cards,
       log,
       mistakes,
+      missions,
+      katas,
       openMistakes: mistakes.items.filter((m) => !m.resolved),
       goal,
       roadmap: goal ? computeRoadmap(goal, topicMap) : null,
@@ -84,9 +88,9 @@ export function useDev() {
       due,
       fresh,
       learned: cards.items.filter(isLearned).length,
-      loading: topics.loading || cards.loading || log.loading || mistakes.loading || goalMeta.loading,
+      loading: topics.loading || cards.loading || log.loading || mistakes.loading || missions.loading || katas.loading || goalMeta.loading,
     };
-  }, [topics, cards, log, mistakes, settings, goal, goalMeta.loading]);
+  }, [topics, cards, log, mistakes, missions, katas, settings, goal, goalMeta.loading]);
 }
 
 export type Dev = ReturnType<typeof useDev>;

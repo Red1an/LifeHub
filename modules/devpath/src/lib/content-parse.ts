@@ -20,7 +20,7 @@ export interface TopicContent {
   reading: string[];
 }
 
-function parseQuestion(block: string[]): Step | null {
+export function parseQuestion(block: string[]): Step | null {
   const head: string[] = [];
   const options: { text: string; ok: boolean }[] = [];
   const order: string[] = [];

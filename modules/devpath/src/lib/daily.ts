@@ -5,6 +5,8 @@ import { nextTopicOf, type Dev } from "./store.ts";
 import { contentFor, hasContent } from "./content.ts";
 import type { Quest } from "./types.ts";
 import { nextGoalTopic } from "./roadmap.ts";
+import { kataOfDay, missionXp } from "./workshop.ts";
+import { MISSIONS } from "../data/workshop.ts";
 
 /** Детерминированный «случай» на день, чтобы план не прыгал при перерисовке. */
 function rng(seed: string) {
@@ -19,7 +21,8 @@ function rng(seed: string) {
 
 /**
  * План дня по принципам науки об обучении:
- * повторение по кривой забывания → новый материал → видео → активное вспоминание (тест/ошибки/смешанная) → практика.
+ * практика (миссия и ката из Мастерской) → повторение по кривой забывания → новый материал → видео →
+ * активное вспоминание (тест/ошибки/смешанная) → практика по теории.
  */
 export function buildPlan(dev: Dev, date = dayKey()): Quest[] {
   const r = rng(date);
@@ -29,6 +32,20 @@ export function buildPlan(dev: Dev, date = dayKey()): Quest[] {
   const weekend = [0, 6].includes(new Date(date).getDay());
   const quests: Quest[] = [];
   const pick = <T,>(a: T[]) => a[Math.floor(r() * a.length)];
+
+  // 0. Мастерская: продолжить миссию (или взять следующую) и ката руками
+  const active = dev.missions.items.filter((m) => m.stage !== "done").sort((a, b) => b.updatedAt - a.updatedAt)[0];
+  const mission = MISSIONS.find((m) => m.id === active?.id) ?? MISSIONS.find((m) => !dev.missions.items.some((x) => x.id === m.id));
+  if (mission) {
+    quests.push({
+      id: "mission", kind: "mission", icon: mission.icon, title: `Миссия: ${mission.title}`,
+      subtitle: active ? "продолжи: проверь гипотезу тестами" : mission.skills, xp: active ? 15 : missionXp(mission, 0), to: `/mission/${mission.id}`,
+    });
+  }
+  const kata = kataOfDay(new Map(dev.katas.items.map((k) => [k.id, k])), date);
+  if (kata) {
+    quests.push({ id: "kata", kind: "kata", icon: "⌨️", title: `Ката: ${kata.title}`, subtitle: `~${kata.minutes} мин · код руками, без подсказок`, xp: 30, to: `/kata/${kata.id}` });
+  }
 
   // 1. Повторение карточек
   const reviewCount = dev.due.length + dev.fresh.length;
@@ -94,5 +111,5 @@ export function buildPlan(dev: Dev, date = dayKey()): Quest[] {
     if (ready) quests.push({ id: "boss", kind: "boss", icon: "👹", title: `Босс: ${ready.title}`, subtitle: "Экзамен по пройденным темам", xp: 100, to: `/boss/${ready.id}` });
   }
 
-  return quests.slice(0, 6);
+  return quests.slice(0, 8);
 }

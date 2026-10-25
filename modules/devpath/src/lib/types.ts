@@ -52,7 +52,7 @@ export interface Card {
 
 export type ActivityKind =
   | "lesson" | "review" | "practice" | "bug" | "blitz" | "boss" | "interview" | "question" | "cards"
-  | "test" | "video" | "mistakes" | "mixed" | "placement" | "project";
+  | "test" | "video" | "mistakes" | "mixed" | "placement" | "project" | "mission" | "kata" | "build";
 
 /** Коллекция log: всё, за что начислен опыт. */
 export interface LogEntry {
@@ -151,3 +151,132 @@ export const DEFAULT_SETTINGS: Settings = {
   newCards: 10,
   about: "",
 };
+
+/* ───────────── Мастерская: миссии и каты (проверяет хаб, server/devpath) ───────────── */
+
+export interface TestCase {
+  name: string;
+  ok: boolean;
+  message?: string;
+  /** Сборка с тестом: Hub.Tests — тесты хаба, остальные — свои тесты ученика. */
+  source?: string;
+}
+
+export interface BuildError {
+  file: string;
+  line: number;
+  code: string;
+  message: string;
+}
+
+/** Результат прогона тестов хабом (формат — server/devpath/runner.ts). */
+export interface RunResult {
+  ok: boolean;
+  built: boolean;
+  passed: number;
+  total: number;
+  tests: TestCase[];
+  errors: BuildError[];
+  output?: string;
+  ms: number;
+}
+
+/** Коллекция runs: запросы к хабу. Модуль добавляет kind и цель, хаб дописывает статус и результат. */
+export interface Run {
+  kind: "start" | "check" | "diff" | "open" | "reset" | "kata" | "env" | "snapshot";
+  /** diff: с какого коммита; snapshot: сообщение коммита. */
+  since?: string;
+  message?: string;
+  commit?: string;
+  mission?: string;
+  project?: string;
+  /** Для проекта: до какого этапа гонять тесты. */
+  stage?: number;
+  kata?: string;
+  code?: string;
+  file?: string;
+  line?: number;
+  status?: "running" | "done" | "error";
+  result?: RunResult;
+  path?: string;
+  diff?: string;
+  error?: string;
+}
+
+/** kv env: окружение компьютера с хабом. */
+export interface WorkshopEnv {
+  dir: string;
+  dotnet: string | null;
+  git: string | null;
+  code: string | null;
+  checkedAt: number;
+}
+
+/** Коллекция missions, id = id миссии. */
+export interface MissionState {
+  stage: "work" | "debrief" | "done";
+  hypothesis: string;
+  /** Сколько подсказок открыто. */
+  hints: number;
+  checks: number;
+  /** День последней проверки: первая проверка за день даёт немного опыта и закрывает задание дня. */
+  lastCheckDay?: string;
+  path?: string;
+  last?: RunResult & { at: number };
+  /** Первый раз все тесты зелёные. */
+  solvedAt?: number;
+  doneAt?: number;
+  quiz?: number;
+  /** Что понял — своими словами после разбора. */
+  takeaway?: string;
+  review?: string;
+  startedAt: number;
+}
+
+/** Коллекция katas, id = id каты. */
+export interface KataState {
+  code: string;
+  attempts: number;
+  last?: RunResult & { at: number };
+  solvedAt?: number;
+  /** Лучшее время решения в секундах (от первого ввода до зелёных тестов). */
+  best?: number;
+  /** Начало текущей попытки. */
+  startedAt?: number;
+  /** Подсмотрел эталон до решения. */
+  peeked?: boolean;
+}
+
+/** Коллекция builds: большой проект, id = id проекта (projects/<id>). Ключи словарей — номер этапа. */
+export interface BuildState {
+  /** Открытый этап: до него всё пройдено. */
+  stage: number;
+  /** Этапы, на которых все тесты зелёные. */
+  passed: number[];
+  /** Этапы, где пройден и разбор (опыт начислен). */
+  finished: number[];
+  design: Record<string, string>;
+  hints: Record<string, number>;
+  takeaways: Record<string, string>;
+  quiz: Record<string, number>;
+  checks: number;
+  lastCheckDay?: string;
+  last?: RunResult & { at: number; stage: number };
+  path?: string;
+  startedAt: number;
+  /** Коммит-снимок начала этапа: от него считается diff этапа для ревью и защиты. */
+  startCommit?: Record<string, string>;
+  /** Открытые этапы: оценка дизайн-документа архитектором (нужно ≥ 7, чтобы писать код). */
+  designReview?: Record<string, Graded>;
+  /** Обязательное ревью кода этапа (нужно ≥ 7). */
+  reviews?: Record<string, Graded>;
+  /** Защита этапа: разговор с интервьюером и итоговая оценка (нужно ≥ 7). */
+  defense?: Record<string, { messages: ChatMsg[]; score?: number; at: number }>;
+}
+
+/** Оценка нейронкой: 0–10 и текст разбора. */
+export interface Graded {
+  score: number;
+  text: string;
+  at: number;
+}

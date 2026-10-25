@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/Exchange.Api/Exchange.Api.csproj" />
+  <Project Path="tests/Exchange.Tests/Exchange.Tests.csproj" />
+  <Project Path="hub/Hub.Tests.csproj" />
+</Solution>

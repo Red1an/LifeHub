@@ -5422,7 +5422,7 @@ export const VIDEOS: Record<string, { ru: Video[]; en: Video[] }> = {
     "t": "Разработка и проектирование высоконагруженных систем (часть 1) / Олег Бунин (Онтико)",
     "c": "HighLoad Channel",
     "d": "1:22:05",
-    "v": 56379
+    "v": 16379
    },
    {
     "id": "lqfrYlMMaA8",

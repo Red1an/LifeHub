@@ -1,7 +1,7 @@
 import { Link, Loading, useParams, cn, toast } from "@lifehub/sdk";
 import { TRACKS, trackById, LEVEL_NAMES } from "../data/curriculum.ts";
 import { useDev, useSettings } from "../lib/store.ts";
-import { Screen, Header, Panel, Ring, Pill, Bar } from "../components/kit.tsx";
+import { Screen, Header, Panel, Ring, Pill, Bar, Tile } from "../components/kit.tsx";
 
 export function MapPage() {
   const dev = useDev();
@@ -11,12 +11,19 @@ export function MapPage() {
   const toggleFocus = (id: string) => {
     const has = settings.focus.includes(id);
     setSettings({ ...settings, focus: has ? settings.focus.filter((x) => x !== id) : [...settings.focus, id] });
-    toast(has ? "Убрано из фокуса" : "Добавлено в фокус: уроки будут в заданиях дня", "success");
+    toast(has ? "Убрано из фокуса" : "Добавлено в фокус: уроки будут в «Теории дня»", "success");
   };
 
   return (
     <Screen wide>
-      <Header title="Карта знаний" subtitle="⭐ — треки в фокусе: из них собираются уроки дня" />
+      <Header title="📚 Справочник" subtitle="Вся теория по темам. Из этапов проекта и миссий сюда ведут ссылки — читать подряд не обязательно." />
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Tile to="/review" icon="🔁" title="Карточки" text={`${dev.due.length} к повторению · ${dev.fresh.length} новых`} color="#8b5cf6" />
+        <Tile to="/mistakes" icon="🩹" title="Ошибки" text={`${dev.openMistakes.length} вопросов разобрать`} color="#f87171" />
+        <Tile to="/mentor" icon="💬" title="Наставник" text="Спросить что угодно" color="#22d3ee" />
+        <Tile to="/learn" icon="🎯" title="Теория дня" text="Уроки, тесты, видео" color="#34d399" />
+      </div>
+      <div className="mb-2 text-xs text-[var(--dp-muted)]">⭐ — треки в фокусе: из них собирается «Теория дня»</div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {TRACKS.map((tr, k) => {
           const done = tr.topics.filter((t) => dev.state(t.id)?.status === "done").length;

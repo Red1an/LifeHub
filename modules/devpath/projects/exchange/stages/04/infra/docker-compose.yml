@@ -1,0 +1,34 @@
+# Инфраструктура биржи. Файл кладёт хаб и обновляет при открытии этапа: новые сервисы появляются по мере надобности.
+name: devpath-exchange
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    # Несколько экземпляров API со своими пулами соединений (по 100 по умолчанию) — лимит сервера должен их вместить.
+    command: ["postgres", "-c", "max_connections=300"]
+    environment:
+      POSTGRES_USER: exchange
+      POSTGRES_PASSWORD: exchange
+      POSTGRES_DB: exchange
+    ports:
+      - "15432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U exchange"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:
