@@ -89,6 +89,50 @@ namespace LifeHubPc {
       SetForegroundWindow(h);
     }
 
+    delegate bool EnumProc(IntPtr h, IntPtr l);
+    [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint cmd);
+    [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int i);
+    [DllImport("user32.dll")] static extern int GetWindowTextLength(IntPtr h);
+
+    /* Обычные окна программ: видимые, с заголовком, не служебные и не дочерние диалоги. */
+    static System.Collections.Generic.List<IntPtr> AppWindows() {
+      var list = new System.Collections.Generic.List<IntPtr>();
+      EnumWindows((h, l) => {
+        if (IsWindowVisible(h) && GetWindowTextLength(h) > 0 && GetWindow(h, 4) == IntPtr.Zero && (GetWindowLong(h, -20) & 0x80) == 0) list.Add(h);
+        return true;
+      }, IntPtr.Zero);
+      return list;
+    }
+
+    /*
+     * Запущенная программа сама на передний план не выйдет: Windows не даёт фокус окнам,
+     * которые открыл фоновый процесс. Ждём её новое окно (до ms) в своём потоке и выводим вперёд.
+     * Программа уже была открыта и нового окна нет — выводим её окно по имени процесса.
+     */
+    public static void RaiseNew(int ms, string procName) {
+      var before = new System.Collections.Generic.HashSet<IntPtr>(AppWindows());
+      var t = new System.Threading.Thread(() => {
+        var until = DateTime.Now.AddMilliseconds(ms);
+        while (DateTime.Now < until) {
+          System.Threading.Thread.Sleep(200);
+          foreach (var h in AppWindows()) {
+            if (before.Contains(h)) continue;
+            System.Threading.Thread.Sleep(150);
+            Focus(h);
+            return;
+          }
+        }
+        if (string.IsNullOrEmpty(procName)) return;
+        foreach (var p in System.Diagnostics.Process.GetProcessesByName(procName)) {
+          if (p.MainWindowHandle != IntPtr.Zero) { Focus(p.MainWindowHandle); return; }
+        }
+      });
+      t.IsBackground = true;
+      t.Start();
+    }
+
     public static string ActiveTitle() {
       var sb = new StringBuilder(512);
       GetWindowText(GetForegroundWindow(), sb, 512);
@@ -160,6 +204,14 @@ function Out-Line($obj) {
   [Console]::Out.Flush()
 }
 
+# Запустить и вывести окно программы на передний план (см. Win.RaiseNew).
+function Start-Launched([string]$target) {
+  $p = Start-Process -FilePath $target -PassThru
+  $name = ''; try { if ($p -and -not $p.HasExited) { $name = $p.ProcessName } } catch {}
+  [LifeHubPc.Win]::RaiseNew(8000, $name)
+  $true
+}
+
 function Get-Vol { @{ level = [int][math]::Round([LifeHubPc.Audio]::Volume * 100); muted = [LifeHubPc.Audio]::Mute } }
 
 $fns = @{
@@ -221,8 +273,7 @@ $fns = @{
   }
   'apps.launch' = { param($a)
     $id = [string]$a.id
-    if ($a.path) { Start-Process -FilePath $id } else { Start-Process -FilePath "shell:AppsFolder\$id" }
-    $true
+    Start-Launched $(if ($a.path) { $id } else { "shell:AppsFolder\$id" })
   }
 
   # Любое сочетание: "ctrl+shift+t", "win+d", "alt+f4", "f5", "ctrl+c".
@@ -275,7 +326,7 @@ $fns = @{
   }
 
   # Ссылка, папка или файл — то же, что двойной щелчок.
-  'open' = { param($a) Start-Process -FilePath ([string]$a.target); $true }
+  'open' = { param($a) Start-Launched ([string]$a.target) }
 
   'windows.list' = { param($a)
     $items = @(Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle } | ForEach-Object {
