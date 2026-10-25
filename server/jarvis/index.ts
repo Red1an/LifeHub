@@ -17,7 +17,7 @@ import { browserConnected, splitWorkspace, startBrowser } from "./browser.ts";
 import { startFocus } from "../focus.ts";
 import { pc } from "./pc.ts";
 import type { CustomCommand, Step } from "./prefs.ts";
-import { addOwnerSample, applyVoiceConfig, enrollVoice, installVoice, resetVoiceprint, restartVoice, startVoice, testVoice, voiceControl } from "./voice.ts";
+import { addOwnerSample, addStrangerSample, applyVoiceConfig, enrollVoice, installVoice, resetVoiceprint, restartVoice, startVoice, testVoice, voiceControl } from "./voice.ts";
 
 /*
  * Джарвис — голосовой помощник хаба. Говорить с ним можно:
@@ -134,6 +134,7 @@ async function applyAction() {
   if (a.kind === "voice.enroll") enrollVoice();
   if (a.kind === "voice.enroll.reset") resetVoiceprint();
   if (a.kind === "voice.owner.add") addOwnerSample();
+  if (a.kind === "voice.owner.not") addStrangerSample();
   if (a.kind === "library.refresh") void writeLibrary().catch((e) => console.error("[jarvis] библиотека", e));
   if (a.kind === "launch" && typeof (a as any).target?.value === "string") void launch((a as any).target).catch(() => {});
   if (a.kind === "scenario" && typeof (a as any).id === "string") {

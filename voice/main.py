@@ -558,6 +558,17 @@ class Voice:
         self.hub.state(speaker={"enrolled": True, "score": round(sc, 2), "owner": ok, "at": int(time.time() * 1000)})
         return ok, sc
 
+    def remember_stranger(self, pcm: bytes):
+        """Голос из своих колонок — точно не владелец: запоминаем как чужой."""
+        if not self.speaker or not self.speaker.enrolled or (self.cfg.get("speakerLock") or "off") == "off":
+            return
+        try:
+            e = self.speaker.embed(pcm, min_sec=0.8)
+            if e is not None:
+                self.speaker.add_other(e)
+        except Exception as ex:
+            log(f"Чужой голос не запомнился: {ex}")
+
     def name_heard(self, pre: bytes) -> bool:
         """
         Прозвучало ли имя на самом деле: распознаём последние ~1.8 с (там, где Vosk его услышал).
@@ -708,6 +719,7 @@ class Voice:
             echo, c = self.sysaudio.is_echo(pre)
             if echo:
                 log(f"Имя прозвучало из колонок ({c:.2f}) — молчу")
+                self.remember_stranger(pre)
                 return
         # Имя сказал явно не владелец (видео, гости) — молчим сразу, без сигнала и орба.
         if self.stranger(pre):
@@ -807,6 +819,9 @@ class Voice:
             return
         scores = self.speaker.save(embs)
         log(f"Голос записан: {len(embs)} фраз, похожесть на себя {min(scores):.2f}–{max(scores):.2f}")
+        if min(scores) < 0.65:
+            # Фразы плохо похожи друг на друга — шум, далеко от микрофона или тихий микрофон.
+            self.say("Запись вышла неразборчивой: возможно, шумно или микрофон далеко. Узнавать буду хуже — лучше перезаписать поближе к микрофону.")
         self.hub.state(
             enroll={"state": "done", "count": len(embs)},
             speaker={"enrolled": True, "self": [round(min(scores), 2), round(max(scores), 2)]},
@@ -843,11 +858,21 @@ class Voice:
             elif t == "enroll":
                 self.enroll([str(x) for x in e.get("phrases") or []][:10])
             elif t == "owner.add":
-                if self.speaker and self.speaker.add_last():
-                    log("Последняя фраза добавлена к голосу владельца")
+                r = self.speaker.add_last() if self.speaker else "none"
+                log(f"«Это был я»: {r}")
+                if r == "ok":
                     sc = self.speaker.self_scores
                     self.hub.state(speaker={"enrolled": True, "owner": True, "added": True, "self": [round(min(sc), 2), round(max(sc), 2)]})
                     self.say("Запомнил. Теперь узнаю вас лучше.")
+                elif r == "foreign":
+                    self.say("Эта фраза совсем не похожа на ваш голос — не добавляю. Если я плохо вас узнаю, лучше перезапишите голос.")
+                elif r == "same":
+                    self.hub.state(speaker={"enrolled": True, "owner": True, "added": True})
+            elif t == "owner.not":
+                if self.speaker and self.speaker.add_other():
+                    log("«Это был не я»: запомнил чужой голос")
+                    self.hub.state(speaker={"enrolled": True, "owner": False, "rejected": True})
+                    self.say("Понял. Этот голос больше слушать не буду.")
             elif t == "enroll.reset":
                 if self.speaker:
                     self.speaker.reset()

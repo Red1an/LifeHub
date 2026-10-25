@@ -383,18 +383,16 @@ function OwnerPanel() {
                 {sp?.score !== undefined && (
                   <span className={cn("text-xs", sp.owner ? "text-[#3ee08f]" : "text-[#ffb36b]")}>
                     последняя фраза: {Math.round(sp.score * 100)}% · {sp.owner ? "вы" : "не вы"}
-                    {!sp.owner && (
-                      <button className="ml-2 underline" onClick={() => void action("voice.owner.add")}>
-                        Это был я
-                      </button>
-                    )}
+                    <button className="ml-2 underline" onClick={() => void action(sp.owner ? "voice.owner.not" : "voice.owner.add")}>
+                      {sp.owner ? "Это был не я" : "Это был я"}
+                    </button>
                   </span>
                 )}
               </div>
               <Slider value={v.speakerThreshold} min={0.3} max={0.8} step={0.05} onChange={(speakerThreshold) => updateVoice({ speakerThreshold })} format={(x) => `${Math.round(x * 100)}%`} />
               <p className="mt-1 text-xs text-[#7f9fb2]">
                 Ваш голос обычно 55–90%, чужие — 10–35%. Не узнал вас — нажмите «Это был я»: Джарвис добавит эту фразу к вашему голосу и
-                будет узнавать лучше. Пропускает чужих — увеличьте строгость.
+                будет узнавать лучше. Ответил чужому — «Это был не я»: этот голос он запомнит и больше пропускать не будет.
               </p>
             </div>
           )}

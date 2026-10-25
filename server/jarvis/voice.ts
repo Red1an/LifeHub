@@ -131,6 +131,7 @@ export type VoiceEvent =
   | { type: "enroll"; phrases: string[] }
   | { type: "enroll.reset" }
   | { type: "owner.add" }
+  | { type: "owner.not" }
   | { type: "stop" };
 
 export interface VoiceConfig extends VoicePrefs {
@@ -240,6 +241,11 @@ export function enrollVoice() {
 /** «Это был я»: последняя фраза — к голосу владельца. */
 export function addOwnerSample() {
   broadcast({ type: "owner.add" });
+}
+
+/** «Это был не я»: последняя фраза — чужой голос. */
+export function addStrangerSample() {
+  broadcast({ type: "owner.not" });
 }
 
 export function resetVoiceprint() {

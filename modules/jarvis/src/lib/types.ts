@@ -165,7 +165,7 @@ export const DEFAULT_PREFS: Prefs = {
 };
 
 export type Action =
-  | { kind: "rotate" | "unlink" | "voice.install" | "voice.restart" | "voice.test" | "voice.mute" | "voice.unmute" | "library.refresh" | "voice.enroll" | "voice.enroll.reset" | "voice.owner.add" }
+  | { kind: "rotate" | "unlink" | "voice.install" | "voice.restart" | "voice.test" | "voice.mute" | "voice.unmute" | "library.refresh" | "voice.enroll" | "voice.enroll.reset" | "voice.owner.add" | "voice.owner.not" }
   | { kind: "launch"; target: OpenTarget }
   | { kind: "scenario"; id: string };
 
