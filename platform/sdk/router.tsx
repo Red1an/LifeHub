@@ -14,15 +14,25 @@ function update() {
 }
 window.addEventListener("popstate", update);
 
+/* Глубина записи в истории внутри хаба: 0 — первая страница вкладки, назад по истории уходить некуда. */
+const depth = () => (history.state as { lh?: number } | null)?.lh ?? 0;
+if ((history.state as { lh?: number } | null)?.lh === undefined) history.replaceState({ ...(history.state ?? {}), lh: 0 }, "");
+
 export function navigate(to: string, opts: { replace?: boolean } = {}) {
   if (/^https?:\/\//.test(to)) {
     location.href = to;
     return;
   }
-  if (opts.replace) history.replaceState(null, "", to);
-  else history.pushState(null, "", to);
+  if (opts.replace) history.replaceState({ lh: depth() }, "", to);
+  else history.pushState({ lh: depth() + 1 }, "", to);
   update();
   if (!opts.replace) window.scrollTo(0, 0);
+}
+
+/** «Назад»: на прошлую страницу хаба, а если её нет (открыли по ссылке) — на `fallback`. */
+export function goBack(fallback = "/") {
+  if (depth() > 0) history.back();
+  else navigate(fallback, { replace: true });
 }
 
 export function useHubLocation() {
@@ -127,10 +137,12 @@ export function createRouting(base: string) {
     /** Активна только при точном совпадении пути. */
     end?: boolean;
     replace?: boolean;
+    /** Кнопка «назад»: вернуться на прошлую страницу, `to` — если возвращаться некуда. */
+    back?: boolean;
     children?: ReactNode;
   };
 
-  function Link({ to, activeClassName, end, replace, className, onClick, children, ...rest }: LinkProps) {
+  function Link({ to, activeClassName, end, replace, back, className, onClick, children, ...rest }: LinkProps) {
     const href = resolveTo(base, to);
     const loc = useHubLocation();
     const active =
@@ -141,7 +153,8 @@ export function createRouting(base: string) {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || rest.target) return;
       if (/^https?:\/\//.test(href)) return;
       e.preventDefault();
-      navigate(href, { replace });
+      if (back) goBack(href);
+      else navigate(href, { replace });
     };
     return (
       <a href={href} onClick={handle} className={[className, active ? activeClassName : ""].filter(Boolean).join(" ") || undefined} {...rest}>

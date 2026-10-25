@@ -27,7 +27,7 @@ export function Head({ title, sub, back, right }: { title: ReactNode; sub?: Reac
   return (
     <header className="mb-5 flex items-start gap-3">
       {back && (
-        <Link to={back} className="nt-mic -ml-1 mt-0.5 !h-9 !w-9 !text-base" aria-label="Назад">
+        <Link to={back} back className="nt-mic -ml-1 mt-0.5 !h-9 !w-9 !text-base" aria-label="Назад">
           ←
         </Link>
       )}

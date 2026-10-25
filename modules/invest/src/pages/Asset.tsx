@@ -44,9 +44,9 @@ export function AssetPage() {
 
   return (
     <Screen>
-      <button onClick={() => (history.length > 1 ? history.back() : nav("/portfolio"))} className="inv-muted mb-3 text-sm font-bold">
+      <Link to="/portfolio" back className="inv-muted mb-3 inline-block text-sm font-bold">
         ← Назад
-      </button>
+      </Link>
       <div className="mb-4 flex items-center gap-3">
         <Avatar ticker={inst.ticker} type={inst.type} />
         <div className="min-w-0">

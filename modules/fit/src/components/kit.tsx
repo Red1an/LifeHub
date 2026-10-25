@@ -13,7 +13,7 @@ export function Header({ title, subtitle, back, right }: { title: ReactNode; sub
   return (
     <div className="mb-5 flex items-start gap-3">
       {back && (
-        <Link to={back} className="ft-btn ft-btn-ghost !min-h-10 !px-3" aria-label="Назад">←</Link>
+        <Link to={back} back className="ft-btn ft-btn-ghost !min-h-10 !px-3" aria-label="Назад">←</Link>
       )}
       <div className="min-w-0 flex-1">
         <h1 className="ft-display text-2xl font-bold leading-tight sm:text-3xl">{title}</h1>

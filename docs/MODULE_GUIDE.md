@@ -321,7 +321,7 @@ const inbox = useCollection<{ receivedAt: number; text?: string; [k: string]: un
 | статусы | `text-success`, `text-warning`, `text-danger` (и `bg-*/15`) | `--lh-success`… |
 
 **Компоненты:**
-- `Page` — `title`, `subtitle`, `actions`, `back` (true | путь), `width` ("narrow" | "normal" | "wide" | "full").
+- `Page` — `title`, `subtitle`, `actions`, `back` (true | путь; возвращает на прошлую страницу, путь — если её нет), `width` ("narrow" | "normal" | "wide" | "full").
 - `Section` (`title`, `actions`), `Card` (`padding`, `interactive`), `List` + `ListItem` (`title`, `subtitle`, `left`, `right`, `onClick`)
 - `Button` (`variant`: primary | secondary | ghost | danger | soft; `size`: sm | md | lg; `icon`, `loading`, `block`), `IconButton` (`label` обязателен)
 - `Input`, `Textarea`, `Select` (`options`), `Field` (`label`, `hint`, `error`), `Checkbox`, `Switch` (`checked`, `onChange`, `label`)
@@ -329,7 +329,7 @@ const inbox = useCollection<{ receivedAt: number; text?: string; [k: string]: un
 - `Badge` (`tone`), `Stat` (`label`, `value`, `hint`, `tone`), `Progress` (`value`, `max`), `EmptyState` (`icon`, `title`, `text`, `action`), `Spinner`, `Loading`
 - Графики: `BarChart` (`data: {label, value, color?}[]`), `LineChart` (`labels`, `series: {name, points}[]`), `DonutChart`, `Sparkline` (`points`), `Heatmap` (`values: { "2026-09-25": 3 }`). Цвета можно передать свои.
 - `toast(msg, "success" | "error")`, `await confirm("Удалить?", { danger: true })`, `await prompt("Название", "")` — диалоги хаба, работают при любом дизайне модуля.
-- Роутинг: `Link` (`to`, `activeClassName`, `end`), `useNavigate()`, `useParams()`, `useLocation()`, `useSearchParams()`
+- Роутинг: `Link` (`to`, `activeClassName`, `end`, `back` — кнопка «назад»: вернуться на прошлую страницу, а `to` — только если возвращаться некуда), `useNavigate()`, `useParams()`, `useLocation()`, `useSearchParams()`
 - `useModule()` → `{ id, basePath, manifest }`
 
 **Утилиты:** `formatDate(d, "short" | "long" | "time" | "datetime" | "weekday")`, `formatRelative`, `formatMoney(n, "RUB")`,

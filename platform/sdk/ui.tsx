@@ -4,7 +4,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "./format.ts";
-import { navigate } from "./router.tsx";
+import { goBack } from "./router.tsx";
 
 /*
  * Базовые компоненты хаба. Все цвета — через токены темы (bg-surface, text-muted,
@@ -19,7 +19,7 @@ export interface PageProps {
   subtitle?: ReactNode;
   /** Кнопки справа от заголовка. */
   actions?: ReactNode;
-  /** Кнопка «назад»: true — history.back(), строка — абсолютный путь. */
+  /** Кнопка «назад»: на прошлую страницу; строка — абсолютный путь, если возвращаться некуда. */
   back?: boolean | string;
   /** Ширина контента. */
   width?: "narrow" | "normal" | "wide" | "full";
@@ -37,7 +37,7 @@ export function Page({ title, subtitle, actions, back, width = "normal", childre
             <button
               type="button"
               aria-label="Назад"
-              onClick={() => (typeof back === "string" ? navigate(back) : history.back())}
+              onClick={() => goBack(typeof back === "string" ? back : undefined)}
               className="-ml-2 grid size-8 shrink-0 place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
             >
               <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" /></svg>
