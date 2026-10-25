@@ -270,6 +270,12 @@
     },
   };
 
+  // Окно показали, а команда «покажись» не дошла (первый запуск, страница ещё грузилась) —
+  // иначе остаётся пустой тёмный прямоугольник.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") window.jv.visible(true);
+  });
+
   const api = () => window.pywebview && window.pywebview.api;
   canvas.addEventListener("click", () => api() && api().open_panel());
   document.getElementById("close").addEventListener("click", () => api() && api().hide_orb());

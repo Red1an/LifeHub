@@ -133,7 +133,19 @@ class Ui:
             x, y = 16, sh - self.h - 60
         else:
             x, y = sw - ORB_W - 16, sh - self.h - 60
-        self.orb.move(x, y)
+        # Не orb.move(): pywebview двигает окно с SWP_SHOWWINDOW и показывает скрытый орб
+        # пустым прямоугольником — страница ещё не включена.
+        try:
+            import ctypes
+
+            hwnd = self.orb.native.Handle.ToInt32()
+            scale = ctypes.windll.user32.GetDpiForWindow(hwnd) / 96 or 1
+            ctypes.windll.user32.SetWindowPos(hwnd, 0, int(x * scale), int(y * scale), 0, 0, 0x0001 | 0x0004 | 0x0010)
+        except Exception as e:
+            print(f"Орб не встал на место: {e}", flush=True)
+            self.orb.move(x, y)
+            if not self.visible:
+                self.orb.hide()
 
     def js(self, code: str):
         if not self.ready.is_set() or not self.orb:
@@ -154,7 +166,19 @@ class Ui:
         if not self.visible:
             self.visible = True
             self.orb.show()
-            self.js("jv.visible(true)")
+            threading.Thread(target=self._reveal, daemon=True).start()
+
+    def _reveal(self):
+        """Включить орб на странице. Сразу после запуска страница может быть ещё не готова — повторяем."""
+        for _ in range(20):
+            if not self.visible:
+                return
+            try:
+                if self.orb.evaluate_js("window.jv ? (jv.visible(true), true) : false"):
+                    return
+            except Exception:
+                pass
+            time.sleep(0.25)
 
     def hide(self, now=False, after: float = 0):
         if self.mode == "always" and not now:
