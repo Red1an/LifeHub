@@ -608,3 +608,131 @@ export function GoogleSection() {
     </Section>
   );
 }
+
+/* ───────────── приложение LifeHub на телефоне ───────────── */
+
+interface AppDevices {
+  devices: { id: string; name: string; createdAt: number; seenAt?: number }[];
+  apk: { versionName: string; size: number } | null;
+}
+interface PairLinks {
+  expires: number;
+  links: { label: string; url: string; qr: string }[];
+}
+
+/** Подключение телефона с приложением LifeHub (phone/android): QR → страница со скачиванием и кнопкой «Открыть в приложении». */
+export function PhoneAppSection() {
+  const { state } = useHub();
+  const [info, setInfo] = useState<AppDevices | null>(null);
+  const [pair, setPair] = useState<PairLinks | null>(null);
+  const [pick, setPick] = useState(0);
+  const load = () => request<AppDevices>("GET", "/api/app/devices").then(setInfo, () => {});
+  useEffect(() => {
+    if (state?.isLocal) load();
+  }, [state?.isLocal]);
+  // Пока QR на экране, ждём, когда телефон подключится.
+  useEffect(() => {
+    if (!pair) return;
+    const t = setInterval(load, 3000);
+    return () => clearInterval(t);
+  }, [pair]);
+  if (!state?.isLocal) return null;
+
+  const start = () =>
+    run(async () => {
+      const p = await request<PairLinks>("POST", "/api/app/pair");
+      setPair(p);
+      setPick(0);
+    });
+  const link = pair?.links[pick];
+
+  return (
+    <Section title="Приложение на телефоне">
+      <Card className="space-y-4">
+        <p className="text-sm text-muted">
+          Приложение LifeHub для Android: хаб как обычное приложение, работает без связи с компьютером (аккорды, заметки, траты — всё, что
+          уже открывали), напоминания, виджеты на экране, «Поделиться» и Фокус. Входит само — пароль и Google не нужны.
+        </p>
+        {!info ? (
+          <Loading />
+        ) : (
+          <>
+            {!info.apk && (
+              <p className="rounded-md bg-warning/10 p-3 text-sm text-warning">
+                Приложение ещё не собрано: <code>node phone/android/build.mjs</code>
+              </p>
+            )}
+            {info.devices.length > 0 && (
+              <div className="divide-y divide-line rounded-md border border-line">
+                {info.devices.map((d) => (
+                  <div key={d.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{d.name}</div>
+                      <div className="text-xs text-muted">
+                        {d.seenAt ? `на связи ${new Date(d.seenAt).toLocaleString("ru")}` : "ещё не заходил"}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        getHost()
+                          .confirm(`Отключить «${d.name}»? Приложение на нём перестанет видеть хаб.`, { danger: true })
+                          .then((ok) => void (ok && run(() => request("DELETE", `/api/app/devices/${d.id}`).then(load), "Телефон отключён")))
+                      }
+                    >
+                      Отключить
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {pair && link ? (
+              <div className="space-y-3">
+                {pair.links.length > 1 && (
+                  <div className="flex flex-wrap gap-2">
+                    {pair.links.map((l, i) => (
+                      <Button key={l.url} size="sm" variant={i === pick ? "primary" : "ghost"} onClick={() => setPick(i)}>
+                        {l.label}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+                <div className="flex flex-wrap items-start gap-4">
+                  <div className="w-44 rounded-md bg-white p-2" dangerouslySetInnerHTML={{ __html: link.qr }} />
+                  <ol className="list-decimal space-y-1.5 pl-5 text-sm">
+                    <li>Наведите камеру телефона на QR-код и откройте ссылку.</li>
+                    <li>Скачайте и установите LifeHub.</li>
+                    <li>Нажмите «Открыть в приложении» — телефон подключится сам и появится в списке выше.</li>
+                  </ol>
+                </div>
+                <p className="text-xs text-muted">
+                  Ссылка одноразовая, работает 10 минут.{" "}
+                  {link.label.includes("ngrok") ? "Из интернета — откроется где угодно." : "Телефон должен быть в той же сети."}
+                </p>
+              </div>
+            ) : (
+              <Button variant="primary" onClick={start}>
+                Подключить телефон
+              </Button>
+            )}
+          </>
+        )}
+      </Card>
+    </Section>
+  );
+}
+
+/** Хаб открыт в приложении LifeHub на телефоне — его собственные настройки (связь, офлайн, обновление, Фокус). */
+export function InAppSection() {
+  const bridge = (window as { LifeHubApp?: { openSettings(): void; version(): string } }).LifeHubApp;
+  if (!bridge) return null;
+  return (
+    <Section title="Это приложение">
+      <Card className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-sm text-muted">LifeHub {bridge.version()} — связь с компьютером, офлайн, обновление, Фокус</div>
+        <Button onClick={() => bridge.openSettings()}>Настройки приложения</Button>
+      </Card>
+    </Section>
+  );
+}

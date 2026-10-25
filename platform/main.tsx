@@ -5,6 +5,8 @@ import * as JsxRuntime from "react/jsx-runtime";
 import * as sdk from "@lifehub/sdk";
 import { bind } from "./sdk/bind.ts";
 import { App } from "./shell/App.tsx";
+import { watchAppBars } from "./shell/appBars.ts";
+import { pullToRefresh } from "./shell/pullRefresh.ts";
 
 /*
  * platform.js — единственное место, где живут React и SDK. Модули и
@@ -36,3 +38,5 @@ if ("serviceWorker" in navigator && window.isSecureContext) {
 }
 
 ReactDOMClient.createRoot(document.getElementById("root")!).render(<App />);
+watchAppBars();
+pullToRefresh();

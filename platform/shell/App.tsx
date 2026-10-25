@@ -67,7 +67,14 @@ export function App() {
     <ModuleNavContext.Provider value={{ set: setModuleNav }}>
       <div className="flex min-h-dvh">
         <Rail current={inModule} path={path} />
-        <main className={cn("flex min-w-0 flex-1 flex-col", hasBottomBar && "pb-[calc(56px+env(safe-area-inset-bottom))] lg:pb-0")}>{page}</main>
+        <main
+          className={cn(
+            "flex min-w-0 flex-1 flex-col",
+            // У модуля своя шапка с отступом от строки состояния; у страниц хаба — здесь.
+            !inModule && "pt-safe",
+            hasBottomBar ? "pb-[calc(56px+env(safe-area-inset-bottom))] lg:pb-0" : "pb-safe",
+          )}
+        >{page}</main>
       </div>
       {inModule ? activeModuleNav && <ModuleTabBar path={path} moduleId={inModule} items={activeModuleNav} /> : <HubTabBar path={path} />}
       <HostLayer />

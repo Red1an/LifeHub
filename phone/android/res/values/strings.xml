@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="guard_description">LifeHub (Фокус) видит, какое приложение открыто, а в браузерах — адрес сайта в адресной строке. Перед YouTube, Инстаграмом и т. п. (в приложении или на сайте) он спрашивает, зачем пришёл, и ставит таймер. Остальное содержимое экрана не читает и никуда не отправляет.</string>
+    <string name="widget_description">Сводки модулей хаба: траты, расписание, привычки</string>
+    <string name="sc_jarvis">Спросить Джарвиса</string>
+    <string name="sc_settings">Настройки</string>
+</resources>

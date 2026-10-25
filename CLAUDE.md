@@ -24,6 +24,14 @@
   - `devpath/` — проверка практики DevPath (модуль `modules/devpath`): большие проекты по этапам (тесты хаба + Docker-инфраструктура),
     миссии и каты — всё в `~/DevPath/<id>` через `dotnet test` (`runner.ts`, разбор TRX и ошибок сборки), запросы — через
     коллекцию `runs` модуля (`index.ts`). `node server/devpath/verify.ts` — проверка самих этапов, миссий и кат.
+  - `mobile.ts` — приложение LifeHub на телефоне: устройства (токены, в настройках только хэш), подключение по QR
+    (`/hook/app/pair/<код>`), туннель `/hook/app/<токен>/<путь>` (app.ts → обычный запрос с `x-lifehub-device`,
+    никогда не «локальный»), `/api/app/*` — напоминания, сообщения Джарвиса, Фокус, список для офлайна (`warm`), APK.
+- `phone/android/` — приложение LifeHub для Android: Java без Gradle (`node phone/android/build.mjs`, инструменты —
+  `%LOCALAPPDATA%\LifeHubAndroid`). `Proxy.java` — хаб на 127.0.0.1 внутри телефона: кэш ответов, офлайн-записи в
+  `/api/data`/`/api/kv` с очередью; `Hub.java` — выбор дороги (дом → Tailscale → ngrok). Оба на чистой Java —
+  проверка на компьютере: `phone/android/test/ProxyCheck.java`. Фокус (`GuardService`…) повторяет `voice/browser-extension/focus`.
+  Версию поднимать в `build.mjs` — приложение само предложит обновиться.
 - `voice/` — голос Джарвиса на Python (`.venv` ставит хаб): `main.py` — цикл, `stt.py` GigaAM/Whisper, `tts.py` Piper/Silero,
   `speaker.py` — голос владельца (WeSpeaker), `echo.py` — не просыпаться от своих колонок,
   `ui.py` + `ui/orb.html` — орб, панель и трей (pywebview). Модели — в `~/.lifehub/voice/models`.

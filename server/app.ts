@@ -26,8 +26,11 @@ import { netFetch } from "./net.ts";
 import { converse, handleAlice } from "./jarvis/index.ts";
 import { acceptClient, reportState, type VoiceEvent } from "./jarvis/voice.ts";
 import { acceptTabs, nextCommand } from "./jarvis/browser.ts";
-import { acceptSessions, focusConfig } from "./focus.ts";
-import { acceptHook, hookInfo, rotateHook } from "./hooks.ts";
+import { acceptSessions, focusConfig, FOCUS } from "./focus.ts";
+import { acceptHook, hookInfo, hubBases, rotateHook } from "./hooks.ts";
+import { APP_APK, apkInfo, claimPair, deviceFor, jarvisMessages, listDevices, newPairCode, pairPage, pairValid, removeDevice } from "./mobile.ts";
+import * as jarvisData from "./jarvis/data.ts";
+import { prefs as jarvisPrefs } from "./jarvis/prefs.ts";
 import { SDK_VERSION, type PlatformBuild } from "./compiler.ts";
 import { FILES_DIR, MODULES_DIR, MODULE_ID_RE, HOME, CHECK_COMMAND } from "./paths.ts";
 import type { Manifest } from "./manifest.ts";
@@ -77,6 +80,43 @@ export function createApp(opts: AppOptions) {
     const body = await c.req.json().catch(() => null);
     const r = await handleAlice(c.req.param("secret"), body);
     return r ? c.json(r) : c.notFound();
+  });
+  // Приложение LifeHub на телефоне (server/mobile.ts): подключение по одноразовому коду и туннель по токену устройства.
+  const apk = (c: Context) =>
+    fs.existsSync(APP_APK)
+      ? c.body(fs.readFileSync(APP_APK), 200, {
+          "content-type": "application/vnd.android.package-archive",
+          "content-disposition": 'attachment; filename="lifehub.apk"',
+        })
+      : c.notFound();
+  app.get("/hook/app/pair/:code", (c) => c.html(pairPage(c.req.param("code"), new URL(c.req.url).origin, pairValid(c.req.param("code")))));
+  app.get("/hook/app/pair/:code/app.apk", (c) => (pairValid(c.req.param("code")) ? apk(c) : c.notFound()));
+  app.post("/hook/app/pair/:code/claim", async (c) => {
+    const b = await c.req.json().catch(() => ({}));
+    const r = claimPair(c.req.param("code"), String(b?.name ?? ""));
+    if (!r) return c.json({ error: "Ссылка устарела — подключите телефон заново" }, 410);
+    return c.json({ ...r, bases: await hubBases({ port: opts.port, https: opts.https, lan: lanAddresses() }) });
+  });
+  app.all("/hook/app/:token/*", async (c) => {
+    const token = c.req.param("token");
+    if (token === "pair" || !deviceFor(token)) return c.json({ error: "Телефон отключён от хаба" }, 401);
+    const u = new URL(c.req.url);
+    const rest = u.pathname.slice(`/hook/app/${token}`.length) || "/";
+    const headers = new Headers(c.req.raw.headers);
+    headers.set("x-lifehub-device", token);
+    // Пришло извне, даже если туннель стучится с этого компьютера: «локальных» прав у телефона нет.
+    headers.set("x-forwarded-for", "lifehub-app");
+    headers.delete("cookie");
+    // Java на телефоне не умеет PATCH — присылает POST с подменой.
+    const override = c.req.method === "POST" ? c.req.header("x-http-method-override")?.toUpperCase() : undefined;
+    const method = override === "PATCH" || override === "PUT" || override === "DELETE" ? override : c.req.method;
+    headers.delete("x-http-method-override");
+    const init: RequestInit & { duplex?: "half" } = { method, headers };
+    if (c.req.method !== "GET" && c.req.method !== "HEAD") {
+      init.body = c.req.raw.body;
+      init.duplex = "half";
+    }
+    return app.fetch(new Request(new URL(rest + u.search, u.origin), init), c.env);
   });
   // Входящие вебхуки модулей (разрешение "webhook"): без входа, доступ — по секрету в адресе (server/hooks.ts).
   app.on(["GET", "POST", "PUT"], "/hook/:module/:secret", async (c) => {
@@ -731,6 +771,80 @@ export function createApp(opts: AppOptions) {
     fromExtension(c);
     return c.json((await nextCommand()) ?? {});
   });
+  /* ─────────────── приложение LifeHub на телефоне ─────────────── */
+
+  app.get("/api/app/info", (c) => c.json({ apk: apkInfo(), device: deviceFor(c.req.header("x-lifehub-device"))?.name ?? null }));
+  app.get("/api/app/apk", (c) => apk(c));
+  /** Ближайшие события и напоминания — телефон ставит по ним будильники сам и напомнит даже без связи. */
+  app.get("/api/app/upcoming", async (c) => {
+    const events = jarvisData.enabled("planner") ? await jarvisData.listEvents(new Date(), new Date(Date.now() + 3 * 86_400_000)).catch(() => []) : [];
+    return c.json({
+      lead: jarvisPrefs().voice.announce || 10,
+      events: events.filter((e) => !e.allDay).map((e) => ({ id: e.id, title: e.title, start: e.start.getTime(), kind: e.kind })),
+    });
+  });
+  /** Что приложению сохранить заранее, чтобы всё открывалось без связи: оболочка, модули, их данные. */
+  app.get("/api/app/warm", (c) => {
+    const paths = ["/", "/api/state", "/api/google/status", `/platform.js?v=${opts.getPlatform().hash}`, `/app.css?v=${reg.getCss().hash}`, "/icon.svg"];
+    for (const m of reg.listModules()) {
+      if (m.status !== "ok" || m.manifest?.type === "service") continue;
+      paths.push(`/modules/${m.id}/module.js?v=${m.hash}`, `/api/kv/${m.id}`);
+      if (m.hasCss) paths.push(`/modules/${m.id}/module.css?v=${m.hash}`);
+      // npm-библиотеки модуль подгружает сам по адресам /libs/… из бандла.
+      for (const lib of new Set(reg.getEntry(m.id).build?.js.match(/\/libs\/[\w.@+-]+\/[\w./-]+\.js/g) ?? [])) if (!paths.includes(lib)) paths.push(lib);
+      const rows = db.getRaw().prepare("SELECT DISTINCT collection FROM records WHERE module = ?").all(m.id) as { collection: string }[];
+      for (const r of rows) if (r.collection !== "webhook") paths.push(`/api/data/${m.id}/${encodeURIComponent(r.collection)}`);
+    }
+    return c.json({ paths });
+  });
+  app.get("/api/app/messages", (c) => c.json(jarvisMessages(Number(c.req.query("since")) || 0)));
+  app.post("/api/app/jarvis", async (c) => {
+    const b = await c.req.json().catch(() => ({}));
+    const text = String(b?.text ?? "").slice(0, 2000).trim();
+    if (!text) throw new HubError("Пустая просьба");
+    const t = await converse("text", text);
+    return c.json({ text: t.text, tts: t.tts });
+  });
+  app.get("/api/app/focus/config", (c) => c.json(focusConfig(c.req.query("v") ?? "", "phone")));
+  app.post("/api/app/focus/sessions", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    for (const s of Array.isArray(body?.sessions) ? body.sessions : []) if (s) s.device = "phone";
+    return c.json({ saved: acceptSessions(body) });
+  });
+  // Установленные на телефоне приложения — чтобы в «Фокусе» выбрать их для сайта.
+  app.post("/api/app/focus/apps", async (c) => {
+    const b = await c.req.json().catch(() => ({}));
+    const apps = (Array.isArray(b?.apps) ? b.apps : [])
+      .slice(0, 400)
+      .map((a: any) => ({ pkg: String(a?.pkg ?? "").slice(0, 120), label: String(a?.label ?? "").slice(0, 60) }))
+      .filter((a: { pkg: string }) => /^[\w.]+$/.test(a.pkg))
+      .sort((x: { label: string }, y: { label: string }) => x.label.localeCompare(y.label, "ru"));
+    db.setKv(FOCUS, "phoneApps", { at: Date.now(), apps });
+    emit({ type: "data", module: FOCUS, collection: "kv:phoneApps", origin: "app" });
+    return c.json({ ok: true });
+  });
+  app.get("/api/app/devices", (c) => {
+    requireLocal(c);
+    return c.json({ devices: listDevices(), apk: apkInfo() });
+  });
+  app.post("/api/app/pair", async (c) => {
+    requireLocal(c);
+    const { code, expires } = newPairCode();
+    const bases = await hubBases({ port: opts.port, https: opts.https, lan: lanAddresses() });
+    const links = await Promise.all(
+      bases.map(async (b) => {
+        const url = `${b.url}/hook/app/pair/${code}`;
+        return { label: b.label, url, qr: await QRCode.toString(url, { type: "svg", margin: 1 }) };
+      }),
+    );
+    return c.json({ expires, links });
+  });
+  app.delete("/api/app/devices/:id", (c) => {
+    requireLocal(c);
+    removeDevice(c.req.param("id"));
+    return c.json({ ok: true });
+  });
+
   // «Фокус» (modules/focus) через то же расширение: настройки и журнал сеансов.
   app.get("/api/focus/config", (c) => {
     fromExtension(c);

@@ -4,3 +4,4 @@ node_modules/
 voice/.venv/
 __pycache__/
 voice-samples/
+phone/android/build/

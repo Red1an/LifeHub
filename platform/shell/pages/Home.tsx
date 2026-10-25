@@ -36,8 +36,21 @@ export function HomePage() {
     }
   }, [hashes]);
 
+  // В приложении LifeHub на телефоне (phone/android) сводки уходят в виджет на главном экране.
+  useEffect(() => {
+    const bridge = (window as { LifeHubApp?: { summaries(json: string): void } }).LifeHubApp;
+    if (!bridge || !Object.keys(summaries).length) return;
+    const t = setTimeout(() => {
+      const list = apps
+        .filter((m) => summaries[m.id])
+        .map((m) => ({ id: m.id, name: m.manifest?.name ?? m.id, icon: m.manifest?.icon ?? "", value: summaries[m.id]!.value ?? "", text: summaries[m.id]!.text ?? "" }));
+      bridge.summaries(JSON.stringify(list));
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [summaries]);
+
   if (!state) return null;
-  const report = (id: string, s: ModuleSummary | null) =>
+  const report =(id: string, s: ModuleSummary | null) =>
     setSummaries((all) => (JSON.stringify(all[id]) === JSON.stringify(s) ? all : { ...all, [id]: s }));
   const broken = state.modules.filter((m) => m.enabled && m.status === "error");
   const updates = state.modules.filter((m) => m.update || m.source?.pending);

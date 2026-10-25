@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="jarvis" android:enabled="true" android:icon="@drawable/ic_jarvis"
+        android:shortcutShortLabel="@string/sc_jarvis">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="ru.lifehub.app" android:targetClass="ru.lifehub.app.Jarvis" />
+    </shortcut>
+    <shortcut android:shortcutId="settings" android:enabled="true" android:icon="@drawable/ic_stat"
+        android:shortcutShortLabel="@string/sc_settings">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="ru.lifehub.app" android:targetClass="ru.lifehub.app.SettingsActivity" />
+    </shortcut>
+</shortcuts>

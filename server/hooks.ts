@@ -41,18 +41,24 @@ export interface HookInfo {
   urls: { label: string; url: string; public: boolean }[];
 }
 
-/** Адреса вебхука: через ngrok (из интернета), Tailscale и домашнюю сеть. Секрет создаётся при первом запросе. */
-export async function hookInfo(module: string, opts: { port: number; https: boolean; lan: string[] }): Promise<HookInfo> {
-  const path = `/hook/${module}/${secretOf(module, true)}`;
+/** Адреса хаба для телефона: ngrok (из интернета), Tailscale и домашняя сеть — без пути. */
+export async function hubBases(opts: { port: number; https: boolean; lan: string[] }): Promise<HookInfo["urls"]> {
   const urls: HookInfo["urls"] = [];
   const ng = await ngrokStatus().catch(() => null);
   if (ng?.enabled && ng.domain) {
     await ensureNgrokPolicy().catch(() => {});
-    urls.push({ label: "Из интернета (ngrok)", url: `https://${ng.domain}${path}`, public: true });
+    urls.push({ label: "Из интернета (ngrok)", url: `https://${ng.domain}`, public: true });
   }
   const ts = await tailscaleStatus(opts.port).catch(() => null);
-  if (ts?.serve.url) urls.push({ label: "Tailscale", url: ts.serve.url + path, public: false });
-  for (const ip of opts.lan) urls.push({ label: "Домашняя сеть", url: `${opts.https ? "https" : "http"}://${ip}:${opts.port}${path}`, public: false });
+  if (ts?.serve.url) urls.push({ label: "Tailscale", url: ts.serve.url.replace(/\/+$/, ""), public: false });
+  for (const ip of opts.lan) urls.push({ label: "Домашняя сеть", url: `${opts.https ? "https" : "http"}://${ip}:${opts.port}`, public: false });
+  return urls;
+}
+
+/** Адреса вебхука: через ngrok (из интернета), Tailscale и домашнюю сеть. Секрет создаётся при первом запросе. */
+export async function hookInfo(module: string, opts: { port: number; https: boolean; lan: string[] }): Promise<HookInfo> {
+  const path = `/hook/${module}/${secretOf(module, true)}`;
+  const urls = (await hubBases(opts)).map((u) => ({ ...u, url: u.url + path }));
   return { path, urls };
 }
 

@@ -3,12 +3,14 @@ import type { Context, Next } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { getSettings, updateSettings } from "./settings.ts";
 import { PNG_ICONS } from "./icons.ts";
+import { deviceFor } from "./mobile.ts";
 
 /*
  * Доступ:
  *  - с этого компьютера (localhost) — без пароля;
  *  - с телефона и других устройств — только после входа по паролю,
- *    а пока пароль не задан, доступ извне закрыт.
+ *    а пока пароль не задан, доступ извне закрыт;
+ *  - приложение LifeHub на телефоне — по токену устройства (server/mobile.ts).
  *
  * Защита от чужих сайтов, открытых в браузере на этом компьютере:
  *  - «локальный» доступ засчитывается только при Host = localhost/127.0.0.1
@@ -107,7 +109,8 @@ export async function authMiddleware(c: Context, next: Next) {
   if (p.startsWith("/api/") && c.req.method !== "GET" && c.req.header("x-lifehub") !== "1") {
     return c.json({ error: "Отсутствует заголовок X-LifeHub" }, 403);
   }
-  if (local || PUBLIC_PATHS.has(p) || validSession(c)) return next();
+  // Телефон с приложением LifeHub входит токеном устройства (server/mobile.ts).
+  if (local || PUBLIC_PATHS.has(p) || validSession(c) || deviceFor(c.req.header("x-lifehub-device"))) return next();
   if (p.startsWith("/api/")) return c.json({ error: "Требуется вход" }, 401);
   return c.redirect("/login");
 }

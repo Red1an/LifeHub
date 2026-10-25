@@ -4,7 +4,7 @@ import { request, getHost } from "../../sdk/core.ts";
 import { cn } from "../../sdk/format.ts";
 import { useHub, saveSettings, type HubSettings } from "../state.ts";
 import { copyText } from "../util.ts";
-import { BackgroundSection, RemoteSection, NgrokSection, AiSection, GoogleSection } from "./SystemSettings.tsx";
+import { BackgroundSection, RemoteSection, NgrokSection, AiSection, GoogleSection, PhoneAppSection, InAppSection } from "./SystemSettings.tsx";
 import { CopyIcon, DownloadIcon } from "../icons.tsx";
 
 const ACCENTS = [
@@ -59,6 +59,8 @@ export function SettingsPage() {
         <RemoteAccess />
       </Section>
 
+      <InAppSection />
+      <PhoneAppSection />
       <RemoteSection />
       <NgrokSection />
       <BackgroundSection />

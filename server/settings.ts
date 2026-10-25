@@ -42,6 +42,8 @@ export interface Settings {
   };
   /** Секреты входящих вебхуков модулей (server/hooks.ts): id модуля → секрет в адресе. */
   hooks?: Record<string, string>;
+  /** Телефоны с приложением LifeHub (server/mobile.ts): в настройках только хэш токена. */
+  devices?: { id: string; name: string; tokenHash: string; createdAt: number; seenAt?: number }[];
 }
 
 const DEFAULTS: Settings = {
