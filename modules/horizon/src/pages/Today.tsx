@@ -137,6 +137,7 @@ function Preview({ kind, card, wide }: { kind: Kind; card: CardDoc; wide: boolea
       );
     case "fact":
       return big("…" + (d as FactData).teaser.replace(/^./, (c) => c.toLowerCase()), 4);
+    case "rofl":
     case "quote":
       return (
         <>

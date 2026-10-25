@@ -43,10 +43,11 @@ export function titleOf(c: CardDoc): string {
       return `${d.year}: ${d.title}`;
     case "fact":
       return d.teaser;
+    case "rofl":
     case "quote":
       return `${d.author}: «${d.text}»`;
     case "joke":
-      return `${d.topic}: ${String(d.punchline).slice(0, 60)}`;
+      return `${d.topic}: ${String(d.punchline).slice(0, 60)}${d.sourceId ? ` #${d.sourceId}` : ""}`;
     case "puzzle":
       return `${d.topic}: ${d.title}`;
     case "tech":

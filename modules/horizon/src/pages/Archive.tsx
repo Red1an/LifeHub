@@ -60,7 +60,7 @@ export function Archive() {
                 .map((c) => (
                   <Link key={c.id} to={`/d/${day}`} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03]">
                     <span className="text-lg">{KIND_INFO[c.kind].icon}</span>
-                    <span className="min-w-0 flex-1 truncate text-[15px]">{titleOf(c)}</span>
+                    <span className="min-w-0 flex-1 truncate text-[15px]">{titleOf(c).replace(/ #\d+$/, "")}</span>
                     {c.reaction === 1 && <span className="text-sm">👍</span>}
                     {c.done && <span className="text-xs text-[#9aa3b8]">✓</span>}
                   </Link>
@@ -105,6 +105,15 @@ function Settings({ open, onClose }: { open: boolean; onClose: () => void }) {
         placeholder="Например: космос, история России, психология, ИИ, архитектура, музыка"
       />
       <p className="mt-1 text-xs text-muted">Нейронка подбирает историю, технологии, понятия и картины с оглядкой на это и на твои 👍/👎.</p>
+
+      <div className="mt-5">
+        <Switch
+          checked={prefs.uncensored}
+          onChange={(on) => setPrefs({ ...prefs, uncensored: on })}
+          label="🔞 Анекдоты и цитаты без цензуры"
+        />
+        <p className="mt-1 text-xs text-muted">Чёрный юмор, мат, зумерские шутки и рофляные цитаты. Выключи — будет только то, что можно рассказать бабушке.</p>
+      </div>
 
       <div className="mt-5 text-sm font-medium">Рубрики порции дня</div>
       <div className="mt-2 space-y-2.5">

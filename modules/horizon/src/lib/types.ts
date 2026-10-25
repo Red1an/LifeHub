@@ -1,12 +1,13 @@
 /** Виды карточек порции дня — в порядке показа. */
-export type Kind = "history" | "fact" | "quote" | "puzzle" | "tech" | "concept" | "word" | "joke" | "poem" | "art";
+export type Kind = "history" | "fact" | "quote" | "rofl" | "puzzle" | "tech" | "concept" | "word" | "joke" | "poem" | "art";
 
-export const KINDS: Kind[] = ["history", "fact", "quote", "puzzle", "tech", "concept", "word", "joke", "poem", "art"];
+export const KINDS: Kind[] = ["history", "fact", "quote", "rofl", "puzzle", "tech", "concept", "word", "joke", "poem", "art"];
 
 export const KIND_INFO: Record<Kind, { icon: string; label: string; color: string }> = {
   history: { icon: "📜", label: "В этот день", color: "#f5b453" },
   fact: { icon: "💡", label: "Знаете ли вы", color: "#5cc8f0" },
   quote: { icon: "💬", label: "Цитата", color: "#facc15" },
+  rofl: { icon: "😂", label: "Рофл-цитата", color: "#e879f9" },
   puzzle: { icon: "🧩", label: "Задачка", color: "#a78bfa" },
   tech: { icon: "🚀", label: "Технология", color: "#34d399" },
   concept: { icon: "🧠", label: "Понятие", color: "#fb7185" },
@@ -115,6 +116,10 @@ export interface QuoteData {
   meaning: string;
   /** Когда её к месту ввернуть. */
   use: string;
+  /** wise — умная (рубрика quote), rofl — смешная/дерзкая, может быть с матом (рубрика rofl). */
+  vibe?: "wise" | "rofl";
+  /** Авторство не подтверждено — «приписывают». */
+  attributed?: boolean;
   recall?: Recall;
 }
 
@@ -124,6 +129,10 @@ export interface JokeData {
   punchline: string;
   /** Когда к месту рассказать. */
   when: string;
+  /** Откуда взят (anekdot.ru): id, ссылка и рейтинг читателей. */
+  sourceId?: string;
+  source?: string;
+  rating?: number;
   recall?: Recall;
 }
 
@@ -201,9 +210,11 @@ export interface Prefs {
   off: Kind[];
   /** Сложность задачек 1–5, подстраивается сама. */
   level: number;
+  /** Анекдоты и цитаты без цензуры: чёрный юмор, мат, зумерский юмор. */
+  uncensored: boolean;
 }
 
-export const DEFAULT_PREFS: Prefs = { interests: "", off: [], level: 2 };
+export const DEFAULT_PREFS: Prefs = { interests: "", off: [], level: 2, uncensored: true };
 
 /**
  * kv quick — короткие задачки с вариантами для экрана «Зачем пришёл?» в Фокусе.

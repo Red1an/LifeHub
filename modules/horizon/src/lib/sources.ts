@@ -186,6 +186,45 @@ export async function loadPoem(author: string, firstLine: string): Promise<PoemT
   return null;
 }
 
+/* ───────────── анекдоты (anekdot.ru) ───────────── */
+
+export interface SiteJoke {
+  id: string;
+  text: string;
+  rating: number;
+  url: string;
+}
+
+/**
+ * Лучшие анекдоты по оценкам читателей anekdot.ru: за месяц, за год и лучшие прошлых лет в этот день.
+ * Политики там много — отбирает нейронка; рейтинг — первое число в data-r.
+ */
+export async function loadSiteJokes(day: string): Promise<SiteJoke[]> {
+  const [, m, d] = day.split("-");
+  const pages = [
+    "https://www.anekdot.ru/release/anekdot/month/",
+    "https://www.anekdot.ru/release/anekdot/year/",
+    `https://www.anekdot.ru/best/anekdot/${m}${d}/`,
+  ];
+  const out = new Map<string, SiteJoke>();
+  const htmls = await Promise.all(pages.map((u) => net.text(u).catch(() => "")));
+  for (const html of htmls) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    for (const box of Array.from(doc.querySelectorAll(".topicbox[data-t='j']"))) {
+      const id = box.getAttribute("data-id") ?? "";
+      const el = box.querySelector(".text");
+      if (!id || !el || out.has(id)) continue;
+      const tmp = doc.createElement("div");
+      tmp.innerHTML = el.innerHTML.replace(/<br\s*\/?>/gi, "\n");
+      const text = (tmp.textContent ?? "").replace(/ /g, " ").replace(/\n{3,}/g, "\n\n").trim();
+      const rating = Number((box.querySelector(".rates")?.getAttribute("data-r") ?? "").split(";")[0]) || 0;
+      if (text.length < 30 || text.length > 900) continue;
+      out.set(id, { id, text, rating, url: `https://www.anekdot.ru/id/${id}/` });
+    }
+  }
+  return [...out.values()].sort((a, b) => b.rating - a.rating);
+}
+
 /* ───────────── технологии ───────────── */
 
 export async function loadHackerNews(): Promise<{ title: string; url: string; points: number }[]> {

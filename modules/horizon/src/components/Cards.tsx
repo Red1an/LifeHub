@@ -122,10 +122,11 @@ function renderBody(kind: Kind, card: Card, open: boolean, expand: () => void): 
       return historyBody(card.data as HistoryData, open);
     case "fact":
       return factBody(card.data as FactData, open);
+    case "rofl":
     case "quote":
       return quoteBody(card.data as QuoteData, open);
     case "joke":
-      return { ...jokeBody(card.data as JokeData, open), content: <JokeContent d={card.data as JokeData} id={card.id} open={open} /> };
+      return { ...jokeBody(card.data as JokeData, open), more: undefined, content: <JokeContent d={card.data as JokeData} id={card.id} open={open} /> };
     case "puzzle": {
       const p = card.data as PuzzleData;
       return {
@@ -221,6 +222,7 @@ function factBody(d: FactData, open: boolean): Body {
 
 function quoteBody(d: QuoteData, open: boolean): Body {
   return {
+    extra: d.attributed ? "приписывают" : undefined,
     content: (
       <>
         <blockquote className="horizon-serif relative mt-4 pl-6 text-[21px] leading-snug sm:text-[23px]">
@@ -235,7 +237,7 @@ function quoteBody(d: QuoteData, open: boolean): Body {
           <div className="horizon-pop">
             <SubHead color="#facc15">Откуда она</SubHead>
             <Prose text={d.context} />
-            <SubHead color="#facc15">О чём на самом деле</SubHead>
+            <SubHead color="#facc15">{d.vibe === "rofl" ? "В чём соль" : "О чём на самом деле"}</SubHead>
             <Prose text={d.meaning} />
             <SubHead color="#facc15">Когда ввернуть</SubHead>
             <p className="border-l-2 border-[#facc15]/40 pl-3 text-[15px] leading-relaxed">{d.use}</p>
@@ -251,26 +253,36 @@ function jokeBody(d: JokeData, _open: boolean): Body {
   return { extra: d.topic, content: null, more: "Узнать концовку" };
 }
 
-function JokeContent({ d, id, open }: { d: JokeData; id: string; open: boolean }) {
+/** Концовка открывается своей кнопкой (и на полноэкранном экране тоже); у однострочника завязки нет — сразу целиком. */
+function JokeContent({ d, id }: { d: JokeData; id: string; open: boolean }) {
   const speak = useSpeak(id);
+  const [shown, setShown] = useState(!d.setup);
   return (
     <>
-      <Prose text={d.setup} className="mt-4" />
-      {open ? (
+      {d.setup && <Prose text={d.setup} className="mt-4" />}
+      {shown ? (
         <div className="horizon-pop">
           <Prose text={d.punchline} className="mt-3 !text-[18px] font-semibold !text-white" />
           <SubHead color="#2dd4bf">Когда рассказать</SubHead>
           <p className="text-[15px] leading-relaxed text-[#ece6da]">{d.when}</p>
+          {d.source && (
+            <div className="mt-3">
+              <ExtLink href={d.source}>{`anekdot.ru${d.rating ? ` · ★ ${d.rating}` : ""}`}</ExtLink>
+            </div>
+          )}
           {speak.supported && (
-            <button className="horizon-btn mt-4" onClick={() => speak.toggle(`${d.setup}
-
-${d.punchline}`, 1)}>
+            <button className="horizon-btn mt-4" onClick={() => speak.toggle([d.setup, d.punchline].filter(Boolean).join("\n\n"), 1)}>
               {speak.on ? "⏹ Стоп" : "🔊 Послушать, как звучит"}
             </button>
           )}
         </div>
       ) : (
-        <p className="mt-3 text-sm text-[#9aa3b8]">Угадаешь концовку?</p>
+        <>
+          <p className="mt-3 text-sm text-[#9aa3b8]">Угадаешь концовку?</p>
+          <button className="horizon-btn mt-3" style={{ color: "#2dd4bf" }} onClick={() => setShown(true)}>
+            Узнать концовку
+          </button>
+        </>
       )}
     </>
   );
