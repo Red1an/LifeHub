@@ -17,11 +17,19 @@
 - Проверка этапа N: хаб кладёт тесты этапов 1..N в `hub/StageNN`, поднимает Docker (`infra/`), гоняет `dotnet test`;
   `ownTests` из stage.md — сколько своих тестов (в `tests/`) нужно. Коллекция `builds` (id проекта): этап, passed/finished,
   план до кода, подсказки, выводы. Экран — `pages/Project.tsx`.
-- Ход этапа: план до кода (обязателен) → работа → все тесты зелёные → разбор, ревью, вопросы с собеседований, вывод → `finishStage`.
+- Ход этапа (`pages/Project.tsx` + `pages/StageGates.tsx`): план до кода → код и тесты → **обязательное ревью** нейронкой-тимлидом
+  (`STAGE_REVIEWER`, проходной балл `PASS_SCORE` = 7) → **защита**: интервьюер задаёт 5 вопросов по коду этапа (`defenseSystem`, тоже ≥ 7) →
+  разбор, вопросы с собеседований, вывод → `finishStage`. Ревью и защита видят diff от снимка начала этапа (run `snapshot` → `startCommit`).
+- **Открытые этапы** (`open: true` в stage.md, «проектируешь сам»): вместо короткого плана — дизайн-документ, его принимает `ARCHITECT`
+  (≥ 7), только потом код; тесты проверяют поведение снаружи.
+- Фронтенд-этапы (5+) проверяются браузером: хаб собирает `web/` (`npm run build`), тесты открывают его в Edge через Playwright.
 - Проверка самих этапов: `node server/devpath/verify.ts exchange` из корня хаба (нужен Docker).
 
 ## Тренировка (`/train`)
 
+- **Проектирование** — `designs/<id>.md` (условие, `---requirements`, `---think`, `---reference`), список — `src/data/designs.ts`,
+  экран — `pages/Designs.tsx` (`/designs`, `/design/:id`), коллекция `designs`. Оценка — `ARCHITECT` со сверкой по эталону
+  (`designTaskPrompt`), эталонный разбор открывается после первой попытки.
 - **Миссии** — `missions/<id>/` (mission.md + starter/ + tests/ + solution/), **каты** — `katas/<id>/` (kata.md + Tests.cs).
   Формат и правила — `missions/README.md`. Список и порядок — `src/data/workshop.ts`, разбор — `lib/workshop-parse.ts`.
 - Тесты гоняет хаб (`server/devpath`): модуль кладёт запрос в коллекцию `runs` (`useRunner` в `lib/workshop.ts`), хаб

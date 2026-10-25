@@ -52,7 +52,7 @@ export interface Card {
 
 export type ActivityKind =
   | "lesson" | "review" | "practice" | "bug" | "blitz" | "boss" | "interview" | "question" | "cards"
-  | "test" | "video" | "mistakes" | "mixed" | "placement" | "project" | "mission" | "kata" | "build";
+  | "test" | "video" | "mistakes" | "mixed" | "placement" | "project" | "mission" | "kata" | "build" | "design";
 
 /** Коллекция log: всё, за что начислен опыт. */
 export interface LogEntry {
@@ -279,4 +279,13 @@ export interface Graded {
   score: number;
   text: string;
   at: number;
+}
+
+/** Коллекция designs: задача System Design, id = id задачи. */
+export interface DesignState {
+  doc: string;
+  /** Лучшая оценка архитектора 0–10. */
+  best?: number;
+  last?: Graded;
+  attempts: number;
 }

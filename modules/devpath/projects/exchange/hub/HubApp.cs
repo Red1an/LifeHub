@@ -41,6 +41,21 @@ public sealed class ExchangeApp : WebApplicationFactory<Program>
         redis.GetServer(Redis).FlushDatabase();
     }
 
+    /// <summary>
+    /// То же, но молча, если Redis ещё нет (этапы 1–3). Новая база — чистый кэш: иначе кэш с версиями от прошлой базы
+    /// «перебивает» свежие данные (сделал бы и в жизни, пересоздавая базу).
+    /// </summary>
+    private static void FlushRedisIfRunning()
+    {
+        try
+        {
+            using var tcp = new System.Net.Sockets.TcpClient();
+            if (!tcp.ConnectAsync("localhost", 16379).Wait(300) || !tcp.Connected) return;
+        }
+        catch (Exception) { return; }
+        try { FlushRedis(); } catch (Exception) { }
+    }
+
     /* С этапа 7 у API есть вход. Тестам он передаёт администратора и ключ подписи через настройки. */
     public const string AdminLogin = "admin";
     public const string AdminPassword = "Hub-Admin-Passw0rd!";
@@ -70,6 +85,7 @@ public sealed class ExchangeApp : WebApplicationFactory<Program>
     {
         Database = database;
         _owner = owner;
+        if (owner && extra is null) FlushRedisIfRunning();
         _settings = new Dictionary<string, string>
         {
             ["ConnectionStrings:Exchange"] = ConnectionString,

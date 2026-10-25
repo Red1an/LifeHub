@@ -17,6 +17,7 @@ import { WorkshopPage } from "./pages/Workshop.tsx";
 import { MissionPage } from "./pages/Mission.tsx";
 import { KatasPage, KataPage } from "./pages/Kata.tsx";
 import { ProjectHome, StagePage } from "./pages/Project.tsx";
+import { DesignsPage, DesignPage } from "./pages/Designs.tsx";
 import { BUILD_PROJECTS } from "./data/projects-build.ts";
 import type { BuildState } from "./lib/types.ts";
 import { useDev } from "./lib/store.ts";
@@ -72,6 +73,8 @@ export default defineModule({
     "/": ProjectHome,
     "/build/:project/:n": StagePage,
     "/train": WorkshopPage,
+    "/designs": DesignsPage,
+    "/design/:id": DesignPage,
     "/learn": Today,
     "/mission/:id": MissionPage,
     "/katas": KatasPage,

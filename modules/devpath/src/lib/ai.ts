@@ -258,6 +258,17 @@ export function designReviewPrompt(c: { project: string; stage: string; story: s
   return [`Проект: ${c.project}. Этап: ${c.stage}`, `Контекст:\n${c.story}`, `Задание на проектирование:\n${c.brief}`, `Дизайн-документ ученика:\n${c.doc.slice(0, 20000)}`].join("\n\n");
 }
 
+/** Оценка задачи System Design: те же критерии, что у архитектора, плюс сверка с эталоном (сам эталон ученику не пересказывать). */
+export function designTaskPrompt(c: { title: string; task: string; requirements: string; reference: string; doc: string }) {
+  return [
+    `Задача System Design: ${c.title}`,
+    `Условие:\n${c.task}`,
+    `Требования:\n${c.requirements}`,
+    `Эталонный разбор (для сверки; не пересказывай его ученику — укажи, что упущено, вопросами):\n${c.reference}`,
+    `Дизайн-документ ученика:\n${c.doc.slice(0, 20000)}`,
+  ].join("\n\n");
+}
+
 /** Нормализация шагов от нейронки: отбрасываем битые. */
 function sanitizeSteps(steps: Step[]): Step[] {
   if (!Array.isArray(steps)) throw new Error("Нейронка вернула урок в неожиданном формате — попробуйте ещё раз");

@@ -1,0 +1,28 @@
+groups:
+  - name: exchange
+    rules:
+      # SLO: 99% заявок сводятся быстрее 100 мс. Пять минут подряд хуже — будим дежурного.
+      - alert: ExchangeMatchingSlow
+        expr: histogram_quantile(0.99, sum by (le) (rate(exchange_match_duration_seconds_bucket[5m]))) > 0.1
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "p99 сведения {{ $value | humanizeDuration }} — выше SLO 100 мс"
+
+      # Заявки шли и вдруг перестали: торговля встала (или сломался приём).
+      - alert: ExchangeNoOrders
+        expr: sum(rate(exchange_orders_total[5m])) == 0 and sum(rate(exchange_orders_total[1h] offset 5m)) > 0
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "10 минут ни одной заявки, хотя час назад торговали"
+
+      - alert: ExchangeHttpErrors
+        expr: sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])) / sum(rate(http_server_request_duration_seconds_count[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Больше 1% запросов падают с 5xx"

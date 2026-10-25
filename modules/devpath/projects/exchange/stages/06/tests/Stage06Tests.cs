@@ -108,12 +108,15 @@ public class Stage06Tests : IAsyncLifetime
         var me = await _http.Account("Аня", 10m);
         var (context, page, _) = await Web.Open($"/?account={me}");
         _context = context;
-        var open = 0;
+        // Открытым считаем сокет, который получил хотя бы один кадр (сервер сразу шлёт снимок) и не закрыт.
+        // Сокет, закрытый ещё до подключения, Playwright может так и не отметить закрытым — его не считаем.
+        var sockets = new System.Collections.Concurrent.ConcurrentDictionary<IWebSocket, bool>();
         page.WebSocket += (_, ws) =>
         {
-            Interlocked.Increment(ref open);
-            ws.Close += (_, _) => Interlocked.Decrement(ref open);
+            sockets[ws] = false;
+            ws.FrameReceived += (_, _) => sockets[ws] = true;
         };
+        int Open() => sockets.Count(p => p.Value && !p.Key.IsClosed);
         await page.ReloadAsync();
         await Assertions.Expect(page.GetByTestId("connection")).ToHaveAttributeAsync("data-state", "online");
         foreach (var t in new[] { "GAZP", "LKOH", "SBER", "GAZP" })
@@ -121,8 +124,8 @@ public class Stage06Tests : IAsyncLifetime
             await page.GetByTestId($"ticker-{t}").ClickAsync();
             await Assertions.Expect(page.GetByTestId("connection")).ToHaveAttributeAsync("data-state", "online");
         }
-        await Task.Delay(1500);
-        Assert.True(open <= 1, $"Открыто WebSocket-соединений: {open}. Старые подписки нужно закрывать (очистка в useEffect).");
+        await Web.Eventually(() => Task.FromResult(Open() <= 1),
+            $"не больше одного открытого WebSocket (сейчас {Open()}): старые подписки нужно закрывать (очистка в useEffect)", 5000);
 
         var mm = await _http.Account("ММ", 100_000m);
         await _http.Order(mm, "GAZP", "buy", 119m, 1);

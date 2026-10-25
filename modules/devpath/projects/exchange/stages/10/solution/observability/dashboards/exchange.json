@@ -1,0 +1,45 @@
+{
+  "uid": "exchange",
+  "title": "Биржа",
+  "schemaVersion": 39,
+  "time": { "from": "now-30m", "to": "now" },
+  "refresh": "5s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Заявки в секунду",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (ticker, side) (rate(exchange_orders_total[1m]))", "legendFormat": "{{ticker}} {{side}}" }]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Сделки в секунду",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (ticker) (rate(exchange_trades_total[1m]))", "legendFormat": "{{ticker}}" }]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Время сведения p50 / p99",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.5, sum by (le) (rate(exchange_match_duration_seconds_bucket[1m])))", "legendFormat": "p50" },
+        { "refId": "B", "expr": "histogram_quantile(0.99, sum by (le) (rate(exchange_match_duration_seconds_bucket[1m])))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Ошибки HTTP 5xx в секунду",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[1m]))", "legendFormat": "{{http_route}}" }]
+    }
+  ]
+}

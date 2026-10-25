@@ -5,7 +5,7 @@ import * as db from "../db.ts";
 import { emit, subscribe } from "../events.ts";
 import { getEntry } from "../registry.ts";
 import { getSettings } from "../settings.ts";
-import { exec, kataExists, missionDiff, missionExists, prepareMission, prepareProject, projectExists, runKata, runMission, runProject, snapshot } from "./runner.ts";
+import { exec, kataExists, missionDiff, missionExists, infraStop, prepareMission, prepareProject, projectExists, runKata, runMission, runProject, snapshot } from "./runner.ts";
 
 /*
  * «Мастерская» DevPath (modules/devpath): миссии — настоящие проекты в папке ~/DevPath/<id>,
@@ -103,7 +103,12 @@ async function handle(run: db.Doc): Promise<Record<string, unknown>> {
   }
   if (!fs.existsSync(work)) await prepare();
   const stage = Math.max(1, Math.min(99, Number(run.stage) || 1));
-  if (kind === "check") return { path: work, result: project ? await runProject(root, id, work, stage) : await runMission(root, id, work) };
+  if (kind === "check") {
+    if (!project) return { path: work, result: await runMission(root, id, work) };
+    const result = await runProject(root, id, work, stage);
+    scheduleInfraStop(work);
+    return { path: work, result };
+  }
   if (kind === "diff") return { path: work, diff: await missionDiff(work, project ? "hub" : "tests", typeof run.since === "string" ? run.since : undefined) };
   if (kind === "snapshot") return { path: work, commit: await snapshot(work, String(run.message ?? "Снимок DevPath").slice(0, 200)) };
   if (kind === "open") {
@@ -111,6 +116,18 @@ async function handle(run: db.Doc): Promise<Record<string, unknown>> {
     return { path: work };
   }
   throw new Error(`Неизвестное действие: ${kind}`);
+}
+
+/** Сколько инфраструктура проекта живёт без проверок: Docker с Kafka и мониторингом ест память, держать его постоянно незачем. */
+const INFRA_IDLE_MS = 20 * 60_000;
+const idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleInfraStop(work: string) {
+  clearTimeout(idleTimers.get(work));
+  idleTimers.set(work, setTimeout(() => {
+    idleTimers.delete(work);
+    void infraStop(work).catch((e) => console.error("[devpath] остановка инфраструктуры", e));
+  }, INFRA_IDLE_MS).unref());
 }
 
 let queue: Promise<void> = Promise.resolve();

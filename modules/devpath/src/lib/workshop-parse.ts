@@ -253,3 +253,28 @@ export function parseStage(n: number, source: string): Stage {
   }
   return s;
 }
+
+/* ───────────── задачи на проектирование (designs/<id>.md) ───────────── */
+
+export interface DesignTask {
+  id: string;
+  title: string;
+  level: 1 | 2 | 3;
+  minutes: number;
+  task: string;
+  requirements: string;
+  think: string;
+  reference: string;
+}
+
+export function parseDesign(id: string, source: string): DesignTask {
+  const { meta, body } = frontMatter(source);
+  const d: DesignTask = { id, title: meta.title ?? id, level: level(meta.level), minutes: Number(meta.minutes) || 45, task: "", requirements: "", think: "", reference: "" };
+  for (const b of blocks(body)) {
+    if (b.name === "") d.task = text(b.lines);
+    else if (b.name === "requirements") d.requirements = text(b.lines);
+    else if (b.name === "think") d.think = text(b.lines);
+    else if (b.name === "reference") d.reference = text(b.lines);
+  }
+  return d;
+}

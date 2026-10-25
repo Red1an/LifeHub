@@ -1,7 +1,7 @@
 {
   "id": "devpath",
   "name": "DevPath",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Обучение инженера на своём проекте: биржа с нуля до продакшена по этапам (PostgreSQL, Redis, Kafka, Grafana, Kubernetes, Java, ML), тесты проверяет хаб. Плюс тренировки, каты руками и справочник",
   "icon": "🧠",
   "author": "Red1an",

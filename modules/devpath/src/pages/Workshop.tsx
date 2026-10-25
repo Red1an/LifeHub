@@ -127,6 +127,7 @@ export function WorkshopPage() {
 
       <h2 className="mb-3 mt-2 text-lg font-bold">Ещё</h2>
       <div className="grid grid-cols-2 gap-3">
+        <Tile to="/designs" icon="🏛️" title="Проектирование" text="System Design: лента, чат, такси, билеты" color="#34d399" />
         <Tile to="/katas" icon="⌨️" title="Все каты" text={`${solvedKatas} из ${KATAS.length} решено`} color="#fbbf24" />
         <Tile to="/review" icon="🔁" title="Карточки" text={`${dev.due.length + dev.fresh.length} к повторению`} color="#8b5cf6" />
         <Tile to="/arena" icon="⚔️" title="Арена" text="Блиц, баги, боссы" color="#f43f5e" />

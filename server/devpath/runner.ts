@@ -277,13 +277,38 @@ function ownTestsRequired(root: string, id: string, stage: number) {
 }
 
 /** docker compose up для инфраструктуры проекта. null — всё поднялось, иначе текст ошибки. */
+const dockerReady = async (cwd: string) => (await exec("docker", ["version", "--format", "{{.Server.Version}}"], cwd, 20_000)).code === 0;
+
+/**
+ * Docker Desktop держать включённым не нужно: если движок не отвечает, запускаем Docker Desktop сами
+ * и ждём до 3 минут, пока поднимется.
+ */
+async function ensureDocker(cwd: string) {
+  if (await dockerReady(cwd)) return true;
+  const exe = path.join(process.env.ProgramFiles ?? "C:\\Program Files", "Docker", "Docker", "Docker Desktop.exe");
+  if (process.platform !== "win32" || !fs.existsSync(exe)) return false;
+  spawn(exe, [], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+  const until = Date.now() + 3 * 60_000;
+  while (Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 4000));
+    if (await dockerReady(cwd)) return true;
+  }
+  return false;
+}
+
 export async function infraUp(work: string): Promise<string | null> {
   const compose = path.join(work, "infra", "docker-compose.yml");
   if (!fs.existsSync(compose)) return null;
-  const ping = await exec("docker", ["version", "--format", "{{.Server.Version}}"], work, 20_000);
-  if (ping.code !== 0) return "Docker не запущен. Открой Docker Desktop, дождись «Engine running» и проверь ещё раз.";
+  if (!(await ensureDocker(work))) return "Docker не запустился. Открой Docker Desktop, дождись «Engine running» и проверь ещё раз.";
   const up = await exec("docker", ["compose", "-f", compose, "up", "-d", "--wait"], work, 10 * 60_000);
   return up.code === 0 ? null : `Инфраструктура не поднялась:\n${up.out.slice(-1500)}`;
+}
+
+/** Остановить инфраструктуру проекта (контейнеры и данные остаются, следующий up — за секунды). */
+export async function infraStop(work: string) {
+  const compose = path.join(work, "infra", "docker-compose.yml");
+  if (!fs.existsSync(compose) || !(await dockerReady(work))) return;
+  await exec("docker", ["compose", "-f", compose, "stop"], work, 2 * 60_000);
 }
 
 export async function runProject(root: string, id: string, work: string, stage: number): Promise<RunResult & { infraError?: string }> {
